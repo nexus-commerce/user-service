@@ -5,6 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+	"user-service/internal/config"
+	"user-service/internal/repository"
+	"user-service/internal/server"
+	"user-service/internal/service"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -19,18 +32,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
-	"user-service/internal/config"
-	"user-service/internal/repository"
-	"user-service/internal/server"
-	"user-service/internal/service"
 )
 
 const (
@@ -88,8 +89,8 @@ func run() error {
 		selector.UnaryServerInterceptor(
 			AuthInterceptor,
 			selector.MatchFunc(func(ctx context.Context, callMeta interceptors.CallMeta) bool {
-				return callMeta.FullMethod() == "/user.UserService/GetProfile" ||
-					callMeta.FullMethod() == "/user.UserService/UpdateProfile"
+				return callMeta.FullMethod() == pb.UserService_GetProfile_FullMethodName ||
+					callMeta.FullMethod() == pb.UserService_UpdateProfile_FullMethodName
 			}),
 		)))
 	pb.RegisterUserServiceServer(s, server.NewServer(svc))

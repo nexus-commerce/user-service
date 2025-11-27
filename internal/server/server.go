@@ -3,11 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
+	"user-service/internal/service"
+
 	pb "github.com/nexus-commerce/nexus-contracts-go/user/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"log"
-	"user-service/internal/service"
 )
 
 type Server struct {
