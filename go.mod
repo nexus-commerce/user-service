@@ -9,7 +9,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/nexus-commerce/nexus-contracts-go v0.0.2
+	github.com/nexus-commerce/nexus-contracts-go v0.0.7
 	github.com/segmentio/kafka-go v0.4.49
 	golang.org/x/crypto v0.42.0
 	google.golang.org/grpc v1.76.0

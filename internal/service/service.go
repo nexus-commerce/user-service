@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	pb "github.com/nexus-commerce/nexus-contracts-go/user/v1"
 	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
@@ -82,23 +83,23 @@ func (s *Service) Authenticate(ctx context.Context, email, password string) (str
 	return token.SignedString([]byte(secret))
 }
 
-func (s *Service) Register(ctx context.Context, firstName, lastName, email, password1, password2 string) (int64, error) {
+func (s *Service) Register(ctx context.Context, firstName, lastName, email, password1, password2 string) (*model.User, error) {
 	if password1 != password2 {
-		return 0, ErrMismatchPassword
+		return nil, ErrMismatchPassword
 	}
 
 	_, err := s.repo.GetUserByEmail(ctx, email)
 	if err == nil {
-		return 0, ErrUserEmailAlreadyExists
+		return nil, ErrUserEmailAlreadyExists
 	}
 
 	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, err
+		return nil, err
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password1), bcrypt.DefaultCost)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	user := &model.User{
@@ -111,7 +112,7 @@ func (s *Service) Register(ctx context.Context, firstName, lastName, email, pass
 
 	userID, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	eventData := UserData{
@@ -124,10 +125,10 @@ func (s *Service) Register(ctx context.Context, firstName, lastName, email, pass
 
 	err = s.sendUserRegisteredEvent(ctx, eventData)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return userID, nil
+	return user, nil
 }
 
 func (s *Service) GetProfile(ctx context.Context, userID int64) (*model.User, error) {
@@ -142,20 +143,34 @@ func (s *Service) GetProfile(ctx context.Context, userID int64) (*model.User, er
 	return user, nil
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, userID int64, email, firstName, lastName string) error {
+func (s *Service) UpdateProfile(ctx context.Context, userID int64, r *pb.UpdateProfileRequest) (*model.User, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrUserNotFound
+			return nil, ErrUserNotFound
 		}
-		return err
+		return nil, err
 	}
 
-	user.FirstName = firstName
-	user.LastName = lastName
-	user.Email = email
+	if r.GetUpdateMask() != nil {
+		for _, path := range r.GetUpdateMask().GetPaths() {
+			switch path {
+			case "first_name":
+				user.FirstName = r.GetUser().GetFirstName()
+			case "last_name":
+				user.LastName = r.GetUser().GetLastName()
+			case "email":
+				user.Email = r.GetUser().GetEmail()
+			}
+		}
+	}
 
-	return s.repo.UpdateUser(ctx, user)
+	err = s.repo.UpdateUser(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (s *Service) sendUserRegisteredEvent(ctx context.Context, eventData UserData) error {

@@ -40,7 +40,7 @@ func (s *Server) Authenticate(ctx context.Context, r *pb.AuthenticateRequest) (*
 }
 
 func (s *Server) Register(ctx context.Context, r *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	userID, err := s.svc.Register(ctx, r.GetFirstName(), r.GetLastName(), r.GetEmail(), r.GetPassword(), r.GetPasswordConfirmation())
+	user, err := s.svc.Register(ctx, r.GetFirstName(), r.GetLastName(), r.GetEmail(), r.GetPassword(), r.GetPasswordConfirmation())
 	if err != nil {
 		log.Println(err)
 		switch {
@@ -53,7 +53,12 @@ func (s *Server) Register(ctx context.Context, r *pb.RegisterRequest) (*pb.Regis
 	}
 
 	return &pb.RegisterResponse{
-		UserId: userID,
+		User: &pb.User{
+			Id:        user.ID,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+		},
 	}, nil
 }
 
@@ -74,21 +79,23 @@ func (s *Server) GetProfile(ctx context.Context, _ *pb.GetProfileRequest) (*pb.G
 	}
 
 	return &pb.GetProfileResponse{
-		UserId:    user.ID,
-		Email:     user.Email,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
+		User: &pb.User{
+			Id:        user.ID,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+		},
 	}, nil
 }
 func (s *Server) UpdateProfile(ctx context.Context, r *pb.UpdateProfileRequest) (*pb.UpdateProfileResponse, error) {
 	userID, ok := ctx.Value("user-id").(int)
 	if !ok {
-		return nil, status.Error(codes.FailedPrecondition, "user id missing") // return FAILED_PRECONDITION status here as the system should never get into this state
+		return nil, status.Error(codes.FailedPrecondition, "user id missing") // return FAILED_PRECONDITION
 	}
 
 	userIDInt := int64(userID)
 
-	err := s.svc.UpdateProfile(ctx, userIDInt, r.GetEmail(), r.GetFirstName(), r.GetLastName())
+	p, err := s.svc.UpdateProfile(ctx, userIDInt, r)
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) {
 			return nil, status.Error(codes.NotFound, err.Error())
@@ -96,5 +103,12 @@ func (s *Server) UpdateProfile(ctx context.Context, r *pb.UpdateProfileRequest) 
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &pb.UpdateProfileResponse{}, nil
+	return &pb.UpdateProfileResponse{
+		User: &pb.User{
+			Id:        p.ID,
+			Email:     p.Email,
+			FirstName: p.FirstName,
+			LastName:  p.LastName,
+		},
+	}, nil
 }
