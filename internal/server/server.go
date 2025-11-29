@@ -27,7 +27,7 @@ func (s *Server) Authenticate(ctx context.Context, r *pb.AuthenticateRequest) (*
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
-			return nil, status.Error(codes.NotFound, err.Error())
+			return nil, status.Error(codes.Unauthenticated, err.Error())
 		case errors.Is(err, service.ErrWrongPassword):
 			return nil, status.Error(codes.Unauthenticated, err.Error())
 		}
@@ -49,7 +49,7 @@ func (s *Server) Register(ctx context.Context, r *pb.RegisterRequest) (*pb.Regis
 		case errors.Is(err, service.ErrUserEmailAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		}
-		return nil, err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	return &pb.RegisterResponse{
@@ -65,7 +65,7 @@ func (s *Server) Register(ctx context.Context, r *pb.RegisterRequest) (*pb.Regis
 func (s *Server) GetProfile(ctx context.Context, _ *pb.GetProfileRequest) (*pb.GetProfileResponse, error) {
 	userID, ok := ctx.Value("user-id").(int)
 	if !ok {
-		return nil, status.Error(codes.FailedPrecondition, "user id missing") // return FAILED_PRECONDITION status here as the system should never get into this state
+		return nil, status.Error(codes.Internal, "user id missing")
 	}
 
 	userIDInt := int64(userID)
@@ -90,7 +90,7 @@ func (s *Server) GetProfile(ctx context.Context, _ *pb.GetProfileRequest) (*pb.G
 func (s *Server) UpdateProfile(ctx context.Context, r *pb.UpdateProfileRequest) (*pb.UpdateProfileResponse, error) {
 	userID, ok := ctx.Value("user-id").(int)
 	if !ok {
-		return nil, status.Error(codes.FailedPrecondition, "user id missing") // return FAILED_PRECONDITION
+		return nil, status.Error(codes.Internal, "user id missing")
 	}
 
 	userIDInt := int64(userID)
