@@ -30,6 +30,11 @@ func (s *Server) Authenticate(ctx context.Context, r *pb.AuthenticateRequest) (*
 			return nil, status.Error(codes.Unauthenticated, err.Error())
 		case errors.Is(err, service.ErrWrongPassword):
 			return nil, status.Error(codes.Unauthenticated, err.Error())
+		case errors.Is(err, service.ErrInvalidEmail):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, service.ErrInvalidPassword):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -48,6 +53,14 @@ func (s *Server) Register(ctx context.Context, r *pb.RegisterRequest) (*pb.Regis
 			return nil, status.Error(codes.FailedPrecondition, err.Error())
 		case errors.Is(err, service.ErrUserEmailAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
+		case errors.Is(err, service.ErrInvalidEmail):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, service.ErrInvalidPassword):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, service.ErrInvalidFirstName):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, service.ErrInvalidLastName):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}

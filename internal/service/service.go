@@ -28,6 +28,10 @@ var (
 	ErrMismatchPassword       = errors.New("passwords do not match")
 	ErrUserEmailAlreadyExists = errors.New("user email already exists")
 	ErrSendingEvent           = errors.New("error sending event")
+	ErrInvalidEmail           = errors.New("invalid email")
+	ErrInvalidPassword        = errors.New("invalid password")
+	ErrInvalidFirstName       = errors.New("invalid first name")
+	ErrInvalidLastName        = errors.New("invalid last name")
 )
 
 type UserRegisteredEvent struct {
@@ -59,6 +63,14 @@ func New(repo *repository.Repository, userRegisteredWriter *kafka.Writer) *Servi
 }
 
 func (s *Service) Authenticate(ctx context.Context, email, password string) (string, error) {
+	if email == "" {
+		return "", ErrInvalidEmail
+	}
+
+	if password == "" {
+		return "", ErrInvalidPassword
+	}
+
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -84,6 +96,22 @@ func (s *Service) Authenticate(ctx context.Context, email, password string) (str
 }
 
 func (s *Service) Register(ctx context.Context, firstName, lastName, email, password1, password2 string) (*model.User, error) {
+	if firstName == "" {
+		return nil, ErrInvalidFirstName
+	}
+
+	if lastName == "" {
+		return nil, ErrInvalidLastName
+	}
+
+	if email == "" {
+		return nil, ErrInvalidEmail
+	}
+
+	if password1 == "" || password2 == "" {
+		return nil, ErrInvalidPassword
+	}
+
 	if password1 != password2 {
 		return nil, ErrMismatchPassword
 	}
@@ -125,7 +153,7 @@ func (s *Service) Register(ctx context.Context, firstName, lastName, email, pass
 
 	err = s.sendUserRegisteredEvent(ctx, eventData)
 	if err != nil {
-		return nil, err
+		return nil, ErrSendingEvent
 	}
 
 	return user, nil
