@@ -1,0 +1,7 @@
+.idea
+.git
+.env
+.air.toml
+tmp
+*.md
+.github

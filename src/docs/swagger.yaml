@@ -1,0 +1,284 @@
+basePath: /api
+definitions:
+  http.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  http.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  http.loginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  http.profileResponse:
+    properties:
+      user:
+        $ref: '#/definitions/http.userResponse'
+    type: object
+  http.registerRequest:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      password:
+        type: string
+      passwordConfirmation:
+        type: string
+    type: object
+  http.registerResponse:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      id:
+        type: string
+      lastName:
+        type: string
+    type: object
+  http.updateProfileRequest:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+    type: object
+  http.userResponse:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      id:
+        type: string
+      lastName:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: This is the API documentation for the User Service
+  title: User Service API
+  version: 0.1.0
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user by email and password and returns a JWT token
+      parameters:
+      - description: User credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.loginResponse'
+        "400":
+          description: Invalid request, malformed email or invalid password
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      summary: Login
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account and publishes a user.registered event
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.registerResponse'
+        "400":
+          description: Invalid request, empty or too long fields, malformed email
+            or passwords do not match
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      summary: Register
+      tags:
+      - Auth
+  /docs:
+    get:
+      description: Serves the interactive API reference UI
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+        "401":
+          description: Missing or invalid credentials
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BasicAuth: []
+      summary: API Documentation
+      tags:
+      - System
+  /docs/swagger.json:
+    get:
+      description: Serves the Swagger specification used by the API reference UI
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Swagger 2.0 specification
+          schema:
+            type: object
+        "401":
+          description: Missing or invalid credentials
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BasicAuth: []
+      summary: API Specification
+      tags:
+      - System
+  /health:
+    get:
+      description: Returns 200 OK when the service is healthy
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Health Check
+      tags:
+      - System
+  /users/profile:
+    get:
+      description: Returns the profile of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.profileResponse'
+        "401":
+          description: Missing or invalid token
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get profile
+      tags:
+      - Users
+    patch:
+      consumes:
+      - application/json
+      description: Partially updates the profile of the authenticated user; only provided
+        fields are changed
+      parameters:
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.profileResponse'
+        "400":
+          description: Invalid request, empty or too long fields or malformed email
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "401":
+          description: Missing or invalid token
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update profile
+      tags:
+      - Users
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  BearerAuth:
+    description: JWT token in the format "Bearer {token}"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

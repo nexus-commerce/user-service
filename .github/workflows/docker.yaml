@@ -20,7 +20,6 @@ jobs:
           username: voloshmiak
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Цей крок автоматично генерує правильні теги!
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
