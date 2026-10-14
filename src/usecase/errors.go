@@ -12,7 +12,6 @@ var (
 	ErrUserNotFound  = errors.New("user not found")
 	ErrWrongPassword = errors.New("wrong password")
 	ErrEmailTaken    = errors.New("user email already exists")
-	ErrPublishEvent  = errors.New("publish event")
 )
 
 var (

@@ -6,15 +6,15 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type GetProfileUsers interface {
+type getProfileUsers interface {
 	ByID(ctx context.Context, id string) (*entity.User, error)
 }
 
 type GetProfile struct {
-	users GetProfileUsers
+	users getProfileUsers
 }
 
-func NewGetProfile(users GetProfileUsers) *GetProfile {
+func NewGetProfile(users getProfileUsers) *GetProfile {
 	return &GetProfile{
 		users: users,
 	}

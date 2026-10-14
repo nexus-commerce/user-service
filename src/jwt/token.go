@@ -1,4 +1,4 @@
-package token
+package jwt
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ type claims struct {
 	jwt.RegisteredClaims
 }
 
-type JWT struct {
+type Tokens struct {
 	secret []byte
 	issuer string
 }
@@ -29,29 +29,34 @@ type Options struct {
 	Issuer string
 }
 
-func New(opts Options) *JWT {
-	return &JWT{
+func NewTokens(opts Options) *Tokens {
+	return &Tokens{
 		secret: []byte(opts.Secret),
 		issuer: opts.Issuer,
 	}
 }
 
-func (j *JWT) Issue(userID string) (string, error) {
+func (t *Tokens) Issue(userID string) (string, error) {
 	c := claims{
 		UserID:    userID,
-		Issuer:    j.issuer,
+		Issuer:    t.issuer,
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 	}
 
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(j.secret)
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(t.secret)
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
+
+	return token, nil
 }
 
-func (j *JWT) Parse(token string) (string, error) {
+func (t *Tokens) Parse(token string) (string, error) {
 	var c claims
-	keyFunc := func(*jwt.Token) (any, error) { return j.secret, nil }
+	keyFunc := func(*jwt.Token) (any, error) { return t.secret, nil }
 	_, err := jwt.ParseWithClaims(token, &c, keyFunc,
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithIssuer(j.issuer),
+		jwt.WithIssuer(t.issuer),
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {

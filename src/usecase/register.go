@@ -7,27 +7,21 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type RegisterUsers interface {
-	Create(ctx context.Context, user *entity.User) error
+type registerUsers interface {
+	CreateWithMessage(ctx context.Context, user *entity.User, msg Message) error
 }
 
-type Events interface {
-	UserRegistered(ctx context.Context, user *entity.User) error
-}
-
-type Transactor interface {
-	WithinTx(ctx context.Context, fn func(ctx context.Context) error) error
+type registerEvents interface {
+	UserRegistered(user *entity.User) (Message, error)
 }
 
 type Register struct {
-	tx     Transactor
-	users  RegisterUsers
-	events Events
+	users  registerUsers
+	events registerEvents
 }
 
-func NewRegister(tx Transactor, users RegisterUsers, events Events) *Register {
+func NewRegister(users registerUsers, events registerEvents) *Register {
 	return &Register{
-		tx:     tx,
 		users:  users,
 		events: events,
 	}
@@ -76,15 +70,12 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (*entity.User,
 		return nil, err
 	}
 
-	err = r.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := r.users.Create(ctx, user); err != nil {
-			return err
-		}
-		if err := r.events.UserRegistered(ctx, user); err != nil {
-			return fmt.Errorf("%w: %v", ErrPublishEvent, err)
-		}
-		return nil
-	})
+	msg, err := r.events.UserRegistered(user)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.users.CreateWithMessage(ctx, user, msg)
 	if err != nil {
 		return nil, err
 	}

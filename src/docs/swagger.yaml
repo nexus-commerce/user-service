@@ -168,6 +168,45 @@ paths:
       summary: API Documentation
       tags:
       - System
+  /docs/asyncapi:
+    get:
+      description: Serves the interactive AsyncAPI reference UI for the events this
+        service publishes
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+        "401":
+          description: Missing or invalid credentials
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BasicAuth: []
+      summary: Events Documentation
+      tags:
+      - System
+  /docs/asyncapi.yaml:
+    get:
+      description: Serves the AsyncAPI specification of the events this service publishes
+      produces:
+      - application/yaml
+      responses:
+        "200":
+          description: AsyncAPI 3.0 specification
+          schema:
+            type: string
+        "401":
+          description: Missing or invalid credentials
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BasicAuth: []
+      summary: Events Specification
+      tags:
+      - System
   /docs/swagger.json:
     get:
       description: Serves the Swagger specification used by the API reference UI

@@ -7,20 +7,20 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type LoginUsers interface {
+type loginUsers interface {
 	ByEmail(ctx context.Context, email entity.Email) (*entity.User, error)
 }
 
-type Tokens interface {
+type tokenIssuer interface {
 	Issue(userID string) (string, error)
 }
 
 type Login struct {
-	users  LoginUsers
-	tokens Tokens
+	users  loginUsers
+	tokens tokenIssuer
 }
 
-func NewLogin(users LoginUsers, tokens Tokens) *Login {
+func NewLogin(users loginUsers, tokens tokenIssuer) *Login {
 	return &Login{
 		users:  users,
 		tokens: tokens,

@@ -162,6 +162,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/docs/asyncapi": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Serves the interactive AsyncAPI reference UI for the events this service publishes",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Events Documentation",
+                "responses": {
+                    "200": {
+                        "description": "HTML page",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/docs/asyncapi.yaml": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Serves the AsyncAPI specification of the events this service publishes",
+                "produces": [
+                    "application/yaml"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Events Specification",
+                "responses": {
+                    "200": {
+                        "description": "AsyncAPI 3.0 specification",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/docs/swagger.json": {
             "get": {
                 "security": [

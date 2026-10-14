@@ -1,0 +1,111 @@
+asyncapi: 3.0.0
+
+info:
+  title: User Service Events
+  version: 0.1.0
+  description: |
+    Events published by the User Service.
+
+    Events are delivered at least once: consumers must deduplicate them by `eventId`.
+    Events about the same user share a message key, so they keep their order
+    within a partition.
+
+defaultContentType: application/json
+
+servers:
+  kafka:
+    host: '{host}'
+    protocol: kafka
+    description: Kafka cluster of the environment.
+    variables:
+      host:
+        description: Broker address (host:port); depends on the environment.
+        default: localhost:9092
+
+channels:
+  users:
+    address: users
+    description: Lifecycle events of user accounts.
+    messages:
+      userRegistered:
+        $ref: '#/components/messages/UserRegistered'
+
+operations:
+  publishUserRegistered:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Announces that a new user has signed up.
+    messages:
+      - $ref: '#/channels/users/messages/userRegistered'
+
+components:
+  messages:
+    UserRegistered:
+      name: UserRegistered
+      title: User registered
+      summary: A new user account was created.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserRegisteredEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the registered user.
+      examples:
+        - name: userRegistered
+          summary: A user signs up.
+          payload:
+            eventId: 0b8f3c1e-6d2a-4f7e-9a51-2c4d8e9f1a3b
+            eventType: user.registered
+            timestamp: '2026-10-14T19:30:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              email: jane.doe@example.com
+              firstName: Jane
+              lastName: Doe
+              createdAt: '2026-10-14T19:30:00Z'
+
+  schemas:
+    UserRegisteredEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.registered
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserRegisteredData'
+
+    UserRegisteredData:
+      type: object
+      required: [userId, email, firstName, lastName, createdAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

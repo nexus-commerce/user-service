@@ -2,11 +2,12 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/nexus-commerce/user-service/src/publisher"
+	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
 const batchTimeout = 10 * time.Millisecond
@@ -26,30 +27,21 @@ func NewProducer(addr string) *Producer {
 	}
 }
 
-func (p *Producer) Publish(ctx context.Context, msgs ...publisher.Message) error {
-	kmsgs := make([]kafka.Message, 0, len(msgs))
-	for _, m := range msgs {
-		kmsgs = append(kmsgs, kafka.Message{
-			Topic:   m.Topic,
-			Key:     m.Key,
-			Value:   m.Value,
-			Headers: toHeaders(m.Headers),
-		})
+func (p *Producer) Publish(ctx context.Context, msgs ...usecase.Message) error {
+	kmsgs := make([]kafka.Message, len(msgs))
+	for i, m := range msgs {
+		kmsgs[i] = kafka.Message{
+			Topic: m.Topic,
+			Key:   []byte(m.Key),
+			Value: m.Value,
+		}
 	}
-	return p.writer.WriteMessages(ctx, kmsgs...)
+	if err := p.writer.WriteMessages(ctx, kmsgs...); err != nil {
+		return fmt.Errorf("publish %d messages: %w", len(kmsgs), err)
+	}
+	return nil
 }
 
 func (p *Producer) Close() error {
 	return p.writer.Close()
-}
-
-func toHeaders(h map[string]string) []kafka.Header {
-	if len(h) == 0 {
-		return nil
-	}
-	headers := make([]kafka.Header, 0, len(h))
-	for k, v := range h {
-		headers = append(headers, kafka.Header{Key: k, Value: []byte(v)})
-	}
-	return headers
 }

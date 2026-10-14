@@ -89,7 +89,7 @@ services:
     command: >
       kafka-topics --create --if-not-exists
       --bootstrap-server kafka:29092
-      --topic ${KAFKA_TOPIC_USERS}
+      --topic users
       --partitions 3
       --replication-factor 1
     depends_on:

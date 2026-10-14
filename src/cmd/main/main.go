@@ -16,11 +16,12 @@ import (
 	"github.com/nexus-commerce/user-service/src/config"
 	httpctrl "github.com/nexus-commerce/user-service/src/controller/http"
 	"github.com/nexus-commerce/user-service/src/docs"
+	"github.com/nexus-commerce/user-service/src/jwt"
 	"github.com/nexus-commerce/user-service/src/kafka"
 	"github.com/nexus-commerce/user-service/src/lifecycle"
+	"github.com/nexus-commerce/user-service/src/messaging"
 	"github.com/nexus-commerce/user-service/src/postgres"
-	"github.com/nexus-commerce/user-service/src/publisher"
-	"github.com/nexus-commerce/user-service/src/token"
+	"github.com/nexus-commerce/user-service/src/relay"
 	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
@@ -79,26 +80,23 @@ func run() error {
 		}
 	}()
 
-	outbox := postgres.NewOutbox(db)
-	events := publisher.NewEvents(outbox, publisher.Topics{
-		Users: cfg.Kafka.Topics.Users,
-	})
-
-	relay := publisher.NewRelay(outbox, producer, publisher.RelayOptions{
-		Interval:  cfg.Outbox.Interval,
-		BatchSize: cfg.Outbox.BatchSize,
-	})
-
 	users := postgres.NewUsers(db)
-	tokens := token.New(token.Options{
+	outbox := postgres.NewOutbox(db)
+	tokens := jwt.NewTokens(jwt.Options{
 		Secret: cfg.JWT.Secret,
 		Issuer: cfg.JWT.Issuer,
 	})
 
 	login := usecase.NewLogin(users, tokens)
-	register := usecase.NewRegister(db, users, events)
+	register := usecase.NewRegister(users, messaging.NewEvents())
 	getProfile := usecase.NewGetProfile(users)
 	updateProfile := usecase.NewUpdateProfile(users)
+	relayMessages := usecase.NewRelayMessages(outbox, producer)
+
+	outboxRelay := relay.New(relayMessages, relay.Options{
+		Interval:  cfg.Outbox.Interval,
+		BatchSize: cfg.Outbox.BatchSize,
+	})
 
 	server := httpctrl.New(httpctrl.Options{
 		Port:       cfg.HTTP.Port,
@@ -107,8 +105,10 @@ func run() error {
 	})
 
 	server.Register(
-		httpctrl.NewDocs(),
+		httpctrl.NewOpenAPIDocs(),
 		httpctrl.NewOpenAPI(docs.SwaggerInfo.ReadDoc()),
+		httpctrl.NewAsyncAPIDocs(),
+		httpctrl.NewAsyncAPI(docs.AsyncAPI),
 		httpctrl.NewHealth(),
 		httpctrl.NewLogin(login),
 		httpctrl.NewRegister(register),
@@ -116,7 +116,7 @@ func run() error {
 		httpctrl.NewUpdateProfile(updateProfile),
 	)
 
-	return lifecycle.Run(ctx, server, relay)
+	return lifecycle.Run(ctx, server, outboxRelay)
 }
 
 func loadDotEnv() error {

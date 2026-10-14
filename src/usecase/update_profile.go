@@ -6,16 +6,15 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type UpdateProfileUsers interface {
-	ByID(ctx context.Context, id string) (*entity.User, error)
-	Update(ctx context.Context, user *entity.User) error
+type updateProfileUsers interface {
+	UpdateByID(ctx context.Context, id string, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
 }
 
 type UpdateProfile struct {
-	users UpdateProfileUsers
+	users updateProfileUsers
 }
 
-func NewUpdateProfile(users UpdateProfileUsers) *UpdateProfile {
+func NewUpdateProfile(users updateProfileUsers) *UpdateProfile {
 	return &UpdateProfile{
 		users: users,
 	}
@@ -28,28 +27,28 @@ type ProfileUpdate struct {
 	Email     *entity.Email
 }
 
+func (pu ProfileUpdate) empty() bool {
+	return pu.FirstName == nil && pu.LastName == nil && pu.Email == nil
+}
+
 func (up *UpdateProfile) Execute(ctx context.Context, update ProfileUpdate) (*entity.User, error) {
-	user, err := up.users.ByID(ctx, update.UserID)
-	if err != nil {
-		return nil, err
-	}
-	if update.FirstName != nil {
-		user.FirstName = *update.FirstName
-	}
-	if update.LastName != nil {
-		user.LastName = *update.LastName
-	}
-	if update.Email != nil {
-		user.Email = *update.Email
-	}
+	return up.users.UpdateByID(ctx, update.UserID, func(user *entity.User) (bool, error) {
+		if update.empty() {
+			return false, nil
+		}
+		if update.FirstName != nil {
+			user.FirstName = *update.FirstName
+		}
+		if update.LastName != nil {
+			user.LastName = *update.LastName
+		}
+		if update.Email != nil {
+			user.Email = *update.Email
+		}
 
-	if err = user.Profile.Validate(); err != nil {
-		return nil, err
-	}
-
-	if err = up.users.Update(ctx, user); err != nil {
-		return nil, err
-	}
-
-	return user, nil
+		if err := user.Profile.Validate(); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
 }

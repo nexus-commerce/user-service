@@ -41,12 +41,7 @@ type HTTP struct {
 	Port string `env:"HTTP_PORT" envDefault:"80"`
 }
 
-type Topics struct {
-	Users string `env:"KAFKA_TOPIC_USERS,required"`
-}
-
 type Kafka struct {
-	Topics
 	Host string `env:"KAFKA_HOST,required"`
 	Port string `env:"KAFKA_PORT" envDefault:"29092"`
 }

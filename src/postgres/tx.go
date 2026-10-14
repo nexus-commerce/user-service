@@ -7,25 +7,13 @@ import (
 	"fmt"
 )
 
-type txKey struct{}
-
-type querier interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
-func (d *DB) WithinTx(ctx context.Context, fn func(ctx context.Context) error) error {
-	if _, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return fn(ctx)
-	}
-
+func (d *DB) runInTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	tx, err := d.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 
-	if err = fn(context.WithValue(ctx, txKey{}, tx)); err != nil {
+	if err = fn(tx); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
 			return errors.Join(err, fmt.Errorf("rollback tx: %w", rbErr))
 		}
@@ -36,11 +24,4 @@ func (d *DB) WithinTx(ctx context.Context, fn func(ctx context.Context) error) e
 		return fmt.Errorf("commit tx: %w", err)
 	}
 	return nil
-}
-
-func (d *DB) querier(ctx context.Context) querier {
-	if tx, ok := ctx.Value(txKey{}).(*sql.Tx); ok {
-		return tx
-	}
-	return d.pool
 }

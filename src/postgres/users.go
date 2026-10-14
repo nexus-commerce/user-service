@@ -37,34 +37,97 @@ func NewUsers(db *DB) *Users {
 }
 
 func (u *Users) ByEmail(ctx context.Context, email entity.Email) (*entity.User, error) {
-	query := `SELECT * FROM users WHERE email = $1`
+	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE email = $1`
 
-	user := new(entity.User)
-
-	err := u.db.querier(ctx).QueryRowContext(ctx, query, email).Scan(
-		&user.ID,
-		&user.FirstName,
-		&user.LastName,
-		&user.Email,
-		&user.PasswordHash,
-		&user.CreatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, usecase.ErrUserNotFound
-		}
+	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email))
+	if err != nil && !errors.Is(err, usecase.ErrUserNotFound) {
 		return nil, fmt.Errorf("select user by email: %w", err)
 	}
-
-	return user, nil
+	return user, err
 }
 
 func (u *Users) ByID(ctx context.Context, id string) (*entity.User, error) {
-	query := `SELECT * FROM users WHERE id = $1`
+	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1`
 
+	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id))
+	if err != nil && !errors.Is(err, usecase.ErrUserNotFound) {
+		return nil, fmt.Errorf("select user by id: %w", err)
+	}
+	return user, err
+}
+
+func (u *Users) CreateWithMessage(ctx context.Context, user *entity.User, msg usecase.Message) error {
+	userQuery := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
+	outboxQuery := `INSERT INTO outbox (topic, key, value) VALUES ($1, $2, $3)`
+
+	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, userQuery,
+			user.ID,
+			user.FirstName,
+			user.LastName,
+			user.Email,
+			user.PasswordHash,
+			user.CreatedAt,
+		)
+		if err != nil {
+			if isEmailTaken(err) {
+				return usecase.ErrEmailTaken
+			}
+			return fmt.Errorf("insert user: %w", err)
+		}
+
+		_, err = tx.ExecContext(ctx, outboxQuery, msg.Topic, []byte(msg.Key), msg.Value)
+		if err != nil {
+			return fmt.Errorf("insert outbox message: %w", err)
+		}
+		return nil
+	})
+}
+
+func (u *Users) UpdateByID(ctx context.Context, id string, updateFn func(user *entity.User) (bool, error)) (*entity.User, error) {
+	selectQuery := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1 FOR UPDATE`
+	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
+
+	var user *entity.User
+	err := u.db.runInTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		user, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id))
+		if err != nil {
+			if errors.Is(err, usecase.ErrUserNotFound) {
+				return err
+			}
+			return fmt.Errorf("select user for update: %w", err)
+		}
+
+		updated, err := updateFn(user)
+		if err != nil || !updated {
+			return err
+		}
+
+		_, err = tx.ExecContext(ctx, updateQuery,
+			user.FirstName,
+			user.LastName,
+			user.Email,
+			user.PasswordHash,
+			user.ID,
+		)
+		if err != nil {
+			if isEmailTaken(err) {
+				return usecase.ErrEmailTaken
+			}
+			return fmt.Errorf("update user: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func scanUser(row *sql.Row) (*entity.User, error) {
 	user := new(entity.User)
-
-	err := u.db.querier(ctx).QueryRowContext(ctx, query, id).Scan(
+	err := row.Scan(
 		&user.ID,
 		&user.FirstName,
 		&user.LastName,
@@ -76,57 +139,7 @@ func (u *Users) ByID(ctx context.Context, id string) (*entity.User, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, usecase.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("select user by id: %w", err)
+		return nil, err
 	}
-
 	return user, nil
-}
-
-func (u *Users) Create(ctx context.Context, user *entity.User) error {
-	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
-
-	_, err := u.db.querier(ctx).ExecContext(ctx, query,
-		user.ID,
-		user.FirstName,
-		user.LastName,
-		user.Email,
-		user.PasswordHash,
-		user.CreatedAt,
-	)
-	if err != nil {
-		if isEmailTaken(err) {
-			return usecase.ErrEmailTaken
-		}
-		return fmt.Errorf("insert user: %w", err)
-	}
-
-	return nil
-}
-
-func (u *Users) Update(ctx context.Context, user *entity.User) error {
-	query := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
-
-	res, err := u.db.querier(ctx).ExecContext(ctx, query,
-		user.FirstName,
-		user.LastName,
-		user.Email,
-		user.PasswordHash,
-		user.ID,
-	)
-	if err != nil {
-		if isEmailTaken(err) {
-			return usecase.ErrEmailTaken
-		}
-		return fmt.Errorf("update user: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("update user: rows affected: %w", err)
-	}
-	if n == 0 {
-		return usecase.ErrUserNotFound
-	}
-
-	return nil
 }
