@@ -46,7 +46,7 @@ func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
 	return user, err
 }
 
-func (u *Users) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error) {
+func (u *Users) Update(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error) {
 	selectQuery := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1 FOR UPDATE`
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
@@ -88,7 +88,7 @@ func (u *Users) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(user
 	return user, nil
 }
 
-func (u *Users) Create(ctx context.Context, user *entity.User) error {
+func (u *Users) Add(ctx context.Context, user *entity.User) error {
 	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
 
 	return u.db.runInTx(ctx, func(tx *sql.Tx) error {

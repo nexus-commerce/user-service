@@ -8,7 +8,7 @@ import (
 )
 
 type updateProfileUsers interface {
-	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
+	Update(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
 }
 
 type UpdateProfile struct {
@@ -29,7 +29,7 @@ type ProfileUpdate struct {
 }
 
 func (up *UpdateProfile) Execute(ctx context.Context, update ProfileUpdate) (*entity.User, error) {
-	return up.users.UpdateByID(ctx, update.UserID, func(user *entity.User) (bool, error) {
+	return up.users.Update(ctx, update.UserID, func(user *entity.User) (bool, error) {
 		p, err := entity.NewProfile(
 			valueOr(update.Email, user.Email().String()),
 			valueOr(update.FirstName, user.FirstName().String()),

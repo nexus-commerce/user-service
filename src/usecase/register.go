@@ -8,7 +8,7 @@ import (
 )
 
 type registerUsers interface {
-	Create(ctx context.Context, user *entity.User) error
+	Add(ctx context.Context, user *entity.User) error
 }
 
 type Register struct {
@@ -49,7 +49,7 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 		return "", err
 	}
 
-	err = r.users.Create(ctx, user)
+	err = r.users.Add(ctx, user)
 	if err != nil {
 		return "", err
 	}
