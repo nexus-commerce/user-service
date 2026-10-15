@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
@@ -21,13 +20,19 @@ type tokenIssuer interface {
 type Login struct {
 	users  loginUsers
 	tokens tokenIssuer
+	dummy  dummyCredentials
 }
 
-func NewLogin(users loginUsers, tokens tokenIssuer) *Login {
+func NewLogin(users loginUsers, tokens tokenIssuer) (*Login, error) {
+	d, err := newDummyCredentials()
+	if err != nil {
+		return nil, fmt.Errorf("dummy credentials: %w", err)
+	}
 	return &Login{
 		users:  users,
 		tokens: tokens,
-	}
+		dummy:  d,
+	}, nil
 }
 
 func (l *Login) Execute(ctx context.Context, rawEmail, rawPassword string) (string, error) {
@@ -41,16 +46,16 @@ func (l *Login) Execute(ctx context.Context, rawEmail, rawPassword string) (stri
 func (l *Login) authenticate(ctx context.Context, rawEmail, rawPassword string) (*entity.User, error) {
 	email, err := entity.NewEmail(rawEmail)
 	if err != nil {
-		return nil, rejectWithoutUser()
+		return nil, l.rejectTimingSafe()
 	}
 	password, err := entity.NewPassword(rawPassword)
 	if err != nil {
-		return nil, rejectWithoutUser()
+		return nil, l.rejectTimingSafe()
 	}
 
 	user, err := l.users.ByEmail(ctx, email)
 	if errors.Is(err, entity.ErrUserNotFound) {
-		return nil, rejectWithoutUser()
+		return nil, l.rejectTimingSafe()
 	}
 	if err != nil {
 		return nil, err
@@ -67,20 +72,19 @@ type dummyCredentials struct {
 	hash     string
 }
 
-var dummy = sync.OnceValue(func() dummyCredentials {
+func newDummyCredentials() (dummyCredentials, error) {
 	password, err := entity.NewPassword("dummy")
 	if err != nil {
-		panic(fmt.Sprintf("create dummy password: %v", err))
+		return dummyCredentials{}, fmt.Errorf("create password: %w", err)
 	}
 	hash, err := password.Hash()
 	if err != nil {
-		panic(fmt.Sprintf("hash dummy password: %v", err))
+		return dummyCredentials{}, err
 	}
-	return dummyCredentials{password: password, hash: hash}
-})
+	return dummyCredentials{password: password, hash: hash}, nil
+}
 
-func rejectWithoutUser() error {
-	d := dummy()
-	_, _ = d.password.Matches(d.hash)
+func (l *Login) rejectTimingSafe() error {
+	_, _ = l.dummy.password.Matches(l.dummy.hash)
 	return entity.ErrInvalidCredentials
 }

@@ -76,7 +76,10 @@ func run() error {
 		Issuer: cfg.JWT.Issuer,
 	})
 
-	login := usecase.NewLogin(users, tokens)
+	login, err := usecase.NewLogin(users, tokens)
+	if err != nil {
+		return fmt.Errorf("create login use case: %w", err)
+	}
 	register := usecase.NewRegister(users, tokens)
 	getProfile := usecase.NewGetProfile(users)
 	updateProfile := usecase.NewUpdateProfile(users)
