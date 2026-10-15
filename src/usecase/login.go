@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
@@ -29,33 +31,56 @@ func NewLogin(users loginUsers, tokens tokenIssuer) *Login {
 }
 
 func (l *Login) Execute(ctx context.Context, rawEmail, rawPassword string) (string, error) {
+	user, err := l.authenticate(ctx, rawEmail, rawPassword)
+	if err != nil {
+		return "", err
+	}
+	return l.tokens.Issue(user.ID())
+}
+
+func (l *Login) authenticate(ctx context.Context, rawEmail, rawPassword string) (*entity.User, error) {
 	email, err := entity.NewEmail(rawEmail)
 	if err != nil {
-		entity.SpendPasswordCheck()
-		return "", entity.ErrUserNotFound
+		return nil, rejectWithoutUser()
 	}
 	password, err := entity.NewPassword(rawPassword)
 	if err != nil {
-		entity.SpendPasswordCheck()
-		return "", ErrWrongPassword
+		return nil, rejectWithoutUser()
 	}
 
 	user, err := l.users.ByEmail(ctx, email)
 	if errors.Is(err, entity.ErrUserNotFound) {
-		entity.SpendPasswordCheck()
-		return "", err
+		return nil, rejectWithoutUser()
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	ok, err := user.CheckPassword(password)
+	if err = user.Authenticate(password); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+type dummyCredentials struct {
+	password entity.Password
+	hash     string
+}
+
+var dummy = sync.OnceValue(func() dummyCredentials {
+	password, err := entity.NewPassword("dummy")
 	if err != nil {
-		return "", err
+		panic(fmt.Sprintf("create dummy password: %v", err))
 	}
-	if !ok {
-		return "", ErrWrongPassword
+	hash, err := password.Hash()
+	if err != nil {
+		panic(fmt.Sprintf("hash dummy password: %v", err))
 	}
+	return dummyCredentials{password: password, hash: hash}
+})
 
-	return l.tokens.Issue(user.ID())
+func rejectWithoutUser() error {
+	d := dummy()
+	_, _ = d.password.Matches(d.hash)
+	return entity.ErrInvalidCredentials
 }

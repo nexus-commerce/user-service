@@ -38,6 +38,7 @@ func (p Profile) LastName() Name { return p.lastName }
 
 var (
 	ErrUserNotFound          = errors.New("user not found")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
 	ErrEmailTaken            = errors.New("user email already exists")
 	ErrMalformedPasswordHash = errors.New("malformed password hash")
 )
@@ -103,8 +104,15 @@ func (u *User) ChangeProfile(p Profile) bool {
 	return true
 }
 
-func (u *User) CheckPassword(password Password) (bool, error) {
-	return password.Matches(u.passwordHash)
+func (u *User) Authenticate(password Password) error {
+	ok, err := password.Matches(u.passwordHash)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrInvalidCredentials
+	}
+	return nil
 }
 
 func (u *User) Events() []Event {

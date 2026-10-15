@@ -1,12 +1,5 @@
 package usecase
 
-import (
-	"errors"
+import "github.com/nexus-commerce/user-service/src/entity"
 
-	"github.com/nexus-commerce/user-service/src/entity"
-)
-
-var (
-	ErrWrongPassword    = errors.New("wrong password")
-	ErrPasswordMismatch = entity.NewValidationError("passwords do not match")
-)
+var ErrPasswordMismatch = entity.NewValidationError("passwords do not match")

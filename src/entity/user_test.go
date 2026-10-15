@@ -63,8 +63,8 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := u.CheckPassword(password); err != nil || !ok {
-		t.Errorf("CheckPassword = %v, %v; want true, nil", ok, err)
+	if err := u.Authenticate(password); err != nil {
+		t.Errorf("Authenticate = %v, want nil", err)
 	}
 
 	events := u.Events()
@@ -143,8 +143,8 @@ func TestRestoreUser(t *testing.T) {
 		if u.ID() != id || !hasProfile(u, profile) || u.PasswordHash() != hash || !u.CreatedAt().Equal(createdAt) {
 			t.Errorf("restored user = %v %s %s %s %s %v", u.ID(), u.Email(), u.FirstName(), u.LastName(), u.PasswordHash(), u.CreatedAt())
 		}
-		if ok, err := u.CheckPassword(password); err != nil || !ok {
-			t.Errorf("CheckPassword = %v, %v; want true, nil", ok, err)
+		if err := u.Authenticate(password); err != nil {
+			t.Errorf("Authenticate = %v, want nil", err)
 		}
 		if events := u.Events(); len(events) != 0 {
 			t.Errorf("got %d events, want none", len(events))
@@ -160,4 +160,17 @@ func TestRestoreUser(t *testing.T) {
 			t.Error("malformed hash must not be a validation error")
 		}
 	})
+}
+
+func TestAuthenticateRejectsWrongPassword(t *testing.T) {
+	password, _ := entity.NewPassword("s3cret")
+	other, _ := entity.NewPassword("other")
+	u, err := entity.NewUser(mustProfile(t, "jane@example.com", "Jane", "Doe"), password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := u.Authenticate(other); !errors.Is(err, entity.ErrInvalidCredentials) {
+		t.Errorf("Authenticate(wrong) = %v, want %v", err, entity.ErrInvalidCredentials)
+	}
 }
