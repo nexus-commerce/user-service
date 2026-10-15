@@ -102,6 +102,7 @@ components:
         email:
           type: string
           format: email
+          description: Normalized to lowercase.
         firstName:
           type: string
         lastName:

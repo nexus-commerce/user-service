@@ -12,10 +12,12 @@ func TestNewEmail(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      string
+		want    string
 		wantErr error
 	}{
-		{name: "valid", in: "jane.doe@example.com"},
-		{name: "max length", in: strings.Repeat("a", 88) + "@example.com"},
+		{name: "valid", in: "jane.doe@example.com", want: "jane.doe@example.com"},
+		{name: "mixed case is lowercased", in: "Jane.Doe@Example.COM", want: "jane.doe@example.com"},
+		{name: "max length", in: strings.Repeat("a", 88) + "@example.com", want: strings.Repeat("a", 88) + "@example.com"},
 		{name: "empty", in: "", wantErr: entity.ErrEmptyEmail},
 		{name: "too long", in: strings.Repeat("a", 89) + "@example.com", wantErr: entity.ErrEmailTooLong},
 		{name: "no at sign", in: "x", wantErr: entity.ErrMalformedEmail},
@@ -34,8 +36,8 @@ func TestNewEmail(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewEmail(%q) unexpected error: %v", tt.in, err)
 			}
-			if got.String() != tt.in {
-				t.Errorf("NewEmail(%q).String() = %q", tt.in, got.String())
+			if got.String() != tt.want {
+				t.Errorf("NewEmail(%q).String() = %q, want %q", tt.in, got.String(), tt.want)
 			}
 		})
 	}

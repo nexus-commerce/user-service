@@ -3,6 +3,7 @@ package entity
 import (
 	"fmt"
 	"net/mail"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -22,6 +23,7 @@ func NewEmail(s string) (Email, error) {
 	if s == "" {
 		return Email{}, ErrEmptyEmail
 	}
+	s = strings.ToLower(s)
 	if utf8.RuneCountInString(s) > maxEmailLength {
 		return Email{}, ErrEmailTooLong
 	}
