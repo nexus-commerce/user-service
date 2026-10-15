@@ -13,16 +13,12 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type eventWriter interface {
-	Write(ctx context.Context, tx *sql.Tx, events []entity.Event) error
-}
-
 type Users struct {
 	db     *DB
-	events eventWriter
+	events *OutboxWriter
 }
 
-func NewUsers(db *DB, events eventWriter) *Users {
+func NewUsers(db *DB, events *OutboxWriter) *Users {
 	return &Users{db: db, events: events}
 }
 
