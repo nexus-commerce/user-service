@@ -125,6 +125,18 @@ func hasProfile(u *entity.User, p entity.Profile) bool {
 	return u.Email() == p.Email() && u.FirstName() == p.FirstName() && u.LastName() == p.LastName()
 }
 
+func TestRestoreProfile(t *testing.T) {
+	longName := strings.Repeat("a", 51)
+	p := entity.RestoreProfile("Legacy@Example.com", longName, "Doe")
+
+	if _, err := entity.NewProfile("Legacy@Example.com", longName, "Doe"); err == nil {
+		t.Fatal("NewProfile accepted data that should fail current rules")
+	}
+	if p.Email().String() != "Legacy@Example.com" || p.FirstName().String() != longName || p.LastName().String() != "Doe" {
+		t.Errorf("restored profile = %s %s %s", p.Email(), p.FirstName(), p.LastName())
+	}
+}
+
 func TestRestoreUser(t *testing.T) {
 	password, _ := entity.NewPassword("s3cret")
 	hash, err := password.Hash()

@@ -135,10 +135,7 @@ func scanUser(row *sql.Row) (*entity.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restore user: %w", err)
 	}
-	profile, err := entity.NewProfile(email, firstName, lastName)
-	if err != nil {
-		return nil, fmt.Errorf("restore user %s profile: %v", id, err)
-	}
+	profile := entity.RestoreProfile(email, firstName, lastName)
 	user, err := entity.RestoreUser(id, profile, passwordHash, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("restore user %s: %w", id, err)

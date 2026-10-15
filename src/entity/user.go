@@ -30,6 +30,14 @@ func NewProfile(email, firstName, lastName string) (Profile, error) {
 	return Profile{email: e, firstName: fn, lastName: ln}, nil
 }
 
+func RestoreProfile(email, firstName, lastName string) Profile {
+	return Profile{
+		email:     Email{value: email},
+		firstName: Name{value: firstName},
+		lastName:  Name{value: lastName},
+	}
+}
+
 func (p Profile) Email() Email { return p.email }
 
 func (p Profile) FirstName() Name { return p.firstName }
