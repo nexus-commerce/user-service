@@ -36,7 +36,11 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 		return "", ErrPasswordMismatch
 	}
 
-	profile, err := entity.NewProfile(reg.Email, reg.FirstName, reg.LastName)
+	profile, err := entity.NewProfile(entity.ProfileFields{
+		Email:     reg.Email,
+		FirstName: reg.FirstName,
+		LastName:  reg.LastName,
+	})
 	if err != nil {
 		return "", err
 	}

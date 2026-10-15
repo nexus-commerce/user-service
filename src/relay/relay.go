@@ -51,7 +51,7 @@ func (r *Relay) Run(ctx context.Context) error {
 
 func (r *Relay) flush(ctx context.Context) {
 	for ctx.Err() == nil {
-		n, err := r.relayBatch(ctx)
+		n, err := r.processBatch(ctx)
 		if err != nil {
 			log.Printf("relay outbox messages: %v", err)
 			return
@@ -62,7 +62,7 @@ func (r *Relay) flush(ctx context.Context) {
 	}
 }
 
-func (r *Relay) relayBatch(ctx context.Context) (int, error) {
+func (r *Relay) processBatch(ctx context.Context) (int, error) {
 	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, func(ctx context.Context, msgs []messaging.Message) error {
 		return r.producer.Publish(ctx, msgs...)
 	})

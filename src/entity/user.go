@@ -14,27 +14,33 @@ type Profile struct {
 	lastName  Name
 }
 
-func NewProfile(email, firstName, lastName string) (Profile, error) {
-	fn, err := NewName(firstName)
+type ProfileFields struct {
+	Email     string
+	FirstName string
+	LastName  string
+}
+
+func NewProfile(f ProfileFields) (Profile, error) {
+	fn, err := NewName(f.FirstName)
 	if err != nil {
 		return Profile{}, fmt.Errorf("first name: %w", err)
 	}
-	ln, err := NewName(lastName)
+	ln, err := NewName(f.LastName)
 	if err != nil {
 		return Profile{}, fmt.Errorf("last name: %w", err)
 	}
-	e, err := NewEmail(email)
+	e, err := NewEmail(f.Email)
 	if err != nil {
 		return Profile{}, fmt.Errorf("email: %w", err)
 	}
 	return Profile{email: e, firstName: fn, lastName: ln}, nil
 }
 
-func RestoreProfile(email, firstName, lastName string) Profile {
+func RestoreProfile(f ProfileFields) Profile {
 	return Profile{
-		email:     Email{value: email},
-		firstName: Name{value: firstName},
-		lastName:  Name{value: lastName},
+		email:     Email{value: f.Email},
+		firstName: Name{value: f.FirstName},
+		lastName:  Name{value: f.LastName},
 	}
 }
 

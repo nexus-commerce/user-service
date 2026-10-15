@@ -16,7 +16,7 @@ type unpublishedEvent struct {
 
 func TestEncodeUserRegistered(t *testing.T) {
 	enc := messaging.NewEncoder()
-	profile, err := entity.NewProfile("jane@example.com", "Jane", "Doe")
+	profile, err := entity.NewProfile(entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
 	if err != nil {
 		t.Fatal(err)
 	}

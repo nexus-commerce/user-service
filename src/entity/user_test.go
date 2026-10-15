@@ -13,20 +13,18 @@ import (
 func TestNewProfile(t *testing.T) {
 	tests := []struct {
 		name       string
-		email      string
-		firstName  string
-		lastName   string
+		fields     entity.ProfileFields
 		wantErr    error
 		wantPrefix string
 	}{
-		{name: "valid", email: "jane@example.com", firstName: "Jane", lastName: "Doe"},
-		{name: "bad first name", email: "jane@example.com", firstName: "", lastName: "Doe", wantErr: entity.ErrEmptyName, wantPrefix: "first name: "},
-		{name: "bad last name", email: "jane@example.com", firstName: "Jane", lastName: " ", wantErr: entity.ErrEmptyName, wantPrefix: "last name: "},
-		{name: "bad email", email: "x", firstName: "Jane", lastName: "Doe", wantErr: entity.ErrMalformedEmail, wantPrefix: "email: "},
+		{name: "valid", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}},
+		{name: "bad first name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"}, wantErr: entity.ErrEmptyName, wantPrefix: "first name: "},
+		{name: "bad last name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "}, wantErr: entity.ErrEmptyName, wantPrefix: "last name: "},
+		{name: "bad email", fields: entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"}, wantErr: entity.ErrMalformedEmail, wantPrefix: "email: "},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := entity.NewProfile(tt.email, tt.firstName, tt.lastName)
+			p, err := entity.NewProfile(tt.fields)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
 					t.Fatalf("error = %v, want %v", err, tt.wantErr)
@@ -39,16 +37,16 @@ func TestNewProfile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if p.Email().String() != tt.email || p.FirstName().String() != tt.firstName || p.LastName().String() != tt.lastName {
+			if p.Email().String() != tt.fields.Email || p.FirstName().String() != tt.fields.FirstName || p.LastName().String() != tt.fields.LastName {
 				t.Errorf("profile = %s %s %s", p.Email(), p.FirstName(), p.LastName())
 			}
 		})
 	}
 }
 
-func mustProfile(t *testing.T, email, firstName, lastName string) entity.Profile {
+func mustProfile(t *testing.T, f entity.ProfileFields) entity.Profile {
 	t.Helper()
-	p, err := entity.NewProfile(email, firstName, lastName)
+	p, err := entity.NewProfile(f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +54,7 @@ func mustProfile(t *testing.T, email, firstName, lastName string) entity.Profile
 }
 
 func TestNewUserRecordsRegistration(t *testing.T) {
-	profile := mustProfile(t, "jane@example.com", "Jane", "Doe")
+	profile := mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
 	password, _ := entity.NewPassword("s3cret")
 
 	u, err := entity.NewUser(profile, password)
@@ -87,7 +85,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 
 func TestEventsReturnsCopy(t *testing.T) {
 	password, _ := entity.NewPassword("s3cret")
-	u, err := entity.NewUser(mustProfile(t, "jane@example.com", "Jane", "Doe"), password)
+	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,12 +100,12 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func TestChangeProfile(t *testing.T) {
 	password, _ := entity.NewPassword("s3cret")
-	u, err := entity.NewUser(mustProfile(t, "jane@example.com", "Jane", "Doe"), password)
+	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	changed := mustProfile(t, "jane.smith@example.com", "Jane", "Smith")
+	changed := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
 	if !u.ChangeProfile(changed) {
 		t.Error("ChangeProfile(new profile) = false, want true")
 	}
@@ -115,7 +113,7 @@ func TestChangeProfile(t *testing.T) {
 		t.Errorf("profile = %s %s %s, want %+v", u.Email(), u.FirstName(), u.LastName(), changed)
 	}
 
-	same := mustProfile(t, "jane.smith@example.com", "Jane", "Smith")
+	same := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
 	if u.ChangeProfile(same) {
 		t.Error("ChangeProfile(same profile) = true, want false")
 	}
@@ -127,9 +125,10 @@ func hasProfile(u *entity.User, p entity.Profile) bool {
 
 func TestRestoreProfile(t *testing.T) {
 	longName := strings.Repeat("a", 51)
-	p := entity.RestoreProfile("Legacy@Example.com", longName, "Doe")
+	fields := entity.ProfileFields{Email: "Legacy@Example.com", FirstName: longName, LastName: "Doe"}
+	p := entity.RestoreProfile(fields)
 
-	if _, err := entity.NewProfile("Legacy@Example.com", longName, "Doe"); err == nil {
+	if _, err := entity.NewProfile(fields); err == nil {
 		t.Fatal("NewProfile accepted data that should fail current rules")
 	}
 	if p.Email().String() != "Legacy@Example.com" || p.FirstName().String() != longName || p.LastName().String() != "Doe" {
@@ -144,7 +143,7 @@ func TestRestoreUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := uuid.New()
-	profile := mustProfile(t, "jane@example.com", "Jane", "Doe")
+	profile := mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
 	t.Run("valid", func(t *testing.T) {
@@ -177,7 +176,7 @@ func TestRestoreUser(t *testing.T) {
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	password, _ := entity.NewPassword("s3cret")
 	other, _ := entity.NewPassword("other")
-	u, err := entity.NewUser(mustProfile(t, "jane@example.com", "Jane", "Doe"), password)
+	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
 	if err != nil {
 		t.Fatal(err)
 	}
