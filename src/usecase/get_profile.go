@@ -2,12 +2,13 @@ package usecase
 
 import (
 	"context"
+	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
 type getProfileUsers interface {
-	ByID(ctx context.Context, id string) (*entity.User, error)
+	ByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
 }
 
 type GetProfile struct {
@@ -20,6 +21,6 @@ func NewGetProfile(users getProfileUsers) *GetProfile {
 	}
 }
 
-func (gp *GetProfile) Execute(ctx context.Context, userID string) (*entity.User, error) {
+func (gp *GetProfile) Execute(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
 	return gp.users.ByID(ctx, userID)
 }

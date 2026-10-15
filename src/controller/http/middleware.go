@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"uuid"
 )
 
 var ErrNoUserID = errors.New("user id not found in context")
@@ -31,7 +32,7 @@ func BasicAuth(username, password string) Middleware {
 }
 
 type TokenParser interface {
-	Parse(token string) (string, error)
+	Parse(token string) (uuid.UUID, error)
 }
 
 type userIDKey struct{}
@@ -57,10 +58,10 @@ func BearerAuth(p TokenParser) Middleware {
 	}
 }
 
-func UserIDFromContext(ctx context.Context) (string, error) {
-	id, ok := ctx.Value(userIDKey{}).(string)
-	if !ok || id == "" {
-		return "", ErrNoUserID
+func UserIDFromContext(ctx context.Context) (uuid.UUID, error) {
+	id, ok := ctx.Value(userIDKey{}).(uuid.UUID)
+	if !ok || id == uuid.Nil() {
+		return uuid.Nil(), ErrNoUserID
 	}
 	return id, nil
 }

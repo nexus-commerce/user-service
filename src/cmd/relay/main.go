@@ -18,7 +18,6 @@ import (
 	"github.com/nexus-commerce/user-service/src/lifecycle"
 	"github.com/nexus-commerce/user-service/src/postgres"
 	"github.com/nexus-commerce/user-service/src/relay"
-	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
 const dbConnectTimeout = 10 * time.Second
@@ -61,10 +60,7 @@ func run() error {
 		}
 	}()
 
-	outbox := postgres.NewOutbox(db)
-	relayMessages := usecase.NewRelayMessages(outbox, producer)
-
-	outboxRelay := relay.New(relayMessages, relay.Options{
+	outboxRelay := relay.New(postgres.NewOutbox(db), producer, relay.Options{
 		Interval:  cfg.Outbox.Interval,
 		BatchSize: cfg.Outbox.BatchSize,
 	})

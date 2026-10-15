@@ -4,10 +4,16 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
-type Messages interface {
-	Execute(ctx context.Context, limit int) (int, error)
+type Outbox interface {
+	ProcessBatch(ctx context.Context, limit int, fn func(ctx context.Context, msgs []messaging.Message) error) (int, error)
+}
+
+type Producer interface {
+	Publish(ctx context.Context, msgs ...messaging.Message) error
 }
 
 type Options struct {
@@ -16,12 +22,13 @@ type Options struct {
 }
 
 type Relay struct {
-	messages Messages
+	outbox   Outbox
+	producer Producer
 	opts     Options
 }
 
-func New(messages Messages, opts Options) *Relay {
-	return &Relay{messages: messages, opts: opts}
+func New(outbox Outbox, producer Producer, opts Options) *Relay {
+	return &Relay{outbox: outbox, producer: producer, opts: opts}
 }
 
 func (r *Relay) Run(ctx context.Context) error {
@@ -44,7 +51,7 @@ func (r *Relay) Run(ctx context.Context) error {
 
 func (r *Relay) flush(ctx context.Context) {
 	for ctx.Err() == nil {
-		n, err := r.messages.Execute(ctx, r.opts.BatchSize)
+		n, err := r.relayBatch(ctx)
 		if err != nil {
 			log.Printf("relay outbox messages: %v", err)
 			return
@@ -53,4 +60,10 @@ func (r *Relay) flush(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (r *Relay) relayBatch(ctx context.Context) (int, error) {
+	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, func(ctx context.Context, msgs []messaging.Message) error {
+		return r.producer.Publish(ctx, msgs...)
+	})
 }

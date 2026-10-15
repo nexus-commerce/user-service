@@ -47,10 +47,10 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.uc.Execute(r.Context(), entity.Email(reqBody.Email), entity.Password(reqBody.Password))
+	token, err := h.uc.Execute(r.Context(), reqBody.Email, reqBody.Password)
 	if err != nil {
 		switch {
-		case errors.Is(err, usecase.ErrUserNotFound), errors.Is(err, usecase.ErrWrongPassword):
+		case errors.Is(err, entity.ErrUserNotFound), errors.Is(err, usecase.ErrWrongPassword):
 			writeError(rw, r, http.StatusUnauthorized, "Invalid credentials")
 			return
 		}

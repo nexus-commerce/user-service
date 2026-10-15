@@ -28,11 +28,11 @@ type registerRequest struct {
 
 func (r *registerRequest) toRegistration() usecase.Registration {
 	return usecase.Registration{
-		FirstName:            entity.Name(r.FirstName),
-		LastName:             entity.Name(r.LastName),
-		Email:                entity.Email(r.Email),
-		Password:             entity.Password(r.Password),
-		PasswordConfirmation: entity.Password(r.PasswordConfirmation),
+		FirstName:            r.FirstName,
+		LastName:             r.LastName,
+		Email:                r.Email,
+		Password:             r.Password,
+		PasswordConfirmation: r.PasswordConfirmation,
 	}
 }
 
@@ -63,10 +63,10 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
 		switch {
-		case errors.Is(err, usecase.ErrValidation):
+		case errors.Is(err, entity.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, err.Error())
 			return
-		case errors.Is(err, usecase.ErrEmailTaken):
+		case errors.Is(err, entity.ErrEmailTaken):
 			writeError(rw, r, http.StatusConflict, err.Error())
 			return
 		}

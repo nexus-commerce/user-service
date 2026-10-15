@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"net/http"
+	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
@@ -24,12 +25,12 @@ type updateProfileRequest struct {
 	Email     *string `json:"email"`
 }
 
-func (r *updateProfileRequest) toProfileUpdate(userID string) usecase.ProfileUpdate {
+func (r *updateProfileRequest) toProfileUpdate(userID uuid.UUID) usecase.ProfileUpdate {
 	return usecase.ProfileUpdate{
 		UserID:    userID,
-		FirstName: (*entity.Name)(r.FirstName),
-		LastName:  (*entity.Name)(r.LastName),
-		Email:     (*entity.Email)(r.Email),
+		FirstName: r.FirstName,
+		LastName:  r.LastName,
+		Email:     r.Email,
 	}
 }
 
@@ -65,13 +66,13 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	user, err := h.uc.Execute(r.Context(), reqBody.toProfileUpdate(userID))
 	if err != nil {
 		switch {
-		case errors.Is(err, usecase.ErrValidation):
+		case errors.Is(err, entity.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, err.Error())
 			return
-		case errors.Is(err, usecase.ErrUserNotFound):
+		case errors.Is(err, entity.ErrUserNotFound):
 			writeError(rw, r, http.StatusNotFound, err.Error())
 			return
-		case errors.Is(err, usecase.ErrEmailTaken):
+		case errors.Is(err, entity.ErrEmailTaken):
 			writeError(rw, r, http.StatusConflict, err.Error())
 			return
 		}
@@ -81,10 +82,10 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	writeJSON(rw, r, http.StatusOK, profileResponse{
 		User: &userResponse{
-			ID:        user.ID,
-			Email:     string(user.Email),
-			FirstName: string(user.FirstName),
-			LastName:  string(user.LastName),
+			ID:        user.ID().String(),
+			Email:     user.Email().String(),
+			FirstName: user.FirstName().String(),
+			LastName:  user.LastName().String(),
 		},
 	})
 }

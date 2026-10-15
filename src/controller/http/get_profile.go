@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
@@ -48,7 +49,7 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	user, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
-		if errors.Is(err, usecase.ErrUserNotFound) {
+		if errors.Is(err, entity.ErrUserNotFound) {
 			writeError(rw, r, http.StatusNotFound, err.Error())
 			return
 		}
@@ -58,10 +59,10 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	writeJSON(rw, r, http.StatusOK, profileResponse{
 		User: &userResponse{
-			ID:        user.ID,
-			Email:     string(user.Email),
-			FirstName: string(user.FirstName),
-			LastName:  string(user.LastName),
+			ID:        user.ID().String(),
+			Email:     user.Email().String(),
+			FirstName: user.FirstName().String(),
+			LastName:  user.LastName().String(),
 		},
 	})
 }

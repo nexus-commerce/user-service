@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -15,7 +16,7 @@ const (
 var ErrInvalid = errors.New("invalid token")
 
 type claims struct {
-	UserID string `json:"userId"`
+	UserID uuid.UUID `json:"userId"`
 	jwt.RegisteredClaims
 }
 
@@ -36,7 +37,7 @@ func NewTokens(opts Options) *Tokens {
 	}
 }
 
-func (t *Tokens) Issue(userID string) (string, error) {
+func (t *Tokens) Issue(userID uuid.UUID) (string, error) {
 	c := claims{
 		UserID:    userID,
 		Issuer:    t.issuer,
@@ -51,7 +52,7 @@ func (t *Tokens) Issue(userID string) (string, error) {
 	return token, nil
 }
 
-func (t *Tokens) Parse(token string) (string, error) {
+func (t *Tokens) Parse(token string) (uuid.UUID, error) {
 	var c claims
 	keyFunc := func(*jwt.Token) (any, error) { return t.secret, nil }
 	_, err := jwt.ParseWithClaims(token, &c, keyFunc,
@@ -60,10 +61,10 @@ func (t *Tokens) Parse(token string) (string, error) {
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalid, err)
+		return uuid.Nil(), fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
-	if c.UserID == "" {
-		return "", fmt.Errorf("%w: missing user ID", ErrInvalid)
+	if c.UserID == uuid.Nil() {
+		return uuid.Nil(), fmt.Errorf("%w: missing user ID", ErrInvalid)
 	}
 
 	return c.UserID, nil

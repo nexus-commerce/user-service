@@ -2,13 +2,13 @@ package usecase
 
 import (
 	"context"
+	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
 type updateProfileUsers interface {
-	ByID(ctx context.Context, id string) (*entity.User, error)
-	UpdateByID(ctx context.Context, id string, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
+	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
 }
 
 type UpdateProfile struct {
@@ -22,36 +22,30 @@ func NewUpdateProfile(users updateProfileUsers) *UpdateProfile {
 }
 
 type ProfileUpdate struct {
-	UserID    string
-	FirstName *entity.Name
-	LastName  *entity.Name
-	Email     *entity.Email
-}
-
-func (pu ProfileUpdate) isZero() bool {
-	return pu.FirstName == nil && pu.LastName == nil && pu.Email == nil
+	UserID    uuid.UUID
+	FirstName *string
+	LastName  *string
+	Email     *string
 }
 
 func (up *UpdateProfile) Execute(ctx context.Context, update ProfileUpdate) (*entity.User, error) {
-	if update.isZero() {
-		return up.users.ByID(ctx, update.UserID)
-	}
-
 	return up.users.UpdateByID(ctx, update.UserID, func(user *entity.User) (bool, error) {
-		p := user.Profile
-		if update.FirstName != nil {
-			p.FirstName = *update.FirstName
-		}
-		if update.LastName != nil {
-			p.LastName = *update.LastName
-		}
-		if update.Email != nil {
-			p.Email = *update.Email
-		}
-
-		if err := user.ChangeProfile(p); err != nil {
+		p, err := entity.NewProfile(
+			valueOr(update.Email, user.Email().String()),
+			valueOr(update.FirstName, user.FirstName().String()),
+			valueOr(update.LastName, user.LastName().String()),
+		)
+		if err != nil {
 			return false, err
 		}
-		return true, nil
+
+		return user.ChangeProfile(p), nil
 	})
+}
+
+func valueOr(v *string, fallback string) string {
+	if v == nil {
+		return fallback
+	}
+	return *v
 }

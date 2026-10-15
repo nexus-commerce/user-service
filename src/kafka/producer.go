@@ -7,7 +7,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/nexus-commerce/user-service/src/usecase"
+	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
 const batchTimeout = 10 * time.Millisecond
@@ -27,7 +27,7 @@ func NewProducer(addr string) *Producer {
 	}
 }
 
-func (p *Producer) Publish(ctx context.Context, msgs ...usecase.Message) error {
+func (p *Producer) Publish(ctx context.Context, msgs ...messaging.Message) error {
 	kmsgs := make([]kafka.Message, len(msgs))
 	for i, m := range msgs {
 		kmsgs[i] = kafka.Message{

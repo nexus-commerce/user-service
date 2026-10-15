@@ -23,20 +23,24 @@ var dummyHash = sync.OnceValue(func() string {
 	return string(hash)
 })
 
-type Password string
-
-func (p Password) Validate() error {
-	if p == "" {
-		return ErrEmptyPassword
-	}
-	if len(p) > maxPasswordBytes {
-		return ErrPasswordTooLong
-	}
-	return nil
+type Password struct {
+	value string
 }
 
+func NewPassword(s string) (Password, error) {
+	if s == "" {
+		return Password{}, ErrEmptyPassword
+	}
+	if len(s) > maxPasswordBytes {
+		return Password{}, ErrPasswordTooLong
+	}
+	return Password{value: s}, nil
+}
+
+func (p Password) String() string { return "[REDACTED]" }
+
 func (p Password) Hash() (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(p), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(p.value), bcrypt.DefaultCost)
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}
@@ -44,7 +48,7 @@ func (p Password) Hash() (string, error) {
 }
 
 func (p Password) Matches(hash string) (bool, error) {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(p))
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(p.value))
 	switch {
 	case err == nil:
 		return true, nil
@@ -55,6 +59,11 @@ func (p Password) Matches(hash string) (bool, error) {
 	}
 }
 
-func (p Password) MatchesNothing() {
-	_, _ = p.Matches(dummyHash())
+func validPasswordHash(h string) bool {
+	_, err := bcrypt.Cost([]byte(h))
+	return err == nil
+}
+
+func SpendPasswordCheck() {
+	_ = bcrypt.CompareHashAndPassword([]byte(dummyHash()), []byte("dummy"))
 }

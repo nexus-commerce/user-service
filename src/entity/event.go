@@ -1,13 +1,17 @@
 package entity
 
-import "time"
+import (
+	"time"
+	"uuid"
+)
 
 type Event interface {
 	event()
 }
 
 type UserRegistered struct {
-	UserID     string
+	ID         uuid.UUID
+	UserID     uuid.UUID
 	Profile    Profile
 	OccurredAt time.Time
 }

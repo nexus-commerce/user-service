@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
-	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
 const typeUserRegistered = "user.registered"
@@ -40,29 +38,41 @@ type userRegistered struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func (enc *Encoder) Encode(e entity.Event) (usecase.Message, error) {
+func (enc *Encoder) Encode(e entity.Event) (Message, bool, error) {
+	var (
+		spec messageSpec
+		data any
+	)
 	switch e := e.(type) {
 	case entity.UserRegistered:
-		spec := messageSpec{
+		spec = messageSpec{
+			id:        e.ID.String(),
 			topic:     enc.topics.Users,
 			typ:       typeUserRegistered,
 			version:   "1.0",
-			key:       e.UserID,
+			key:       e.UserID.String(),
 			timestamp: e.OccurredAt,
 		}
-		return encode(spec, userRegistered{
-			UserID:    e.UserID,
-			Email:     string(e.Profile.Email),
-			FirstName: string(e.Profile.FirstName),
-			LastName:  string(e.Profile.LastName),
+		data = userRegistered{
+			UserID:    e.UserID.String(),
+			Email:     e.Profile.Email().String(),
+			FirstName: e.Profile.FirstName().String(),
+			LastName:  e.Profile.LastName().String(),
 			CreatedAt: e.OccurredAt,
-		})
+		}
 	default:
-		return usecase.Message{}, fmt.Errorf("unknown event %T", e)
+		return Message{}, false, nil
 	}
+
+	msg, err := encode(spec, data)
+	if err != nil {
+		return Message{}, false, err
+	}
+	return msg, true, nil
 }
 
 type messageSpec struct {
+	id        string
 	topic     string
 	typ       string
 	version   string
@@ -70,18 +80,19 @@ type messageSpec struct {
 	timestamp time.Time
 }
 
-func encode(spec messageSpec, data any) (usecase.Message, error) {
+func encode(spec messageSpec, data any) (Message, error) {
 	value, err := json.Marshal(envelope{
-		ID:        uuid.New().String(),
+		ID:        spec.id,
 		Type:      spec.typ,
 		Timestamp: spec.timestamp,
 		Version:   spec.version,
 		Data:      data,
 	})
 	if err != nil {
-		return usecase.Message{}, fmt.Errorf("marshal %s event: %w", spec.typ, err)
+		return Message{}, fmt.Errorf("marshal %s event: %w", spec.typ, err)
 	}
-	return usecase.Message{
+	return Message{
+		ID:    spec.id,
 		Topic: spec.topic,
 		Key:   spec.key,
 		Value: value,

@@ -14,19 +14,23 @@ var (
 	ErrMalformedEmail = NewValidationError("must be a valid email address")
 )
 
-type Email string
-
-func (e Email) Validate() error {
-	if e == "" {
-		return ErrEmptyEmail
-	}
-	if utf8.RuneCountInString(string(e)) > maxEmailLength {
-		return ErrEmailTooLong
-	}
-
-	addr, err := mail.ParseAddress(string(e))
-	if err != nil || addr.Address != string(e) {
-		return ErrMalformedEmail
-	}
-	return nil
+type Email struct {
+	value string
 }
+
+func NewEmail(s string) (Email, error) {
+	if s == "" {
+		return Email{}, ErrEmptyEmail
+	}
+	if utf8.RuneCountInString(s) > maxEmailLength {
+		return Email{}, ErrEmailTooLong
+	}
+
+	addr, err := mail.ParseAddress(s)
+	if err != nil || addr.Address != s {
+		return Email{}, ErrMalformedEmail
+	}
+	return Email{value: s}, nil
+}
+
+func (e Email) String() string { return e.value }

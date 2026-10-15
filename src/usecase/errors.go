@@ -6,14 +6,7 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-var ErrValidation = entity.ErrValidation
-
 var (
-	ErrUserNotFound  = errors.New("user not found")
-	ErrWrongPassword = errors.New("wrong password")
-	ErrEmailTaken    = errors.New("user email already exists")
-)
-
-var (
+	ErrWrongPassword    = errors.New("wrong password")
 	ErrPasswordMismatch = entity.NewValidationError("passwords do not match")
 )
