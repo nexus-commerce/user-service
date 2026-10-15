@@ -12,7 +12,6 @@ type Config struct {
 	Postgres Postgres
 	HTTP     HTTP
 	Kafka    Kafka
-	Topics   Topics
 	Outbox   Outbox
 	JWT      JWT
 	Docs     Docs
@@ -49,10 +48,6 @@ type Kafka struct {
 
 func (k *Kafka) Addr() string {
 	return net.JoinHostPort(k.Host, k.Port)
-}
-
-type Topics struct {
-	Users string `env:"KAFKA_TOPIC_USERS" envDefault:"users"`
 }
 
 type Outbox struct {

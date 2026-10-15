@@ -8,18 +8,15 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-const typeUserRegistered = "user.registered"
+const (
+	topicUsers         = "users"
+	typeUserRegistered = "user.registered"
+)
 
-type Topics struct {
-	Users string
-}
+type Encoder struct{}
 
-type Encoder struct {
-	topics Topics
-}
-
-func NewEncoder(topics Topics) *Encoder {
-	return &Encoder{topics: topics}
+func NewEncoder() *Encoder {
+	return &Encoder{}
 }
 
 type envelope struct {
@@ -47,7 +44,7 @@ func (enc *Encoder) Encode(e entity.Event) (Message, bool, error) {
 	case entity.UserRegistered:
 		spec = messageSpec{
 			id:        e.ID.String(),
-			topic:     enc.topics.Users,
+			topic:     topicUsers,
 			typ:       typeUserRegistered,
 			version:   "1.0",
 			key:       e.UserID.String(),

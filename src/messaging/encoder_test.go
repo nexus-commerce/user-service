@@ -15,7 +15,7 @@ type unpublishedEvent struct {
 }
 
 func TestEncodeUserRegistered(t *testing.T) {
-	enc := messaging.NewEncoder(messaging.Topics{Users: "users"})
+	enc := messaging.NewEncoder()
 	profile, err := entity.NewProfile("jane@example.com", "Jane", "Doe")
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +52,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 }
 
 func TestEncodeSkipsUnpublishedEvents(t *testing.T) {
-	enc := messaging.NewEncoder(messaging.Topics{Users: "users"})
+	enc := messaging.NewEncoder()
 
 	_, ok, err := enc.Encode(unpublishedEvent{})
 	if err != nil || ok {

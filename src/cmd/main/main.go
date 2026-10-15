@@ -70,10 +70,7 @@ func run() error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	encoder := messaging.NewEncoder(messaging.Topics{
-		Users: cfg.Topics.Users,
-	})
-	users := postgres.NewUsers(db, postgres.NewOutboxWriter(encoder))
+	users := postgres.NewUsers(db, postgres.NewOutboxWriter(messaging.NewEncoder()))
 	tokens := jwt.NewTokens(jwt.Options{
 		Secret: cfg.JWT.Secret,
 		Issuer: cfg.JWT.Issuer,
