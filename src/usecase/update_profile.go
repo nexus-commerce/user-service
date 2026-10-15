@@ -7,6 +7,7 @@ import (
 )
 
 type updateProfileUsers interface {
+	ByID(ctx context.Context, id string) (*entity.User, error)
 	UpdateByID(ctx context.Context, id string, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
 }
 
@@ -27,26 +28,28 @@ type ProfileUpdate struct {
 	Email     *entity.Email
 }
 
-func (pu ProfileUpdate) empty() bool {
+func (pu ProfileUpdate) isZero() bool {
 	return pu.FirstName == nil && pu.LastName == nil && pu.Email == nil
 }
 
 func (up *UpdateProfile) Execute(ctx context.Context, update ProfileUpdate) (*entity.User, error) {
+	if update.isZero() {
+		return up.users.ByID(ctx, update.UserID)
+	}
+
 	return up.users.UpdateByID(ctx, update.UserID, func(user *entity.User) (bool, error) {
-		if update.empty() {
-			return false, nil
-		}
+		p := user.Profile
 		if update.FirstName != nil {
-			user.FirstName = *update.FirstName
+			p.FirstName = *update.FirstName
 		}
 		if update.LastName != nil {
-			user.LastName = *update.LastName
+			p.LastName = *update.LastName
 		}
 		if update.Email != nil {
-			user.Email = *update.Email
+			p.Email = *update.Email
 		}
 
-		if err := user.Profile.Validate(); err != nil {
+		if err := user.ChangeProfile(p); err != nil {
 			return false, err
 		}
 		return true, nil

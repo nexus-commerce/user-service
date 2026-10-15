@@ -35,7 +35,7 @@ type loginResponse struct {
 // @Produce     json
 // @Param       request  body      loginRequest   true  "User credentials"
 // @Success     200      {object}  loginResponse
-// @Failure     400      {object}  errorResponse  "Invalid request, malformed email or invalid password"
+// @Failure     400      {object}  errorResponse  "Invalid request body"
 // @Failure     401      {object}  errorResponse  "Invalid credentials"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
@@ -52,9 +52,6 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, usecase.ErrUserNotFound), errors.Is(err, usecase.ErrWrongPassword):
 			writeError(rw, r, http.StatusUnauthorized, "Invalid credentials")
-			return
-		case errors.Is(err, usecase.ErrValidation):
-			writeError(rw, r, http.StatusBadRequest, err.Error())
 			return
 		}
 		writeInternalError(rw, r, err)

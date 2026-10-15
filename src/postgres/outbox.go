@@ -16,14 +16,12 @@ func NewOutbox(db *DB) *Outbox {
 	return &Outbox{db: db}
 }
 
-func (o *Outbox) Dispatch(ctx context.Context, limit int, send func(ctx context.Context, msgs []usecase.Message) error) (int, error) {
-	selectQuery := `SELECT id, topic, key, value
-		FROM outbox ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED`
-	deleteQuery := `DELETE FROM outbox WHERE id = ANY($1)`
+func (o *Outbox) ProcessBatch(ctx context.Context, limit int, fn func(ctx context.Context, msgs []usecase.Message) error) (int, error) {
+	query := `DELETE FROM outbox WHERE id = ANY($1)`
 
-	var n int
+	var count int
 	err := o.db.runInTx(ctx, func(tx *sql.Tx) error {
-		ids, msgs, err := selectOutbox(ctx, tx, selectQuery, limit)
+		ids, msgs, err := selectOutboxMessages(ctx, tx, limit)
 		if err != nil {
 			return err
 		}
@@ -31,23 +29,25 @@ func (o *Outbox) Dispatch(ctx context.Context, limit int, send func(ctx context.
 			return nil
 		}
 
-		if err = send(ctx, msgs); err != nil {
+		if err = fn(ctx, msgs); err != nil {
 			return err
 		}
 
-		if _, err = tx.ExecContext(ctx, deleteQuery, ids); err != nil {
+		if _, err = tx.ExecContext(ctx, query, ids); err != nil {
 			return fmt.Errorf("delete outbox messages: %w", err)
 		}
-		n = len(msgs)
+		count = len(msgs)
 		return nil
 	})
 	if err != nil {
 		return 0, err
 	}
-	return n, nil
+	return count, nil
 }
 
-func selectOutbox(ctx context.Context, tx *sql.Tx, query string, limit int) ([]int64, []usecase.Message, error) {
+func selectOutboxMessages(ctx context.Context, tx *sql.Tx, limit int) ([]int64, []usecase.Message, error) {
+	query := `SELECT id, topic, key, value FROM outbox ORDER BY id LIMIT $1 FOR UPDATE`
+
 	rows, err := tx.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, nil, fmt.Errorf("select outbox messages: %w", err)

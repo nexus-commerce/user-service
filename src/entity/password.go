@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -13,6 +14,14 @@ var (
 	ErrEmptyPassword   = NewValidationError("must not be empty")
 	ErrPasswordTooLong = NewValidationError(fmt.Sprintf("must be at most %d bytes", maxPasswordBytes))
 )
+
+var dummyHash = sync.OnceValue(func() string {
+	hash, err := bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(fmt.Sprintf("generate dummy password hash: %v", err))
+	}
+	return string(hash)
+})
 
 type Password string
 
@@ -44,4 +53,8 @@ func (p Password) Matches(hash string) (bool, error) {
 	default:
 		return false, fmt.Errorf("compare password hash: %w", err)
 	}
+}
+
+func (p Password) MatchesNothing() {
+	_, _ = p.Matches(dummyHash())
 }

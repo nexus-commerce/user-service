@@ -37,13 +37,7 @@ definitions:
     type: object
   http.registerResponse:
     properties:
-      email:
-        type: string
-      firstName:
-        type: string
-      id:
-        type: string
-      lastName:
+      token:
         type: string
     type: object
   http.updateProfileRequest:
@@ -92,7 +86,7 @@ paths:
           schema:
             $ref: '#/definitions/http.loginResponse'
         "400":
-          description: Invalid request, malformed email or invalid password
+          description: Invalid request body
           schema:
             $ref: '#/definitions/http.errorResponse'
         "401":
@@ -114,7 +108,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new user account and publishes a user.registered event
+      description: Creates a new user account, publishes a user.registered event and
+        returns a JWT token
       parameters:
       - description: Registration data
         in: body

@@ -37,15 +37,12 @@ func (r *registerRequest) toRegistration() usecase.Registration {
 }
 
 type registerResponse struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	Token string `json:"token"`
 }
 
 // ServeHTTP godoc
 // @Summary     Register
-// @Description Creates a new user account and publishes a user.registered event
+// @Description Creates a new user account, publishes a user.registered event and returns a JWT token
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
@@ -63,7 +60,7 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
+	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrValidation):
@@ -77,12 +74,7 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, registerResponse{
-		ID:        user.ID,
-		Email:     string(user.Email),
-		FirstName: string(user.FirstName),
-		LastName:  string(user.LastName),
-	})
+	writeJSON(rw, r, http.StatusOK, registerResponse{Token: token})
 }
 
 func (h *Register) Route() Route {

@@ -2,28 +2,23 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
 type registerUsers interface {
-	CreateWithMessage(ctx context.Context, user *entity.User, msg Message) error
-}
-
-type registerEvents interface {
-	UserRegistered(user *entity.User) (Message, error)
+	Create(ctx context.Context, user *entity.User) error
 }
 
 type Register struct {
 	users  registerUsers
-	events registerEvents
+	tokens tokenIssuer
 }
 
-func NewRegister(users registerUsers, events registerEvents) *Register {
+func NewRegister(users registerUsers, tokens tokenIssuer) *Register {
 	return &Register{
 		users:  users,
-		events: events,
+		tokens: tokens,
 	}
 }
 
@@ -43,42 +38,20 @@ func (r Registration) profile() entity.Profile {
 	}
 }
 
-func (r Registration) validate() error {
-	if err := r.profile().Validate(); err != nil {
-		return err
-	}
-
-	if err := r.Password.Validate(); err != nil {
-		return fmt.Errorf("password: %w", err)
-	}
-
-	if r.Password != r.PasswordConfirmation {
-		return ErrPasswordMismatch
-	}
-
-	return nil
-}
-
-func (r *Register) Execute(ctx context.Context, reg Registration) (*entity.User, error) {
-	err := reg.validate()
-	if err != nil {
-		return nil, err
+func (r *Register) Execute(ctx context.Context, reg Registration) (string, error) {
+	if reg.Password != reg.PasswordConfirmation {
+		return "", ErrPasswordMismatch
 	}
 
 	user, err := entity.NewUser(reg.profile(), reg.Password)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	msg, err := r.events.UserRegistered(user)
+	err = r.users.Create(ctx, user)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	err = r.users.CreateWithMessage(ctx, user, msg)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return r.tokens.Issue(user.ID)
 }

@@ -10,17 +10,18 @@ import (
 	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
-// The topic and event type names are part of the public contract
-// documented in src/docs/asyncapi.yaml.
-const (
-	topicUsers         = "users"
-	typeUserRegistered = "user.registered"
-)
+const typeUserRegistered = "user.registered"
 
-type Events struct{}
+type Topics struct {
+	Users string
+}
 
-func NewEvents() *Events {
-	return &Events{}
+type Encoder struct {
+	topics Topics
+}
+
+func NewEncoder(topics Topics) *Encoder {
+	return &Encoder{topics: topics}
 }
 
 type envelope struct {
@@ -39,34 +40,41 @@ type userRegistered struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func (*Events) UserRegistered(u *entity.User) (usecase.Message, error) {
-	spec := messageSpec{
-		topic:   topicUsers,
-		typ:     typeUserRegistered,
-		version: "1.0",
-		key:     u.ID,
+func (enc *Encoder) Encode(e entity.Event) (usecase.Message, error) {
+	switch e := e.(type) {
+	case entity.UserRegistered:
+		spec := messageSpec{
+			topic:     enc.topics.Users,
+			typ:       typeUserRegistered,
+			version:   "1.0",
+			key:       e.UserID,
+			timestamp: e.OccurredAt,
+		}
+		return encode(spec, userRegistered{
+			UserID:    e.UserID,
+			Email:     string(e.Profile.Email),
+			FirstName: string(e.Profile.FirstName),
+			LastName:  string(e.Profile.LastName),
+			CreatedAt: e.OccurredAt,
+		})
+	default:
+		return usecase.Message{}, fmt.Errorf("unknown event %T", e)
 	}
-	return encode(spec, userRegistered{
-		UserID:    u.ID,
-		Email:     string(u.Profile.Email),
-		FirstName: string(u.Profile.FirstName),
-		LastName:  string(u.Profile.LastName),
-		CreatedAt: u.CreatedAt,
-	})
 }
 
 type messageSpec struct {
-	topic   string
-	typ     string
-	version string
-	key     string
+	topic     string
+	typ       string
+	version   string
+	key       string
+	timestamp time.Time
 }
 
 func encode(spec messageSpec, data any) (usecase.Message, error) {
 	value, err := json.Marshal(envelope{
 		ID:        uuid.New().String(),
 		Type:      spec.typ,
-		Timestamp: time.Now().UTC(),
+		Timestamp: spec.timestamp,
 		Version:   spec.version,
 		Data:      data,
 	})

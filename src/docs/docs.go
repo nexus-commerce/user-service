@@ -47,7 +47,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request, malformed email or invalid password",
+                        "description": "Invalid request body",
                         "schema": {
                             "$ref": "#/definitions/http.errorResponse"
                         }
@@ -75,7 +75,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account and publishes a user.registered event",
+                "description": "Creates a new user account, publishes a user.registered event and returns a JWT token",
                 "consumes": [
                     "application/json"
                 ],
@@ -448,16 +448,7 @@ const docTemplate = `{
         "http.registerResponse": {
             "type": "object",
             "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "firstName": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "lastName": {
+                "token": {
                     "type": "string"
                 }
             }

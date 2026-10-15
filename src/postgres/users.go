@@ -12,28 +12,17 @@ import (
 	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
-const (
-	uniqueViolation       = "23505"
-	emailUniqueConstraint = "users_email_key"
-)
-
-func isEmailTaken(err error) bool {
-	pgErr, ok := errors.AsType[*pgconn.PgError](err)
-	if !ok {
-		return false
-	}
-
-	isUniqueViolation := pgErr.Code == uniqueViolation
-	isEmailConstraint := pgErr.ConstraintName == emailUniqueConstraint
-	return isUniqueViolation && isEmailConstraint
+type eventEncoder interface {
+	Encode(e entity.Event) (usecase.Message, error)
 }
 
 type Users struct {
-	db *DB
+	db      *DB
+	encoder eventEncoder
 }
 
-func NewUsers(db *DB) *Users {
-	return &Users{db: db}
+func NewUsers(db *DB, encoder eventEncoder) *Users {
+	return &Users{db: db, encoder: encoder}
 }
 
 func (u *Users) ByEmail(ctx context.Context, email entity.Email) (*entity.User, error) {
@@ -54,34 +43,6 @@ func (u *Users) ByID(ctx context.Context, id string) (*entity.User, error) {
 		return nil, fmt.Errorf("select user by id: %w", err)
 	}
 	return user, err
-}
-
-func (u *Users) CreateWithMessage(ctx context.Context, user *entity.User, msg usecase.Message) error {
-	userQuery := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
-	outboxQuery := `INSERT INTO outbox (topic, key, value) VALUES ($1, $2, $3)`
-
-	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, userQuery,
-			user.ID,
-			user.FirstName,
-			user.LastName,
-			user.Email,
-			user.PasswordHash,
-			user.CreatedAt,
-		)
-		if err != nil {
-			if isEmailTaken(err) {
-				return usecase.ErrEmailTaken
-			}
-			return fmt.Errorf("insert user: %w", err)
-		}
-
-		_, err = tx.ExecContext(ctx, outboxQuery, msg.Topic, []byte(msg.Key), msg.Value)
-		if err != nil {
-			return fmt.Errorf("insert outbox message: %w", err)
-		}
-		return nil
-	})
 }
 
 func (u *Users) UpdateByID(ctx context.Context, id string, updateFn func(user *entity.User) (bool, error)) (*entity.User, error) {
@@ -117,12 +78,83 @@ func (u *Users) UpdateByID(ctx context.Context, id string, updateFn func(user *e
 			}
 			return fmt.Errorf("update user: %w", err)
 		}
-		return nil
+
+		msgs, err := u.pullMessages(user)
+		if err != nil {
+			return err
+		}
+		return insertOutboxMessages(ctx, tx, msgs)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (u *Users) Create(ctx context.Context, user *entity.User) error {
+	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
+
+	msgs, err := u.pullMessages(user)
+	if err != nil {
+		return err
+	}
+
+	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, query,
+			user.ID,
+			user.FirstName,
+			user.LastName,
+			user.Email,
+			user.PasswordHash,
+			user.CreatedAt,
+		)
+		if err != nil {
+			if isEmailTaken(err) {
+				return usecase.ErrEmailTaken
+			}
+			return fmt.Errorf("insert user: %w", err)
+		}
+
+		return insertOutboxMessages(ctx, tx, msgs)
+	})
+}
+
+func (u *Users) pullMessages(user *entity.User) ([]usecase.Message, error) {
+	events := user.PullEvents()
+	msgs := make([]usecase.Message, len(events))
+	for i, e := range events {
+		msg, err := u.encoder.Encode(e)
+		if err != nil {
+			return nil, fmt.Errorf("encode event: %w", err)
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
+}
+
+func insertOutboxMessages(ctx context.Context, tx *sql.Tx, msgs []usecase.Message) error {
+	query := `INSERT INTO outbox (topic, key, value)
+		SELECT topic, key, value
+		FROM unnest($1::text[], $2::bytea[], $3::bytea[]) WITH ORDINALITY AS m(topic, key, value, ord)
+		ORDER BY ord`
+
+	if len(msgs) == 0 {
+		return nil
+	}
+
+	topics := make([]string, len(msgs))
+	keys := make([][]byte, len(msgs))
+	values := make([][]byte, len(msgs))
+	for i, m := range msgs {
+		topics[i] = m.Topic
+		keys[i] = []byte(m.Key)
+		values[i] = m.Value
+	}
+
+	if _, err := tx.ExecContext(ctx, query, topics, keys, values); err != nil {
+		return fmt.Errorf("insert %d outbox messages: %w", len(msgs), err)
+	}
+	return nil
 }
 
 func scanUser(row *sql.Row) (*entity.User, error) {
@@ -142,4 +174,20 @@ func scanUser(row *sql.Row) (*entity.User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+const (
+	uniqueViolation       = "23505"
+	emailUniqueConstraint = "users_email_key"
+)
+
+func isEmailTaken(err error) bool {
+	pgErr, ok := errors.AsType[*pgconn.PgError](err)
+	if !ok {
+		return false
+	}
+
+	isUniqueViolation := pgErr.Code == uniqueViolation
+	isEmailConstraint := pgErr.ConstraintName == emailUniqueConstraint
+	return isUniqueViolation && isEmailConstraint
 }

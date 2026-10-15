@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 )
@@ -28,15 +28,11 @@ func NewLogin(users loginUsers, tokens tokenIssuer) *Login {
 }
 
 func (l *Login) Execute(ctx context.Context, email entity.Email, password entity.Password) (string, error) {
-	if err := email.Validate(); err != nil {
-		return "", fmt.Errorf("email: %w", err)
-	}
-
-	if err := password.Validate(); err != nil {
-		return "", fmt.Errorf("password: %w", err)
-	}
-
 	user, err := l.users.ByEmail(ctx, email)
+	if errors.Is(err, ErrUserNotFound) {
+		password.MatchesNothing()
+		return "", err
+	}
 	if err != nil {
 		return "", err
 	}

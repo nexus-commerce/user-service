@@ -4,7 +4,6 @@ import (
 	"context"
 )
 
-// Message is an encoded event ready to be stored in the outbox and published.
 type Message struct {
 	Topic string
 	Key   string
@@ -12,7 +11,7 @@ type Message struct {
 }
 
 type relayOutbox interface {
-	Dispatch(ctx context.Context, limit int, send func(ctx context.Context, msgs []Message) error) (int, error)
+	ProcessBatch(ctx context.Context, limit int, fn func(ctx context.Context, msgs []Message) error) (int, error)
 }
 
 type relayProducer interface {
@@ -32,7 +31,7 @@ func NewRelayMessages(outbox relayOutbox, producer relayProducer) *RelayMessages
 }
 
 func (rm *RelayMessages) Execute(ctx context.Context, limit int) (int, error) {
-	return rm.outbox.Dispatch(ctx, limit, func(ctx context.Context, msgs []Message) error {
+	return rm.outbox.ProcessBatch(ctx, limit, func(ctx context.Context, msgs []Message) error {
 		return rm.producer.Publish(ctx, msgs...)
 	})
 }
