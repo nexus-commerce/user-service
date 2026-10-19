@@ -8,7 +8,11 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-const topicUsers = "users"
+const (
+	topicUsers = "users"
+
+	typeUserRegistered = "user.registered"
+)
 
 type route struct {
 	event   entity.EventType
@@ -20,7 +24,7 @@ type route struct {
 
 func newRoute[E entity.Event](topic, typ, version string, fn func(E) any) route {
 	var zero E
-	t := zero.EventType()
+	t := zero.Type()
 	return route{
 		event:   t,
 		topic:   topic,
@@ -42,7 +46,7 @@ type encoder struct {
 
 func newEncoder() *encoder {
 	enc := &encoder{routes: make(map[entity.EventType]route)}
-	enc.register(newRoute(topicUsers, "user.registered", "1.0", convertUserRegistered))
+	enc.register(newRoute(topicUsers, typeUserRegistered, "1.0", convertUserRegistered))
 	return enc
 }
 
@@ -62,9 +66,9 @@ type envelope struct {
 }
 
 func (enc *encoder) encode(e entity.Event) (Message, error) {
-	r, ok := enc.routes[e.EventType()]
+	r, ok := enc.routes[e.Type()]
 	if !ok {
-		return Message{}, fmt.Errorf("no route for event %s", e.EventType())
+		return Message{}, fmt.Errorf("no route for event %s", e.Type())
 	}
 	data, err := r.convert(e)
 	if err != nil {

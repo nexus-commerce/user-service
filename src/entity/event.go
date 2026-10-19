@@ -20,7 +20,7 @@ func (m EventMeta) Meta() EventMeta {
 }
 
 type Event interface {
-	EventType() EventType
+	Type() EventType
 	Meta() EventMeta
 }
 
@@ -29,6 +29,6 @@ type UserRegistered struct {
 	Profile Profile
 }
 
-func (UserRegistered) EventType() EventType {
+func (UserRegistered) Type() EventType {
 	return EventUserRegistered
 }

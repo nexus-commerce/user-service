@@ -13,7 +13,7 @@ type unknownEvent struct {
 	entity.EventMeta
 }
 
-func (unknownEvent) EventType() entity.EventType {
+func (unknownEvent) Type() entity.EventType {
 	return "Unknown"
 }
 
