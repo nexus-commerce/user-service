@@ -120,8 +120,10 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 		t.Errorf("Events()[0].ID = nil, want non-nil")
 	}
 	want := entity.UserRegistered{
-		EventMeta: entity.EventMeta{ID: reg.ID, AggregateID: u.ID(), OccurredAt: u.CreatedAt()},
-		Profile:   profile,
+		ID:          reg.ID,
+		AggregateID: u.ID(),
+		OccurredAt:  u.CreatedAt(),
+		Profile:     profile,
 	}
 	if reg != want {
 		t.Errorf("Events()[0] = %+v, want %+v", reg, want)

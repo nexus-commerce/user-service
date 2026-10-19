@@ -21,12 +21,10 @@ func newUserRegistered(t *testing.T) entity.UserRegistered {
 		t.Fatalf("NewProfile(%+v) error: %v", fields, err)
 	}
 	return entity.UserRegistered{
-		EventMeta: entity.EventMeta{
-			ID:          uuid.New(),
-			AggregateID: uuid.New(),
-			OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
-		},
-		Profile: profile,
+		ID:          uuid.New(),
+		AggregateID: uuid.New(),
+		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
+		Profile:     profile,
 	}
 }
 
