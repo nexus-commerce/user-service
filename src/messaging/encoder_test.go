@@ -1,4 +1,4 @@
-package messaging_test
+package messaging
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"uuid"
 
 	"github.com/nexus-commerce/user-service/src/entity"
-	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
 type unknownEvent struct{}
@@ -35,10 +34,10 @@ func newUserRegistered(t *testing.T) entity.UserRegistered {
 }
 
 func TestEncodeUserRegistered(t *testing.T) {
-	enc := messaging.NewEncoder()
+	enc := newEncoder()
 	e := newUserRegistered(t)
 
-	msg, err := enc.Encode(e)
+	msg, err := enc.encode(e)
 	if err != nil {
 		t.Fatalf("Encode = _, %v; want _, nil", err)
 	}
@@ -64,17 +63,17 @@ func TestEncodeUserRegistered(t *testing.T) {
 }
 
 func TestEncodeRejectsUnknownEvent(t *testing.T) {
-	enc := messaging.NewEncoder()
+	enc := newEncoder()
 
-	if _, err := enc.Encode(unknownEvent{}); err == nil {
+	if _, err := enc.encode(unknownEvent{}); err == nil {
 		t.Error("Encode(unknownEvent) = _, nil; want error")
 	}
 }
 
 func TestEncodeRejectsMismatchedType(t *testing.T) {
-	enc := messaging.NewEncoder()
+	enc := newEncoder()
 
-	if _, err := enc.Encode(mismatchedEvent{newUserRegistered(t)}); err == nil {
+	if _, err := enc.encode(mismatchedEvent{newUserRegistered(t)}); err == nil {
 		t.Error("Encode(mismatchedEvent) = _, nil; want error")
 	}
 }

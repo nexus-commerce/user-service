@@ -10,7 +10,7 @@ import (
 
 const topicUsers = "users"
 
-type Encoder struct {
+type encoder struct {
 	routes map[entity.EventType]route
 }
 
@@ -27,13 +27,13 @@ type meta struct {
 	timestamp time.Time
 }
 
-func NewEncoder() *Encoder {
-	enc := &Encoder{routes: make(map[entity.EventType]route)}
+func newEncoder() *encoder {
+	enc := &encoder{routes: make(map[entity.EventType]route)}
 	register(enc, topicUsers, "user.registered", "1.0", convertUserRegistered)
 	return enc
 }
 
-func register[E entity.Event](enc *Encoder, topic, typ, version string, fn func(E) (meta, any)) {
+func register[E entity.Event](enc *encoder, topic, typ, version string, fn func(E) (meta, any)) {
 	var zero E
 	t := zero.EventType()
 	if _, ok := enc.routes[t]; ok {
@@ -85,7 +85,7 @@ func convertUserRegistered(e entity.UserRegistered) (meta, any) {
 	}
 }
 
-func (enc *Encoder) Encode(e entity.Event) (Message, error) {
+func (enc *encoder) encode(e entity.Event) (Message, error) {
 	r, ok := enc.routes[e.EventType()]
 	if !ok {
 		return Message{}, fmt.Errorf("no route for event %s", e.EventType())

@@ -12,11 +12,11 @@ type Producer interface {
 }
 
 type Publisher struct {
-	encoder *Encoder
+	encoder *encoder
 }
 
-func NewPublisher(encoder *Encoder) *Publisher {
-	return &Publisher{encoder: encoder}
+func NewPublisher() *Publisher {
+	return &Publisher{encoder: newEncoder()}
 }
 
 func (p *Publisher) Publish(ctx context.Context, pr Producer, events []entity.Event) error {
@@ -25,7 +25,7 @@ func (p *Publisher) Publish(ctx context.Context, pr Producer, events []entity.Ev
 	}
 	msgs := make([]Message, 0, len(events))
 	for _, e := range events {
-		msg, err := p.encoder.Encode(e)
+		msg, err := p.encoder.encode(e)
 		if err != nil {
 			return fmt.Errorf("encode event: %w", err)
 		}

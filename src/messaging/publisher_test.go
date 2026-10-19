@@ -1,24 +1,23 @@
-package messaging_test
+package messaging
 
 import (
 	"context"
 	"testing"
 
 	"github.com/nexus-commerce/user-service/src/entity"
-	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
 type fakeProducer struct {
-	calls [][]messaging.Message
+	calls [][]Message
 }
 
-func (p *fakeProducer) Produce(_ context.Context, msgs ...messaging.Message) error {
+func (p *fakeProducer) Produce(_ context.Context, msgs ...Message) error {
 	p.calls = append(p.calls, msgs)
 	return nil
 }
 
 func TestPublishProducesEncodedMessages(t *testing.T) {
-	pub := messaging.NewPublisher(messaging.NewEncoder())
+	pub := NewPublisher()
 	producer := &fakeProducer{}
 	first, second := newUserRegistered(t), newUserRegistered(t)
 
@@ -35,7 +34,7 @@ func TestPublishProducesEncodedMessages(t *testing.T) {
 }
 
 func TestPublishSkipsEmptyEvents(t *testing.T) {
-	pub := messaging.NewPublisher(messaging.NewEncoder())
+	pub := NewPublisher()
 	producer := &fakeProducer{}
 
 	if err := pub.Publish(context.Background(), producer, nil); err != nil {
@@ -47,7 +46,7 @@ func TestPublishSkipsEmptyEvents(t *testing.T) {
 }
 
 func TestPublishReturnsEncodeError(t *testing.T) {
-	pub := messaging.NewPublisher(messaging.NewEncoder())
+	pub := NewPublisher()
 	producer := &fakeProducer{}
 
 	err := pub.Publish(context.Background(), producer, []entity.Event{newUserRegistered(t), unknownEvent{}})
