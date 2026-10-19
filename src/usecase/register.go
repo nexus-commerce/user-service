@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/nexus-commerce/user-service/src/entity"
 )
@@ -33,7 +32,7 @@ type Registration struct {
 
 func (r *Register) Execute(ctx context.Context, reg Registration) (string, error) {
 	if reg.Password != reg.PasswordConfirmation {
-		return "", ErrPasswordMismatch
+		return "", &entity.FieldError{Field: "passwordConfirmation", Err: ErrPasswordMismatch}
 	}
 
 	profile, err := entity.NewProfile(entity.ProfileFields{
@@ -46,7 +45,7 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 	}
 	password, err := entity.NewPassword(reg.Password)
 	if err != nil {
-		return "", fmt.Errorf("password: %w", err)
+		return "", &entity.FieldError{Field: "password", Err: err}
 	}
 	user, err := entity.NewUser(profile, password)
 	if err != nil {
