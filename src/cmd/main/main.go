@@ -14,8 +14,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/nexus-commerce/user-service/src/config"
-	"github.com/nexus-commerce/user-service/src/controller/httpapi"
 	"github.com/nexus-commerce/user-service/src/docs"
+	"github.com/nexus-commerce/user-service/src/httpapi"
 	"github.com/nexus-commerce/user-service/src/jwt"
 	"github.com/nexus-commerce/user-service/src/messaging"
 	"github.com/nexus-commerce/user-service/src/postgres"
