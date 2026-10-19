@@ -21,6 +21,26 @@ func NewGetProfile(users getProfileUsers) *GetProfile {
 	}
 }
 
-func (gp *GetProfile) Execute(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
-	return gp.users.ByID(ctx, userID)
+type ProfileView struct {
+	ID        uuid.UUID
+	Email     string
+	FirstName string
+	LastName  string
+}
+
+func toProfileView(u *entity.User) ProfileView {
+	return ProfileView{
+		ID:        u.ID(),
+		Email:     u.Email().String(),
+		FirstName: u.FirstName().String(),
+		LastName:  u.LastName().String(),
+	}
+}
+
+func (gp *GetProfile) Execute(ctx context.Context, userID uuid.UUID) (ProfileView, error) {
+	user, err := gp.users.ByID(ctx, userID)
+	if err != nil {
+		return ProfileView{}, err
+	}
+	return toProfileView(user), nil
 }

@@ -14,12 +14,16 @@ import (
 	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
-type Users struct {
-	db     *Database
-	events *messaging.Publisher
+type eventPublisher interface {
+	Publish(ctx context.Context, pr messaging.Producer, events []entity.Event) error
 }
 
-func NewUsers(db *Database, events *messaging.Publisher) *Users {
+type Users struct {
+	db     *Database
+	events eventPublisher
+}
+
+func NewUsers(db *Database, events eventPublisher) *Users {
 	return &Users{db: db, events: events}
 }
 

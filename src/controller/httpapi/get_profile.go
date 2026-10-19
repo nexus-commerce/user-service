@@ -29,6 +29,17 @@ type userResponse struct {
 	LastName  string `json:"lastName"`
 }
 
+func toProfileResponse(v usecase.ProfileView) profileResponse {
+	return profileResponse{
+		User: &userResponse{
+			ID:        v.ID.String(),
+			Email:     v.Email,
+			FirstName: v.FirstName,
+			LastName:  v.LastName,
+		},
+	}
+}
+
 // ServeHTTP godoc
 // @Summary     Get profile
 // @Description Returns the profile of the authenticated user
@@ -47,7 +58,7 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.uc.Execute(r.Context(), userID)
+	profile, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			writeError(rw, r, http.StatusNotFound, err.Error())
@@ -57,14 +68,7 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, profileResponse{
-		User: &userResponse{
-			ID:        user.ID().String(),
-			Email:     user.Email().String(),
-			FirstName: user.FirstName().String(),
-			LastName:  user.LastName().String(),
-		},
-	})
+	writeJSON(rw, r, http.StatusOK, toProfileResponse(profile))
 }
 
 func (h *GetProfile) Route() Route {

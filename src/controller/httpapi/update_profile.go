@@ -63,7 +63,7 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.uc.Execute(r.Context(), reqBody.toProfileUpdate(userID))
+	profile, err := h.uc.Execute(r.Context(), reqBody.toProfileUpdate(userID))
 	if err != nil {
 		switch {
 		case errors.Is(err, entity.ErrValidation):
@@ -80,14 +80,7 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, profileResponse{
-		User: &userResponse{
-			ID:        user.ID().String(),
-			Email:     user.Email().String(),
-			FirstName: user.FirstName().String(),
-			LastName:  user.LastName().String(),
-		},
-	})
+	writeJSON(rw, r, http.StatusOK, toProfileResponse(profile))
 }
 
 func (h *UpdateProfile) Route() Route {
