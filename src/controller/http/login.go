@@ -23,6 +23,13 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+func (r *loginRequest) toCredentials() usecase.Credentials {
+	return usecase.Credentials{
+		Email:    r.Email,
+		Password: r.Password,
+	}
+}
+
 type loginResponse struct {
 	Token string `json:"token"`
 }
@@ -47,7 +54,7 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.uc.Execute(r.Context(), reqBody.Email, reqBody.Password)
+	token, err := h.uc.Execute(r.Context(), reqBody.toCredentials())
 	if err != nil {
 		if errors.Is(err, entity.ErrInvalidCredentials) {
 			writeError(rw, r, http.StatusUnauthorized, "Invalid credentials")

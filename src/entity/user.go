@@ -2,7 +2,6 @@ package entity
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"time"
 	"uuid"
@@ -23,15 +22,15 @@ type ProfileFields struct {
 func NewProfile(f ProfileFields) (Profile, error) {
 	fn, err := NewName(f.FirstName)
 	if err != nil {
-		return Profile{}, fmt.Errorf("first name: %w", err)
+		return Profile{}, &FieldError{Field: "firstName", Err: err}
 	}
 	ln, err := NewName(f.LastName)
 	if err != nil {
-		return Profile{}, fmt.Errorf("last name: %w", err)
+		return Profile{}, &FieldError{Field: "lastName", Err: err}
 	}
 	e, err := NewEmail(f.Email)
 	if err != nil {
-		return Profile{}, fmt.Errorf("email: %w", err)
+		return Profile{}, &FieldError{Field: "email", Err: err}
 	}
 	return Profile{email: e, firstName: fn, lastName: ln}, nil
 }

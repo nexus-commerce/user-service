@@ -3,6 +3,7 @@ package messaging
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/nexus-commerce/user-service/src/entity"
@@ -14,39 +15,37 @@ const (
 	typeUserRegistered = "user.registered"
 )
 
-type route struct {
-	event   entity.EventType
+type destination struct {
 	topic   string
 	typ     string
 	version string
-	convert func(entity.Event) (any, error)
 }
 
-func newRoute[E entity.Event](topic, typ, version string, fn func(E) any) route {
-	var zero E
-	t := zero.Type()
+type route struct {
+	destination
+	event   reflect.Type
+	convert func(entity.Event) any
+}
+
+func newRoute[E entity.Event](dst destination, fn func(E) any) route {
 	return route{
-		event:   t,
-		topic:   topic,
-		typ:     typ,
-		version: version,
-		convert: func(e entity.Event) (any, error) {
-			ev, ok := e.(E)
-			if !ok {
-				return nil, fmt.Errorf("event %s: unexpected type %T", t, e)
-			}
-			return fn(ev), nil
-		},
+		destination: dst,
+		event:       reflect.TypeFor[E](),
+		convert:     func(e entity.Event) any { return fn(e.(E)) },
 	}
 }
 
 type encoder struct {
-	routes map[entity.EventType]route
+	routes map[reflect.Type]route
 }
 
 func newEncoder() *encoder {
-	enc := &encoder{routes: make(map[entity.EventType]route)}
-	enc.register(newRoute(topicUsers, typeUserRegistered, "1.0", convertUserRegistered))
+	enc := &encoder{routes: make(map[reflect.Type]route)}
+	enc.register(newRoute(destination{
+		topic:   topicUsers,
+		typ:     typeUserRegistered,
+		version: "1.0",
+	}, convertUserRegistered))
 	return enc
 }
 
@@ -66,13 +65,9 @@ type envelope struct {
 }
 
 func (enc *encoder) encode(e entity.Event) (Message, error) {
-	r, ok := enc.routes[e.Type()]
+	r, ok := enc.routes[reflect.TypeOf(e)]
 	if !ok {
-		return Message{}, fmt.Errorf("no route for event %s", e.Type())
-	}
-	data, err := r.convert(e)
-	if err != nil {
-		return Message{}, err
+		return Message{}, fmt.Errorf("no route for event %T", e)
 	}
 	meta := e.Meta()
 	value, err := json.Marshal(envelope{
@@ -80,7 +75,7 @@ func (enc *encoder) encode(e entity.Event) (Message, error) {
 		Type:      r.typ,
 		Timestamp: meta.OccurredAt,
 		Version:   r.version,
-		Data:      data,
+		Data:      r.convert(e),
 	})
 	if err != nil {
 		return Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)

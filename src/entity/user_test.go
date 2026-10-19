@@ -12,15 +12,15 @@ import (
 
 func TestNewProfile(t *testing.T) {
 	tests := []struct {
-		name       string
-		fields     entity.ProfileFields
-		wantErr    error
-		wantPrefix string
+		name      string
+		fields    entity.ProfileFields
+		wantErr   error
+		wantField string
 	}{
 		{name: "valid", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}},
-		{name: "bad first name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"}, wantErr: entity.ErrEmptyName, wantPrefix: "first name: "},
-		{name: "bad last name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "}, wantErr: entity.ErrEmptyName, wantPrefix: "last name: "},
-		{name: "bad email", fields: entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"}, wantErr: entity.ErrMalformedEmail, wantPrefix: "email: "},
+		{name: "bad first name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"}, wantErr: entity.ErrEmptyName, wantField: "firstName"},
+		{name: "bad last name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "}, wantErr: entity.ErrEmptyName, wantField: "lastName"},
+		{name: "bad email", fields: entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"}, wantErr: entity.ErrMalformedEmail, wantField: "email"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -29,8 +29,8 @@ func TestNewProfile(t *testing.T) {
 				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
 					t.Fatalf("error = %v, want %v", err, tt.wantErr)
 				}
-				if !strings.HasPrefix(err.Error(), tt.wantPrefix) {
-					t.Errorf("error = %q, want prefix %q", err, tt.wantPrefix)
+				if fe, ok := errors.AsType[*entity.FieldError](err); !ok || fe.Field != tt.wantField {
+					t.Errorf("error = %v, want field %q", err, tt.wantField)
 				}
 				return
 			}

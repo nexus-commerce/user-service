@@ -35,20 +35,25 @@ func NewLogin(users loginUsers, tokens tokenIssuer) (*Login, error) {
 	}, nil
 }
 
-func (l *Login) Execute(ctx context.Context, rawEmail, rawPassword string) (string, error) {
-	user, err := l.authenticate(ctx, rawEmail, rawPassword)
+type Credentials struct {
+	Email    string
+	Password string
+}
+
+func (l *Login) Execute(ctx context.Context, creds Credentials) (string, error) {
+	user, err := l.authenticate(ctx, creds)
 	if err != nil {
 		return "", err
 	}
 	return l.tokens.Issue(user.ID())
 }
 
-func (l *Login) authenticate(ctx context.Context, rawEmail, rawPassword string) (*entity.User, error) {
-	email, err := entity.NewEmail(rawEmail)
+func (l *Login) authenticate(ctx context.Context, creds Credentials) (*entity.User, error) {
+	email, err := entity.NewEmail(creds.Email)
 	if err != nil {
 		return nil, l.rejectTimingSafe()
 	}
-	password, err := entity.NewPassword(rawPassword)
+	password, err := entity.NewPassword(creds.Password)
 	if err != nil {
 		return nil, l.rejectTimingSafe()
 	}

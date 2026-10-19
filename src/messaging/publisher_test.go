@@ -49,7 +49,7 @@ func TestPublishReturnsEncodeError(t *testing.T) {
 	pub := NewPublisher()
 	fake := &fakeProducer{}
 
-	err := pub.Publish(context.Background(), fake, []entity.Event{newUserRegistered(t), unknownEvent{}})
+	err := pub.Publish(context.Background(), fake, []entity.Event{newUserRegistered(t), unroutedEvent{newUserRegistered(t)}})
 	if err == nil {
 		t.Fatal("Publish = nil; want error")
 	}

@@ -5,10 +5,6 @@ import (
 	"uuid"
 )
 
-type EventType string
-
-const EventUserRegistered EventType = "UserRegistered"
-
 type EventMeta struct {
 	ID          uuid.UUID
 	AggregateID uuid.UUID
@@ -20,8 +16,8 @@ func (m EventMeta) Meta() EventMeta {
 }
 
 type Event interface {
-	Type() EventType
 	Meta() EventMeta
+	isEvent()
 }
 
 type UserRegistered struct {
@@ -29,6 +25,4 @@ type UserRegistered struct {
 	Profile Profile
 }
 
-func (UserRegistered) Type() EventType {
-	return EventUserRegistered
-}
+func (UserRegistered) isEvent() {}

@@ -9,15 +9,7 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type unknownEvent struct {
-	entity.EventMeta
-}
-
-func (unknownEvent) Type() entity.EventType {
-	return "Unknown"
-}
-
-type mismatchedEvent struct {
+type unroutedEvent struct {
 	entity.UserRegistered
 }
 
@@ -66,18 +58,10 @@ func TestEncodeUserRegistered(t *testing.T) {
 	}
 }
 
-func TestEncodeRejectsUnknownEvent(t *testing.T) {
+func TestEncodeRejectsUnroutedEvent(t *testing.T) {
 	enc := newEncoder()
 
-	if _, err := enc.encode(unknownEvent{}); err == nil {
-		t.Error("Encode(unknownEvent) = _, nil; want error")
-	}
-}
-
-func TestEncodeRejectsMismatchedType(t *testing.T) {
-	enc := newEncoder()
-
-	if _, err := enc.encode(mismatchedEvent{newUserRegistered(t)}); err == nil {
-		t.Error("Encode(mismatchedEvent) = _, nil; want error")
+	if _, err := enc.encode(unroutedEvent{newUserRegistered(t)}); err == nil {
+		t.Error("Encode(unroutedEvent) = _, nil; want error")
 	}
 }
