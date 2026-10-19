@@ -5,70 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
-type eventEncoder interface {
-	Encode(e entity.Event) (messaging.Message, bool, error)
-}
-
-type OutboxWriter struct {
-	encoder eventEncoder
-}
-
-func NewOutboxWriter(encoder eventEncoder) *OutboxWriter {
-	return &OutboxWriter{encoder: encoder}
-}
-
-func (w *OutboxWriter) Write(ctx context.Context, tx *sql.Tx, events []entity.Event) error {
-	msgs := make([]messaging.Message, 0, len(events))
-	for _, e := range events {
-		msg, ok, err := w.encoder.Encode(e)
-		if err != nil {
-			return fmt.Errorf("encode event: %w", err)
-		}
-		if ok {
-			msgs = append(msgs, msg)
-		}
-	}
-	return insertOutboxMessages(ctx, tx, msgs)
-}
-
-func insertOutboxMessages(ctx context.Context, tx *sql.Tx, msgs []messaging.Message) error {
-	query := `INSERT INTO outbox (event_id, topic, key, value)
-		SELECT event_id, topic, key, value
-		FROM unnest($1::uuid[], $2::text[], $3::bytea[], $4::bytea[])
-			WITH ORDINALITY AS m(event_id, topic, key, value, ord)
-		ORDER BY ord
-		ON CONFLICT (event_id) DO NOTHING`
-
-	if len(msgs) == 0 {
-		return nil
-	}
-
-	ids := make([]string, len(msgs))
-	topics := make([]string, len(msgs))
-	keys := make([][]byte, len(msgs))
-	values := make([][]byte, len(msgs))
-	for i, m := range msgs {
-		ids[i] = m.ID
-		topics[i] = m.Topic
-		keys[i] = []byte(m.Key)
-		values[i] = m.Value
-	}
-
-	if _, err := tx.ExecContext(ctx, query, ids, topics, keys, values); err != nil {
-		return fmt.Errorf("insert %d outbox messages: %w", len(msgs), err)
-	}
-	return nil
-}
-
 type Outbox struct {
-	db *DB
+	db *Database
 }
 
-func NewOutbox(db *DB) *Outbox {
+func NewOutbox(db *Database) *Outbox {
 	return &Outbox{db: db}
 }
 

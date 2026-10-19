@@ -11,14 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/messaging"
 )
 
-type Users struct {
-	db     *DB
-	events *OutboxWriter
+type eventPublisher interface {
+	Publish(ctx context.Context, to messaging.Producer, events []entity.Event) error
 }
 
-func NewUsers(db *DB, events *OutboxWriter) *Users {
+type Users struct {
+	db     *Database
+	events eventPublisher
+}
+
+func NewUsers(db *Database, events eventPublisher) *Users {
 	return &Users{db: db, events: events}
 }
 
@@ -76,7 +81,7 @@ func (u *Users) Update(ctx context.Context, id uuid.UUID, updateFn func(user *en
 			return fmt.Errorf("update user: %w", err)
 		}
 
-		return u.events.Write(ctx, tx, user.Events())
+		return u.events.Publish(ctx, outboxProducer{tx: tx}, user.Events())
 	})
 	if err != nil {
 		return nil, err
@@ -103,7 +108,7 @@ func (u *Users) Add(ctx context.Context, user *entity.User) error {
 			return fmt.Errorf("insert user: %w", err)
 		}
 
-		return u.events.Write(ctx, tx, user.Events())
+		return u.events.Publish(ctx, outboxProducer{tx: tx}, user.Events())
 	})
 }
 

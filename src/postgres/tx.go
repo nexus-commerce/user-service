@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func (d *DB) runInTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (d *Database) runInTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	tx, err := d.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)

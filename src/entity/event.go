@@ -5,8 +5,12 @@ import (
 	"uuid"
 )
 
+type EventType string
+
+const EventUserRegistered EventType = "UserRegistered"
+
 type Event interface {
-	event()
+	EventType() EventType
 }
 
 type UserRegistered struct {
@@ -16,4 +20,6 @@ type UserRegistered struct {
 	OccurredAt time.Time
 }
 
-func (UserRegistered) event() {}
+func (UserRegistered) EventType() EventType {
+	return EventUserRegistered
+}

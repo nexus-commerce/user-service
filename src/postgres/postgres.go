@@ -11,11 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-type DB struct {
+type Database struct {
 	pool *sql.DB
 }
 
-func New(ctx context.Context, dsn string) (*DB, error) {
+func New(ctx context.Context, dsn string) (*Database, error) {
 	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse dsn: %w", err)
@@ -31,9 +31,9 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 		return nil, errors.Join(fmt.Errorf("ping: %w", err), pool.Close())
 	}
 
-	return &DB{pool: pool}, nil
+	return &Database{pool: pool}, nil
 }
 
-func (d *DB) Close() error {
+func (d *Database) Close() error {
 	return d.pool.Close()
 }

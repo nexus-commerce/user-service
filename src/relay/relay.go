@@ -13,7 +13,7 @@ type Outbox interface {
 }
 
 type Producer interface {
-	Publish(ctx context.Context, msgs ...messaging.Message) error
+	Produce(ctx context.Context, msgs ...messaging.Message) error
 }
 
 type Options struct {
@@ -64,6 +64,6 @@ func (r *Relay) flush(ctx context.Context) {
 
 func (r *Relay) processBatch(ctx context.Context) (int, error) {
 	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, func(ctx context.Context, msgs []messaging.Message) error {
-		return r.producer.Publish(ctx, msgs...)
+		return r.producer.Produce(ctx, msgs...)
 	})
 }

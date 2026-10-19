@@ -27,7 +27,7 @@ func NewProducer(addr string) *Producer {
 	}
 }
 
-func (p *Producer) Publish(ctx context.Context, msgs ...messaging.Message) error {
+func (p *Producer) Produce(ctx context.Context, msgs ...messaging.Message) error {
 	kmsgs := make([]kafka.Message, len(msgs))
 	for i, m := range msgs {
 		kmsgs[i] = kafka.Message{

@@ -15,7 +15,7 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-func (d *DB) Migrate(ctx context.Context) error {
+func (d *Database) Migrate(ctx context.Context) error {
 	source, err := iofs.New(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("open source: %w", err)
