@@ -10,6 +10,8 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
+var janeDoe = entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
+
 func TestNewProfile(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -17,28 +19,46 @@ func TestNewProfile(t *testing.T) {
 		wantErr   error
 		wantField string
 	}{
-		{name: "valid", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}},
-		{name: "bad first name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"}, wantErr: entity.ErrEmptyName, wantField: "firstName"},
-		{name: "bad last name", fields: entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "}, wantErr: entity.ErrEmptyName, wantField: "lastName"},
-		{name: "bad email", fields: entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"}, wantErr: entity.ErrMalformedEmail, wantField: "email"},
+		{
+			name:   "valid",
+			fields: janeDoe,
+		},
+		{
+			name:      "bad first name",
+			fields:    entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"},
+			wantErr:   entity.ErrEmptyName,
+			wantField: "firstName",
+		},
+		{
+			name:      "bad last name",
+			fields:    entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "},
+			wantErr:   entity.ErrEmptyName,
+			wantField: "lastName",
+		},
+		{
+			name:      "bad email",
+			fields:    entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"},
+			wantErr:   entity.ErrMalformedEmail,
+			wantField: "email",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := entity.NewProfile(tt.fields)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
-					t.Fatalf("error = %v, want %v", err, tt.wantErr)
+					t.Fatalf("NewProfile(%+v) error = %v, want %v", tt.fields, err, tt.wantErr)
 				}
 				if fe, ok := errors.AsType[*entity.FieldError](err); !ok || fe.Field != tt.wantField {
-					t.Errorf("error = %v, want field %q", err, tt.wantField)
+					t.Errorf("NewProfile(%+v) error = %v, want FieldError for %q", tt.fields, err, tt.wantField)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatalf("NewProfile(%+v) unexpected error: %v", tt.fields, err)
 			}
-			if p.Email().String() != tt.fields.Email || p.FirstName().String() != tt.fields.FirstName || p.LastName().String() != tt.fields.LastName {
-				t.Errorf("profile = %s %s %s", p.Email(), p.FirstName(), p.LastName())
+			if got := fieldsOf(p); got != tt.fields {
+				t.Errorf("NewProfile(%+v) = %+v, want %+v", tt.fields, got, tt.fields)
 			}
 		})
 	}
@@ -48,18 +68,41 @@ func mustProfile(t *testing.T, f entity.ProfileFields) entity.Profile {
 	t.Helper()
 	p, err := entity.NewProfile(f)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewProfile(%+v) error: %v", f, err)
 	}
 	return p
 }
 
+func mustPassword(t *testing.T, s string) entity.Password {
+	t.Helper()
+	p, err := entity.NewPassword(s)
+	if err != nil {
+		t.Fatalf("NewPassword(%q) error: %v", s, err)
+	}
+	return p
+}
+
+type profileView interface {
+	Email() entity.Email
+	FirstName() entity.Name
+	LastName() entity.Name
+}
+
+func fieldsOf(p profileView) entity.ProfileFields {
+	return entity.ProfileFields{
+		Email:     p.Email().String(),
+		FirstName: p.FirstName().String(),
+		LastName:  p.LastName().String(),
+	}
+}
+
 func TestNewUserRecordsRegistration(t *testing.T) {
-	profile := mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
-	password, _ := entity.NewPassword("s3cret")
+	profile := mustProfile(t, janeDoe)
+	password := mustPassword(t, "s3cret")
 
 	u, err := entity.NewUser(profile, password)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewUser() error: %v", err)
 	}
 	if err := u.Authenticate(password); err != nil {
 		t.Errorf("Authenticate = %v, want nil", err)
@@ -67,14 +110,21 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 
 	events := u.Events()
 	if len(events) != 1 {
-		t.Fatalf("got %d events, want 1", len(events))
+		t.Fatalf("Events() returned %d events, want 1", len(events))
 	}
 	reg, ok := events[0].(entity.UserRegistered)
 	if !ok {
-		t.Fatalf("event %T, want UserRegistered", events[0])
+		t.Fatalf("Events()[0] is %T, want UserRegistered", events[0])
 	}
-	if reg.ID == uuid.Nil() || reg.AggregateID != u.ID() || reg.Profile != profile || !reg.OccurredAt.Equal(u.CreatedAt()) {
-		t.Errorf("event = %+v", reg)
+	if reg.ID == uuid.Nil() {
+		t.Errorf("Events()[0].ID = nil, want non-nil")
+	}
+	want := entity.UserRegistered{
+		EventMeta: entity.EventMeta{ID: reg.ID, AggregateID: u.ID(), OccurredAt: u.CreatedAt()},
+		Profile:   profile,
+	}
+	if reg != want {
+		t.Errorf("Events()[0] = %+v, want %+v", reg, want)
 	}
 
 	again := u.Events()
@@ -84,10 +134,10 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 }
 
 func TestEventsReturnsCopy(t *testing.T) {
-	password, _ := entity.NewPassword("s3cret")
-	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
+	password := mustPassword(t, "s3cret")
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewUser() error: %v", err)
 	}
 
 	events := u.Events()
@@ -99,28 +149,24 @@ func TestEventsReturnsCopy(t *testing.T) {
 }
 
 func TestChangeProfile(t *testing.T) {
-	password, _ := entity.NewPassword("s3cret")
-	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
+	password := mustPassword(t, "s3cret")
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewUser() error: %v", err)
 	}
 
 	changed := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
 	if !u.ChangeProfile(changed) {
 		t.Error("ChangeProfile(new profile) = false, want true")
 	}
-	if !hasProfile(u, changed) {
-		t.Errorf("profile = %s %s %s, want %+v", u.Email(), u.FirstName(), u.LastName(), changed)
+	if got, want := fieldsOf(u), fieldsOf(changed); got != want {
+		t.Errorf("after ChangeProfile, user profile = %+v, want %+v", got, want)
 	}
 
 	same := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
 	if u.ChangeProfile(same) {
 		t.Error("ChangeProfile(same profile) = true, want false")
 	}
-}
-
-func hasProfile(u *entity.User, p entity.Profile) bool {
-	return u.Email() == p.Email() && u.FirstName() == p.FirstName() && u.LastName() == p.LastName()
 }
 
 func TestRestoreProfile(t *testing.T) {
@@ -131,41 +177,46 @@ func TestRestoreProfile(t *testing.T) {
 	if _, err := entity.NewProfile(fields); err == nil {
 		t.Fatal("NewProfile accepted data that should fail current rules")
 	}
-	if p.Email().String() != "Legacy@Example.com" || p.FirstName().String() != longName || p.LastName().String() != "Doe" {
-		t.Errorf("restored profile = %s %s %s", p.Email(), p.FirstName(), p.LastName())
+	if got := fieldsOf(p); got != fields {
+		t.Errorf("RestoreProfile(%+v) = %+v, want %+v", fields, got, fields)
 	}
 }
 
 func TestRestoreUser(t *testing.T) {
-	password, _ := entity.NewPassword("s3cret")
+	password := mustPassword(t, "s3cret")
 	hash, err := password.Hash()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Hash() error: %v", err)
 	}
 	id := uuid.New()
-	profile := mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
+	fields := janeDoe
+	profile := mustProfile(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
 	t.Run("valid", func(t *testing.T) {
 		u, err := entity.RestoreUser(id, profile, hash, createdAt)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("RestoreUser() error: %v", err)
 		}
-		if u.ID() != id || !hasProfile(u, profile) || u.PasswordHash() != hash || !u.CreatedAt().Equal(createdAt) {
-			t.Errorf("restored user = %v %s %s %s %s %v", u.ID(), u.Email(), u.FirstName(), u.LastName(), u.PasswordHash(), u.CreatedAt())
+		got := fieldsOf(u)
+		matches := u.ID() == id && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
+		if !matches {
+			t.Errorf("RestoreUser() = {id: %v, profile: %+v, hash: %q, createdAt: %v}, want {id: %v, profile: %+v, hash: %q, createdAt: %v}",
+				u.ID(), got, u.PasswordHash(), u.CreatedAt(), id, fields, hash, createdAt)
 		}
 		if err := u.Authenticate(password); err != nil {
 			t.Errorf("Authenticate = %v, want nil", err)
 		}
 		if events := u.Events(); len(events) != 0 {
-			t.Errorf("got %d events, want none", len(events))
+			t.Errorf("Events() after RestoreUser returned %d events, want 0", len(events))
 		}
 	})
 
 	t.Run("malformed hash", func(t *testing.T) {
-		_, err := entity.RestoreUser(id, profile, "not-a-bcrypt-hash", createdAt)
+		const malformed = "not-a-bcrypt-hash"
+		_, err := entity.RestoreUser(id, profile, malformed, createdAt)
 		if !errors.Is(err, entity.ErrMalformedPasswordHash) {
-			t.Fatalf("error = %v, want %v", err, entity.ErrMalformedPasswordHash)
+			t.Fatalf("RestoreUser(hash=%q) error = %v, want %v", malformed, err, entity.ErrMalformedPasswordHash)
 		}
 		if errors.Is(err, entity.ErrValidation) {
 			t.Error("malformed hash must not be a validation error")
@@ -174,11 +225,11 @@ func TestRestoreUser(t *testing.T) {
 }
 
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
-	password, _ := entity.NewPassword("s3cret")
-	other, _ := entity.NewPassword("other")
-	u, err := entity.NewUser(mustProfile(t, entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}), password)
+	password := mustPassword(t, "s3cret")
+	other := mustPassword(t, "other")
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewUser() error: %v", err)
 	}
 
 	if err := u.Authenticate(other); !errors.Is(err, entity.ErrInvalidCredentials) {

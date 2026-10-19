@@ -16,7 +16,7 @@ func NewOutbox(db *Database) *Outbox {
 	return &Outbox{db: db}
 }
 
-func (o *Outbox) ProcessBatch(ctx context.Context, limit int, fn func(ctx context.Context, msgs []messaging.Message) error) (int, error) {
+func (o *Outbox) ProcessBatch(ctx context.Context, limit int, fn messaging.BatchFunc) (int, error) {
 	query := `DELETE FROM outbox WHERE id = ANY($1)`
 
 	var count int

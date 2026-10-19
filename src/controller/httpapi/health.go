@@ -1,4 +1,4 @@
-package http
+package httpapi
 
 import (
 	"net/http"
@@ -16,7 +16,7 @@ func NewHealth() *Health {
 // @Tags        System
 // @Success     200  {string}  string  "OK"
 // @Router      /health [get]
-func (h *Health) ServeHTTP(rw http.ResponseWriter, _ *http.Request) {
+func (*Health) ServeHTTP(rw http.ResponseWriter, _ *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 

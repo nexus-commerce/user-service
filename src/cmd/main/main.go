@@ -14,7 +14,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/nexus-commerce/user-service/src/config"
-	httpctrl "github.com/nexus-commerce/user-service/src/controller/http"
+	"github.com/nexus-commerce/user-service/src/controller/httpapi"
 	"github.com/nexus-commerce/user-service/src/docs"
 	"github.com/nexus-commerce/user-service/src/jwt"
 	"github.com/nexus-commerce/user-service/src/messaging"
@@ -84,22 +84,22 @@ func run() error {
 	getProfile := usecase.NewGetProfile(users)
 	updateProfile := usecase.NewUpdateProfile(users)
 
-	server := httpctrl.New(httpctrl.Options{
+	server := httpapi.New(httpapi.Options{
 		Port:       cfg.HTTP.Port,
-		BasicAuth:  httpctrl.BasicAuth(cfg.Docs.Username, cfg.Docs.Password),
-		BearerAuth: httpctrl.BearerAuth(tokens),
+		BasicAuth:  httpapi.BasicAuth(cfg.Docs.Username, cfg.Docs.Password),
+		BearerAuth: httpapi.BearerAuth(tokens),
 	})
 
 	server.Register(
-		httpctrl.NewOpenAPIDocs(),
-		httpctrl.NewOpenAPI(docs.SwaggerInfo.ReadDoc()),
-		httpctrl.NewAsyncAPIDocs(),
-		httpctrl.NewAsyncAPI(docs.AsyncAPI),
-		httpctrl.NewHealth(),
-		httpctrl.NewLogin(login),
-		httpctrl.NewRegister(register),
-		httpctrl.NewGetProfile(getProfile),
-		httpctrl.NewUpdateProfile(updateProfile),
+		httpapi.NewOpenAPIDocs(),
+		httpapi.NewOpenAPI(docs.SwaggerInfo.ReadDoc()),
+		httpapi.NewAsyncAPIDocs(),
+		httpapi.NewAsyncAPI(docs.AsyncAPI),
+		httpapi.NewHealth(),
+		httpapi.NewLogin(login),
+		httpapi.NewRegister(register),
+		httpapi.NewGetProfile(getProfile),
+		httpapi.NewUpdateProfile(updateProfile),
 	)
 
 	return server.Run(ctx)

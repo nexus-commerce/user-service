@@ -1,4 +1,4 @@
-package http
+package httpapi
 
 import (
 	"log"
@@ -54,7 +54,7 @@ func NewOpenAPIDocs() *OpenAPIDocs {
 // @Success     200  {string}  string  "HTML page"
 // @Failure     401  {object}  errorResponse  "Missing or invalid credentials"
 // @Router      /docs [get]
-func (h *OpenAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (*OpenAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if _, err := rw.Write([]byte(openAPIDocsHTML)); err != nil {

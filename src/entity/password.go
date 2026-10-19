@@ -28,7 +28,7 @@ func NewPassword(s string) (Password, error) {
 	return Password{value: s}, nil
 }
 
-func (p Password) String() string { return "[REDACTED]" }
+func (Password) String() string { return "[REDACTED]" }
 
 func (p Password) Hash() (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(p.value), bcrypt.DefaultCost)

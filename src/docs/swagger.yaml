@@ -1,28 +1,28 @@
 basePath: /api
 definitions:
-  http.errorResponse:
+  httpapi.errorResponse:
     properties:
       error:
         type: string
     type: object
-  http.loginRequest:
+  httpapi.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  http.loginResponse:
+  httpapi.loginResponse:
     properties:
       token:
         type: string
     type: object
-  http.profileResponse:
+  httpapi.profileResponse:
     properties:
       user:
-        $ref: '#/definitions/http.userResponse'
+        $ref: '#/definitions/httpapi.userResponse'
     type: object
-  http.registerRequest:
+  httpapi.registerRequest:
     properties:
       email:
         type: string
@@ -35,12 +35,12 @@ definitions:
       passwordConfirmation:
         type: string
     type: object
-  http.registerResponse:
+  httpapi.registerResponse:
     properties:
       token:
         type: string
     type: object
-  http.updateProfileRequest:
+  httpapi.updateProfileRequest:
     properties:
       email:
         type: string
@@ -49,7 +49,7 @@ definitions:
       lastName:
         type: string
     type: object
-  http.userResponse:
+  httpapi.userResponse:
     properties:
       email:
         type: string
@@ -77,30 +77,30 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.loginRequest'
+          $ref: '#/definitions/httpapi.loginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.loginResponse'
+            $ref: '#/definitions/httpapi.loginResponse'
         "400":
           description: Invalid request body
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "401":
           description: Invalid credentials
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       summary: Login
       tags:
       - Auth
@@ -116,31 +116,31 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.registerRequest'
+          $ref: '#/definitions/httpapi.registerRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.registerResponse'
+            $ref: '#/definitions/httpapi.registerResponse'
         "400":
           description: Invalid request, empty or too long fields, malformed email
             or passwords do not match
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "409":
           description: User with this email already exists
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       summary: Register
       tags:
       - Auth
@@ -157,7 +157,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BasicAuth: []
       summary: API Documentation
@@ -177,7 +177,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BasicAuth: []
       summary: Events Documentation
@@ -196,7 +196,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BasicAuth: []
       summary: Events Specification
@@ -215,7 +215,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BasicAuth: []
       summary: API Specification
@@ -241,19 +241,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.profileResponse'
+            $ref: '#/definitions/httpapi.profileResponse'
         "401":
           description: Missing or invalid token
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BearerAuth: []
       summary: Get profile
@@ -270,38 +270,38 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.updateProfileRequest'
+          $ref: '#/definitions/httpapi.updateProfileRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.profileResponse'
+            $ref: '#/definitions/httpapi.profileResponse'
         "400":
           description: Invalid request, empty or too long fields or malformed email
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "401":
           description: Missing or invalid token
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "409":
           description: User with this email already exists
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/http.errorResponse'
+            $ref: '#/definitions/httpapi.errorResponse'
       security:
       - BearerAuth: []
       summary: Update profile

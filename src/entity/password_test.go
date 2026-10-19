@@ -40,7 +40,7 @@ func TestNewPassword(t *testing.T) {
 func TestPasswordIsRedacted(t *testing.T) {
 	p, err := entity.NewPassword("s3cret")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewPassword(%q) error: %v", "s3cret", err)
 	}
 	for _, verb := range []string{"%s", "%v", "%+v"} {
 		if out := fmt.Sprintf(verb, p); strings.Contains(out, "s3cret") {
@@ -50,12 +50,12 @@ func TestPasswordIsRedacted(t *testing.T) {
 }
 
 func TestPasswordHashMatches(t *testing.T) {
-	p, _ := entity.NewPassword("s3cret")
-	other, _ := entity.NewPassword("other")
+	p := mustPassword(t, "s3cret")
+	other := mustPassword(t, "other")
 
 	hash, err := p.Hash()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Hash() error: %v", err)
 	}
 	if ok, err := p.Matches(hash); err != nil || !ok {
 		t.Errorf("Matches(own hash) = %v, %v; want true, nil", ok, err)

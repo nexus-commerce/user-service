@@ -9,7 +9,7 @@ import (
 )
 
 type Outbox interface {
-	ProcessBatch(ctx context.Context, limit int, fn func(ctx context.Context, msgs []messaging.Message) error) (int, error)
+	ProcessBatch(ctx context.Context, limit int, fn messaging.BatchFunc) (int, error)
 }
 
 type Producer interface {
@@ -63,7 +63,9 @@ func (r *Relay) flush(ctx context.Context) {
 }
 
 func (r *Relay) processBatch(ctx context.Context) (int, error) {
-	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, func(ctx context.Context, msgs []messaging.Message) error {
-		return r.producer.Produce(ctx, msgs...)
-	})
+	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, r.produce)
+}
+
+func (r *Relay) produce(ctx context.Context, msgs []messaging.Message) error {
+	return r.producer.Produce(ctx, msgs...)
 }

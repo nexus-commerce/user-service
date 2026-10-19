@@ -15,11 +15,11 @@ func TestIssueParseRoundTrip(t *testing.T) {
 
 	token, err := tokens.Issue(id)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Issue(%v) error: %v", id, err)
 	}
 	got, err := tokens.Parse(token)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Parse(%q) error: %v", token, err)
 	}
 	if got != id {
 		t.Errorf("Parse = %v, want %v", got, id)
@@ -43,7 +43,7 @@ func TestParseRejectsBadUserID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.claims).SignedString([]byte("secret"))
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("SignedString(claims=%v) error: %v", tt.claims, err)
 			}
 			if _, err := tokens.Parse(token); !errors.Is(err, ErrInvalid) {
 				t.Errorf("Parse error = %v, want %v", err, ErrInvalid)

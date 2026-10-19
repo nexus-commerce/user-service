@@ -8,7 +8,7 @@ import (
 )
 
 type updateProfileUsers interface {
-	Update(ctx context.Context, id uuid.UUID, updateFn func(user *entity.User) (bool, error)) (*entity.User, error)
+	Update(ctx context.Context, id uuid.UUID, updateFn func(*entity.User) (bool, error)) (*entity.User, error)
 }
 
 type UpdateProfile struct {

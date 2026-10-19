@@ -15,9 +15,10 @@ type unroutedEvent struct {
 
 func newUserRegistered(t *testing.T) entity.UserRegistered {
 	t.Helper()
-	profile, err := entity.NewProfile(entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"})
+	fields := entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
+	profile, err := entity.NewProfile(fields)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("NewProfile(%+v) error: %v", fields, err)
 	}
 	return entity.UserRegistered{
 		EventMeta: entity.EventMeta{
@@ -37,11 +38,14 @@ func TestEncodeUserRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encode = _, %v; want _, nil", err)
 	}
-	if msg.ID != e.ID.String() || msg.Topic != "users" || msg.Key != e.AggregateID.String() {
-		t.Errorf("id, topic, key = %q, %q, %q", msg.ID, msg.Topic, msg.Key)
+	type header struct{ ID, Topic, Key string }
+	gotHeader := header{msg.ID, msg.Topic, msg.Key}
+	wantHeader := header{e.ID.String(), "users", e.AggregateID.String()}
+	if gotHeader != wantHeader {
+		t.Errorf("encode(UserRegistered) header = %+v, want %+v", gotHeader, wantHeader)
 	}
 
-	var got struct {
+	type payload struct {
 		ID      string `json:"eventId"`
 		Type    string `json:"eventType"`
 		Version string `json:"version"`
@@ -50,11 +54,15 @@ func TestEncodeUserRegistered(t *testing.T) {
 			Email  string `json:"email"`
 		} `json:"data"`
 	}
+	var got payload
 	if err := json.Unmarshal(msg.Value, &got); err != nil {
-		t.Fatal(err)
+		t.Fatalf("json.Unmarshal(%s) error: %v", msg.Value, err)
 	}
-	if got.ID != e.ID.String() || got.Type != "user.registered" || got.Version != "1.0" || got.Data.UserID != e.AggregateID.String() || got.Data.Email != "jane@example.com" {
-		t.Errorf("payload = %s", msg.Value)
+	want := payload{ID: e.ID.String(), Type: "user.registered", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.Email = "jane@example.com"
+	if got != want {
+		t.Errorf("encode(UserRegistered) payload = %+v, want %+v", got, want)
 	}
 }
 

@@ -90,6 +90,7 @@ func newDummyCredentials() (dummyCredentials, error) {
 }
 
 func (l *Login) rejectTimingSafe() error {
+	// Burns bcrypt time so unknown emails are indistinguishable by latency; the result is irrelevant.
 	_, _ = l.dummy.password.Matches(l.dummy.hash)
 	return entity.ErrInvalidCredentials
 }
