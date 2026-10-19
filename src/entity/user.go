@@ -78,10 +78,8 @@ func NewUser(p Profile, password Password) (*User, error) {
 		createdAt:    time.Now().UTC(),
 	}
 	u.events = append(u.events, UserRegistered{
-		ID:         uuid.New(),
-		UserID:     u.id,
-		Profile:    u.profile,
-		OccurredAt: u.createdAt,
+		EventMeta: u.newEventMeta(u.createdAt),
+		Profile:   u.profile,
 	})
 	return u, nil
 }
@@ -127,6 +125,10 @@ func (u *User) Authenticate(password Password) error {
 		return ErrInvalidCredentials
 	}
 	return nil
+}
+
+func (u *User) newEventMeta(at time.Time) EventMeta {
+	return EventMeta{ID: uuid.New(), AggregateID: u.id, OccurredAt: at}
 }
 
 func (u *User) Events() []Event {

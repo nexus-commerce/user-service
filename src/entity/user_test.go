@@ -73,7 +73,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	if !ok {
 		t.Fatalf("event %T, want UserRegistered", events[0])
 	}
-	if reg.ID == uuid.Nil() || reg.UserID != u.ID() || reg.Profile != profile || !reg.OccurredAt.Equal(u.CreatedAt()) {
+	if reg.ID == uuid.Nil() || reg.AggregateID != u.ID() || reg.Profile != profile || !reg.OccurredAt.Equal(u.CreatedAt()) {
 		t.Errorf("event = %+v", reg)
 	}
 

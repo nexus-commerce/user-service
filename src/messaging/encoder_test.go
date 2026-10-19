@@ -9,7 +9,9 @@ import (
 	"github.com/nexus-commerce/user-service/src/entity"
 )
 
-type unknownEvent struct{}
+type unknownEvent struct {
+	entity.EventMeta
+}
 
 func (unknownEvent) EventType() entity.EventType {
 	return "Unknown"
@@ -26,10 +28,12 @@ func newUserRegistered(t *testing.T) entity.UserRegistered {
 		t.Fatal(err)
 	}
 	return entity.UserRegistered{
-		ID:         uuid.New(),
-		UserID:     uuid.New(),
-		Profile:    profile,
-		OccurredAt: time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
+		EventMeta: entity.EventMeta{
+			ID:          uuid.New(),
+			AggregateID: uuid.New(),
+			OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
+		},
+		Profile: profile,
 	}
 }
 
@@ -41,7 +45,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encode = _, %v; want _, nil", err)
 	}
-	if msg.ID != e.ID.String() || msg.Topic != "users" || msg.Key != e.UserID.String() {
+	if msg.ID != e.ID.String() || msg.Topic != "users" || msg.Key != e.AggregateID.String() {
 		t.Errorf("id, topic, key = %q, %q, %q", msg.ID, msg.Topic, msg.Key)
 	}
 
@@ -57,7 +61,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 	if err := json.Unmarshal(msg.Value, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.ID != e.ID.String() || got.Type != "user.registered" || got.Version != "1.0" || got.Data.UserID != e.UserID.String() || got.Data.Email != "jane@example.com" {
+	if got.ID != e.ID.String() || got.Type != "user.registered" || got.Version != "1.0" || got.Data.UserID != e.AggregateID.String() || got.Data.Email != "jane@example.com" {
 		t.Errorf("payload = %s", msg.Value)
 	}
 }

@@ -10,48 +10,47 @@ import (
 
 const topicUsers = "users"
 
+type route struct {
+	event   entity.EventType
+	topic   string
+	typ     string
+	version string
+	convert func(entity.Event) (any, error)
+}
+
+func newRoute[E entity.Event](topic, typ, version string, fn func(E) any) route {
+	var zero E
+	t := zero.EventType()
+	return route{
+		event:   t,
+		topic:   topic,
+		typ:     typ,
+		version: version,
+		convert: func(e entity.Event) (any, error) {
+			ev, ok := e.(E)
+			if !ok {
+				return nil, fmt.Errorf("event %s: unexpected type %T", t, e)
+			}
+			return fn(ev), nil
+		},
+	}
+}
+
 type encoder struct {
 	routes map[entity.EventType]route
 }
 
-type route struct {
-	topic   string
-	typ     string
-	version string
-	convert func(entity.Event) (meta, any, error)
-}
-
-type meta struct {
-	id        string
-	key       string
-	timestamp time.Time
-}
-
 func newEncoder() *encoder {
 	enc := &encoder{routes: make(map[entity.EventType]route)}
-	register(enc, topicUsers, "user.registered", "1.0", convertUserRegistered)
+	enc.register(newRoute(topicUsers, "user.registered", "1.0", convertUserRegistered))
 	return enc
 }
 
-func register[E entity.Event](enc *encoder, topic, typ, version string, fn func(E) (meta, any)) {
-	var zero E
-	t := zero.EventType()
-	if _, ok := enc.routes[t]; ok {
-		panic(fmt.Sprintf("messaging: duplicate route for event %s", t))
+func (enc *encoder) register(r route) {
+	if _, ok := enc.routes[r.event]; ok {
+		panic(fmt.Sprintf("messaging: duplicate route for event %s", r.event))
 	}
-	enc.routes[t] = route{
-		topic:   topic,
-		typ:     typ,
-		version: version,
-		convert: func(e entity.Event) (meta, any, error) {
-			ev, ok := e.(E)
-			if !ok {
-				return meta{}, nil, fmt.Errorf("event %s: unexpected type %T", t, e)
-			}
-			m, data := fn(ev)
-			return m, data, nil
-		},
-	}
+	enc.routes[r.event] = r
 }
 
 type envelope struct {
@@ -62,6 +61,34 @@ type envelope struct {
 	Data      any       `json:"data"`
 }
 
+func (enc *encoder) encode(e entity.Event) (Message, error) {
+	r, ok := enc.routes[e.EventType()]
+	if !ok {
+		return Message{}, fmt.Errorf("no route for event %s", e.EventType())
+	}
+	data, err := r.convert(e)
+	if err != nil {
+		return Message{}, err
+	}
+	meta := e.Meta()
+	value, err := json.Marshal(envelope{
+		ID:        meta.ID.String(),
+		Type:      r.typ,
+		Timestamp: meta.OccurredAt,
+		Version:   r.version,
+		Data:      data,
+	})
+	if err != nil {
+		return Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)
+	}
+	return Message{
+		ID:    meta.ID.String(),
+		Topic: r.topic,
+		Key:   meta.AggregateID.String(),
+		Value: value,
+	}, nil
+}
+
 type userRegistered struct {
 	UserID    string    `json:"userId"`
 	Email     string    `json:"email"`
@@ -70,44 +97,12 @@ type userRegistered struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func convertUserRegistered(e entity.UserRegistered) (meta, any) {
-	m := meta{
-		id:        e.ID.String(),
-		key:       e.UserID.String(),
-		timestamp: e.OccurredAt,
-	}
-	return m, userRegistered{
-		UserID:    e.UserID.String(),
+func convertUserRegistered(e entity.UserRegistered) any {
+	return userRegistered{
+		UserID:    e.AggregateID.String(),
 		Email:     e.Profile.Email().String(),
 		FirstName: e.Profile.FirstName().String(),
 		LastName:  e.Profile.LastName().String(),
 		CreatedAt: e.OccurredAt,
 	}
-}
-
-func (enc *encoder) encode(e entity.Event) (Message, error) {
-	r, ok := enc.routes[e.EventType()]
-	if !ok {
-		return Message{}, fmt.Errorf("no route for event %s", e.EventType())
-	}
-	m, data, err := r.convert(e)
-	if err != nil {
-		return Message{}, err
-	}
-	value, err := json.Marshal(envelope{
-		ID:        m.id,
-		Type:      r.typ,
-		Timestamp: m.timestamp,
-		Version:   r.version,
-		Data:      data,
-	})
-	if err != nil {
-		return Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)
-	}
-	return Message{
-		ID:    m.id,
-		Topic: r.topic,
-		Key:   m.key,
-		Value: value,
-	}, nil
 }
