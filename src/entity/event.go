@@ -26,3 +26,10 @@ type UserRegistered struct {
 }
 
 func (UserRegistered) isEvent() {}
+
+type UserProfileChanged struct {
+	EventMeta
+	Profile Profile
+}
+
+func (UserProfileChanged) isEvent() {}

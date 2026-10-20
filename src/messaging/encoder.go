@@ -12,7 +12,8 @@ import (
 const (
 	topicUsers = "users"
 
-	typeUserRegistered = "user.registered"
+	typeUserRegistered     = "user.registered"
+	typeUserProfileChanged = "user.profile_changed"
 )
 
 type destination struct {
@@ -46,6 +47,11 @@ func newEncoder() *encoder {
 		typ:     typeUserRegistered,
 		version: "1.0",
 	}, convertUserRegistered))
+	enc.register(newRoute(destination{
+		topic:   topicUsers,
+		typ:     typeUserProfileChanged,
+		version: "1.0",
+	}, convertUserProfileChanged))
 	return enc
 }
 
@@ -103,5 +109,23 @@ func convertUserRegistered(e entity.UserRegistered) any {
 		FirstName: e.Profile.FirstName().String(),
 		LastName:  e.Profile.LastName().String(),
 		CreatedAt: e.OccurredAt,
+	}
+}
+
+type userProfileChanged struct {
+	UserID    string    `json:"userId"`
+	Email     string    `json:"email"`
+	FirstName string    `json:"firstName"`
+	LastName  string    `json:"lastName"`
+	ChangedAt time.Time `json:"changedAt"`
+}
+
+func convertUserProfileChanged(e entity.UserProfileChanged) any {
+	return userProfileChanged{
+		UserID:    e.AggregateID.String(),
+		Email:     e.Profile.Email().String(),
+		FirstName: e.Profile.FirstName().String(),
+		LastName:  e.Profile.LastName().String(),
+		ChangedAt: e.OccurredAt,
 	}
 }

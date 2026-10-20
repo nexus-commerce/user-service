@@ -29,6 +29,8 @@ channels:
     messages:
       userRegistered:
         $ref: '#/components/messages/UserRegistered'
+      userProfileChanged:
+        $ref: '#/components/messages/UserProfileChanged'
 
 operations:
   publishUserRegistered:
@@ -38,9 +40,44 @@ operations:
     summary: Announces that a new user has signed up.
     messages:
       - $ref: '#/channels/users/messages/userRegistered'
+  publishUserProfileChanged:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Announces that a user changed their profile.
+    messages:
+      - $ref: '#/channels/users/messages/userProfileChanged'
 
 components:
   messages:
+    UserProfileChanged:
+      name: UserProfileChanged
+      title: User profile changed
+      summary: A user changed their email or name; carries the full current profile.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserProfileChangedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the user.
+      examples:
+        - name: userProfileChanged
+          summary: A user changes their last name.
+          payload:
+            eventId: 3d1f7a52-8b4e-4c0a-b6f2-9e1d2c3a4b5c
+            eventType: user.profile_changed
+            timestamp: '2026-10-20T10:15:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              email: jane.doe@example.com
+              firstName: Jane
+              lastName: Smith
+              changedAt: '2026-10-20T10:15:00Z'
+
     UserRegistered:
       name: UserRegistered
       title: User registered
@@ -108,5 +145,46 @@ components:
         lastName:
           type: string
         createdAt:
+          type: string
+          format: date-time
+
+    UserProfileChangedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.profile_changed
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserProfileChangedData'
+
+    UserProfileChangedData:
+      type: object
+      required: [userId, email, firstName, lastName, changedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          description: Normalized to lowercase.
+        firstName:
+          type: string
+        lastName:
+          type: string
+        changedAt:
           type: string
           format: date-time

@@ -252,6 +252,13 @@ func TestChangeProfile(t *testing.T) {
 		if got := u.LastName().String(); got != "Smith" {
 			t.Errorf("LastName() = %q, want %q", got, "Smith")
 		}
+		events := profileChangedEvents(u)
+		if len(events) != 1 {
+			t.Fatalf("recorded %d UserProfileChanged events, want 1", len(events))
+		}
+		if e := events[0]; e.AggregateID != u.ID() || e.ID == uuid.Nil() || fieldsOf(e.Profile) != fieldsOf(u) {
+			t.Errorf("UserProfileChanged = %+v, want aggregate %v with profile %+v", e, u.ID(), fieldsOf(u))
+		}
 	})
 
 	t.Run("same values", func(t *testing.T) {
@@ -260,6 +267,9 @@ func TestChangeProfile(t *testing.T) {
 		changed, err := u.ChangeProfile(entity.ProfileChange{FirstName: &first})
 		if err != nil || changed {
 			t.Errorf("ChangeProfile(same) = %v, %v; want false, nil", changed, err)
+		}
+		if n := len(profileChangedEvents(u)); n != 0 {
+			t.Errorf("recorded %d UserProfileChanged events, want 0", n)
 		}
 	})
 
@@ -271,6 +281,9 @@ func TestChangeProfile(t *testing.T) {
 		}
 		if got := fieldsOf(u); got != janeDoe {
 			t.Errorf("profile after failed change = %+v, want %+v", got, janeDoe)
+		}
+		if n := len(profileChangedEvents(u)); n != 0 {
+			t.Errorf("recorded %d UserProfileChanged events, want 0", n)
 		}
 	})
 
@@ -285,7 +298,21 @@ func TestChangeProfile(t *testing.T) {
 		if got := u.LastName().String(); got != legacy.LastName {
 			t.Errorf("LastName() = %q, want legacy value kept", got)
 		}
+		events := profileChangedEvents(u)
+		if len(events) != 1 || events[0].Profile.LastName().String() != legacy.LastName {
+			t.Errorf("UserProfileChanged events = %+v, want one carrying the full profile", events)
+		}
 	})
+}
+
+func profileChangedEvents(u *entity.User) []entity.UserProfileChanged {
+	var out []entity.UserProfileChanged
+	for _, e := range u.Events() {
+		if pc, ok := e.(entity.UserProfileChanged); ok {
+			out = append(out, pc)
+		}
+	}
+	return out
 }
 
 func TestRestoreProfile(t *testing.T) {

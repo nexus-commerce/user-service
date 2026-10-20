@@ -143,6 +143,10 @@ func (u *User) ChangeProfile(c ProfileChange) (bool, error) {
 		return false, nil
 	}
 	u.profile = p
+	u.events = append(u.events, UserProfileChanged{
+		EventMeta: u.newEventMeta(time.Now().UTC()),
+		Profile:   u.profile,
+	})
 	return true, nil
 }
 

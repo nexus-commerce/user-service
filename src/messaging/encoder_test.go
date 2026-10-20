@@ -71,3 +71,47 @@ func TestEncodeRejectsUnroutedEvent(t *testing.T) {
 		t.Error("Encode(unroutedEvent) = _, nil; want error")
 	}
 }
+
+func TestEncodeUserProfileChanged(t *testing.T) {
+	enc := newEncoder()
+	reg := newUserRegistered(t)
+	e := entity.UserProfileChanged{
+		ID:          uuid.New(),
+		AggregateID: reg.AggregateID,
+		OccurredAt:  time.Date(2026, 10, 20, 10, 15, 0, 0, time.UTC),
+		Profile:     reg.Profile,
+	}
+
+	msg, err := enc.encode(e)
+	if err != nil {
+		t.Fatalf("Encode = _, %v; want _, nil", err)
+	}
+	type header struct{ ID, Topic, Key string }
+	gotHeader := header{msg.ID, msg.Topic, msg.Key}
+	wantHeader := header{e.ID.String(), "users", e.AggregateID.String()}
+	if gotHeader != wantHeader {
+		t.Errorf("encode(UserProfileChanged) header = %+v, want %+v", gotHeader, wantHeader)
+	}
+
+	type payload struct {
+		ID      string `json:"eventId"`
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID    string    `json:"userId"`
+			Email     string    `json:"email"`
+			ChangedAt time.Time `json:"changedAt"`
+		} `json:"data"`
+	}
+	var got payload
+	if err := json.Unmarshal(msg.Value, &got); err != nil {
+		t.Fatalf("json.Unmarshal(%s) error: %v", msg.Value, err)
+	}
+	want := payload{ID: e.ID.String(), Type: "user.profile_changed", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.Email = "jane@example.com"
+	want.Data.ChangedAt = e.OccurredAt
+	if got != want {
+		t.Errorf("encode(UserProfileChanged) payload = %+v, want %+v", got, want)
+	}
+}
