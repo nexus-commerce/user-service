@@ -74,9 +74,6 @@ func (u *Users) Update(
 		if err = updateFn(usr); err != nil {
 			return err
 		}
-		if len(usr.Events()) == 0 {
-			return nil
-		}
 
 		_, err = tx.ExecContext(ctx, updateQuery,
 			usr.FullName().FirstName().String(),
