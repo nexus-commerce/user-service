@@ -105,7 +105,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request, empty or too long fields, malformed email or passwords do not match",
+                        "description": "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match",
                         "schema": {
                             "$ref": "#/definitions/httpapi.errorResponse"
                         }

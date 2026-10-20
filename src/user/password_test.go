@@ -15,9 +15,13 @@ func TestNewPassword(t *testing.T) {
 		in      string
 		wantErr error
 	}{
-		{name: "valid", in: "s3cret"},
+		{name: "valid", in: "s3cretpass"},
+		{name: "min length", in: strings.Repeat("a", 8)},
+		{name: "min length multibyte", in: strings.Repeat("ї", 8)},
 		{name: "max bytes", in: strings.Repeat("a", 72)},
 		{name: "empty", in: "", wantErr: user.ErrEmptyPassword},
+		{name: "too short", in: strings.Repeat("a", 7), wantErr: user.ErrPasswordTooShort},
+		{name: "too short multibyte", in: strings.Repeat("ї", 7), wantErr: user.ErrPasswordTooShort},
 		{name: "too long", in: strings.Repeat("a", 73), wantErr: user.ErrPasswordTooLong},
 		{name: "too long multibyte", in: strings.Repeat("ї", 37), wantErr: user.ErrPasswordTooLong},
 	}
@@ -38,12 +42,12 @@ func TestNewPassword(t *testing.T) {
 }
 
 func TestPasswordIsRedacted(t *testing.T) {
-	p, err := user.NewPassword("s3cret")
+	p, err := user.NewPassword("s3cretpass")
 	if err != nil {
-		t.Fatalf("NewPassword(%q) error: %v", "s3cret", err)
+		t.Fatalf("NewPassword(%q) error: %v", "s3cretpass", err)
 	}
 	for _, verb := range []string{"%s", "%v", "%+v"} {
-		if out := fmt.Sprintf(verb, p); strings.Contains(out, "s3cret") {
+		if out := fmt.Sprintf(verb, p); strings.Contains(out, "s3cretpass") {
 			t.Errorf("Sprintf(%q) leaks password: %s", verb, out)
 		}
 	}

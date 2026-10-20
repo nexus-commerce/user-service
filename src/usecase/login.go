@@ -80,7 +80,7 @@ type dummyCredentials struct {
 }
 
 func newDummyCredentials(hasher user.Hasher) (dummyCredentials, error) {
-	password, err := user.NewPassword("dummy")
+	password, err := user.NewPassword("dummy-password")
 	if err != nil {
 		return dummyCredentials{}, fmt.Errorf("create password: %w", err)
 	}

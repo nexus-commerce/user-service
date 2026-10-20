@@ -18,7 +18,8 @@ type Name struct {
 }
 
 func NewName(s string) (Name, error) {
-	if strings.TrimSpace(s) == "" {
+	s = strings.TrimSpace(s)
+	if s == "" {
 		return Name{}, ErrEmptyName
 	}
 	if utf8.RuneCountInString(s) > maxNameLength {

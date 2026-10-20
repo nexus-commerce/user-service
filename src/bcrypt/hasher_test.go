@@ -21,8 +21,8 @@ func mustPassword(t *testing.T, s string) user.Password {
 
 func TestHasherVerify(t *testing.T) {
 	h := bcrypt.NewHasher(xbcrypt.MinCost)
-	p := mustPassword(t, "s3cret")
-	other := mustPassword(t, "other")
+	p := mustPassword(t, "s3cretpass")
+	other := mustPassword(t, "otherpass")
 
 	hash, err := h.Hash(p)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestHasherVerifyMalformedHash(t *testing.T) {
 		t.Fatalf("NewPasswordHash() error: %v", err)
 	}
 
-	ok, err := h.Verify(hash, mustPassword(t, "s3cret"))
+	ok, err := h.Verify(hash, mustPassword(t, "s3cretpass"))
 	if ok || !errors.Is(err, user.ErrMalformedPasswordHash) {
 		t.Errorf("Verify(malformed) = %v, %v; want false, %v", ok, err, user.ErrMalformedPasswordHash)
 	}

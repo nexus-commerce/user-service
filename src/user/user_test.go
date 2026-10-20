@@ -108,7 +108,7 @@ func fieldsOf(p profileView) user.ProfileFields {
 
 func TestNewUserRecordsRegistration(t *testing.T) {
 	profile := mustProfile(t, janeDoe)
-	password := mustPassword(t, "s3cret")
+	password := mustPassword(t, "s3cretpass")
 
 	u, err := user.NewUser(profile, password, fakeHasher{})
 	if err != nil {
@@ -146,7 +146,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 }
 
 func TestEventsReturnsCopy(t *testing.T) {
-	password := mustPassword(t, "s3cret")
+	password := mustPassword(t, "s3cretpass")
 	u, err := user.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
@@ -162,7 +162,7 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func mustUser(t *testing.T) *user.User {
 	t.Helper()
-	u, err := user.NewUser(mustProfile(t, janeDoe), mustPassword(t, "s3cret"), fakeHasher{})
+	u, err := user.NewUser(mustProfile(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -171,7 +171,7 @@ func mustUser(t *testing.T) *user.User {
 
 func mustHash(t *testing.T) user.PasswordHash {
 	t.Helper()
-	h, err := fakeHasher{}.Hash(mustPassword(t, "s3cret"))
+	h, err := fakeHasher{}.Hash(mustPassword(t, "s3cretpass"))
 	if err != nil {
 		t.Fatalf("Hash() error: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestRestoreProfile(t *testing.T) {
 }
 
 func TestRestoreUser(t *testing.T) {
-	password := mustPassword(t, "s3cret")
+	password := mustPassword(t, "s3cretpass")
 	hash, err := fakeHasher{}.Hash(password)
 	if err != nil {
 		t.Fatalf("Hash() error: %v", err)
@@ -355,8 +355,8 @@ func TestRestoreUser(t *testing.T) {
 }
 
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
-	password := mustPassword(t, "s3cret")
-	other := mustPassword(t, "other")
+	password := mustPassword(t, "s3cretpass")
+	other := mustPassword(t, "otherpass")
 	u, err := user.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)

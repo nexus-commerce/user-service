@@ -3,12 +3,17 @@ package user
 import (
 	"errors"
 	"fmt"
+	"unicode/utf8"
 )
 
-const maxPasswordBytes = 72
+const (
+	minPasswordLength = 8
+	maxPasswordBytes  = 72
+)
 
 var (
 	ErrEmptyPassword         = NewValidationError("must not be empty")
+	ErrPasswordTooShort      = NewValidationError(fmt.Sprintf("must be at least %d characters", minPasswordLength))
 	ErrPasswordTooLong       = NewValidationError(fmt.Sprintf("must be at most %d bytes", maxPasswordBytes))
 	ErrMalformedPasswordHash = errors.New("malformed password hash")
 )
@@ -20,6 +25,9 @@ type Password struct {
 func NewPassword(s string) (Password, error) {
 	if s == "" {
 		return Password{}, ErrEmptyPassword
+	}
+	if utf8.RuneCountInString(s) < minPasswordLength {
+		return Password{}, ErrPasswordTooShort
 	}
 	if len(s) > maxPasswordBytes {
 		return Password{}, ErrPasswordTooLong

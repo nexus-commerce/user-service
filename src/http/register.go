@@ -48,7 +48,7 @@ type registerResponse struct {
 // @Produce     json
 // @Param       request  body      registerRequest   true  "Registration data"
 // @Success     200      {object}  registerResponse
-// @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields, malformed email or passwords do not match"
+// @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match"
 // @Failure     409      {object}  errorResponse  "User with this email already exists"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
