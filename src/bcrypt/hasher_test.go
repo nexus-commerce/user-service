@@ -7,12 +7,12 @@ import (
 	xbcrypt "golang.org/x/crypto/bcrypt"
 
 	"github.com/nexus-commerce/user-service/src/bcrypt"
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
-func mustPassword(t *testing.T, s string) entity.Password {
+func mustPassword(t *testing.T, s string) user.Password {
 	t.Helper()
-	p, err := entity.NewPassword(s)
+	p, err := user.NewPassword(s)
 	if err != nil {
 		t.Fatalf("NewPassword(%q) error: %v", s, err)
 	}
@@ -38,13 +38,13 @@ func TestHasherVerify(t *testing.T) {
 
 func TestHasherVerifyMalformedHash(t *testing.T) {
 	h := bcrypt.NewHasher(xbcrypt.MinCost)
-	hash, err := entity.NewPasswordHash("not-a-bcrypt-hash")
+	hash, err := user.NewPasswordHash("not-a-bcrypt-hash")
 	if err != nil {
 		t.Fatalf("NewPasswordHash() error: %v", err)
 	}
 
 	ok, err := h.Verify(hash, mustPassword(t, "s3cret"))
-	if ok || !errors.Is(err, entity.ErrMalformedPasswordHash) {
-		t.Errorf("Verify(malformed) = %v, %v; want false, %v", ok, err, entity.ErrMalformedPasswordHash)
+	if ok || !errors.Is(err, user.ErrMalformedPasswordHash) {
+		t.Errorf("Verify(malformed) = %v, %v; want false, %v", ok, err, user.ErrMalformedPasswordHash)
 	}
 }

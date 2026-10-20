@@ -10,12 +10,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/messaging"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type eventPublisher interface {
-	Publish(ctx context.Context, pr messaging.Producer, events []entity.Event) error
+	Publish(ctx context.Context, pr messaging.Producer, events []user.Event) error
 }
 
 type Users struct {
@@ -27,21 +27,21 @@ func NewUsers(db *Database, events eventPublisher) *Users {
 	return &Users{db: db, events: events}
 }
 
-func (u *Users) ByEmail(ctx context.Context, email entity.Email) (*entity.User, error) {
+func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, error) {
 	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE email = $1`
 
 	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
-	if err != nil && !errors.Is(err, entity.ErrUserNotFound) {
+	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return nil, fmt.Errorf("select user by email: %w", err)
 	}
 	return user, err
 }
 
-func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
+func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1`
 
 	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
-	if err != nil && !errors.Is(err, entity.ErrUserNotFound) {
+	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return nil, fmt.Errorf("select user by id: %w", err)
 	}
 	return user, err
@@ -50,17 +50,17 @@ func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
 func (u *Users) Update(
 	ctx context.Context,
 	id uuid.UUID,
-	updateFn func(*entity.User) (bool, error),
-) (*entity.User, error) {
+	updateFn func(*user.User) (bool, error),
+) (*user.User, error) {
 	selectQuery := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1 FOR UPDATE`
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
-	var user *entity.User
+	var user *user.User
 	err := u.db.runInTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		user, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id.String()))
 		if err != nil {
-			if errors.Is(err, entity.ErrUserNotFound) {
+			if errors.Is(err, user.ErrUserNotFound) {
 				return err
 			}
 			return fmt.Errorf("select user for update: %w", err)
@@ -80,7 +80,7 @@ func (u *Users) Update(
 		)
 		if err != nil {
 			if isEmailTaken(err) {
-				return entity.ErrEmailTaken
+				return user.ErrEmailTaken
 			}
 			return fmt.Errorf("update user: %w", err)
 		}
@@ -93,7 +93,7 @@ func (u *Users) Update(
 	return user, nil
 }
 
-func (u *Users) Add(ctx context.Context, user *entity.User) error {
+func (u *Users) Add(ctx context.Context, user *user.User) error {
 	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
 
 	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
@@ -107,7 +107,7 @@ func (u *Users) Add(ctx context.Context, user *entity.User) error {
 		)
 		if err != nil {
 			if isEmailTaken(err) {
-				return entity.ErrEmailTaken
+				return user.ErrEmailTaken
 			}
 			return fmt.Errorf("insert user: %w", err)
 		}
@@ -116,7 +116,7 @@ func (u *Users) Add(ctx context.Context, user *entity.User) error {
 	})
 }
 
-func scanUser(row *sql.Row) (*entity.User, error) {
+func scanUser(row *sql.Row) (*user.User, error) {
 	var (
 		rawID, firstName, lastName, email, passwordHash string
 		createdAt                                       time.Time
@@ -131,7 +131,7 @@ func scanUser(row *sql.Row) (*entity.User, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, entity.ErrUserNotFound
+			return nil, user.ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -140,16 +140,16 @@ func scanUser(row *sql.Row) (*entity.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restore user: %w", err)
 	}
-	profile := entity.RestoreProfile(entity.ProfileFields{
+	profile := user.RestoreProfile(user.ProfileFields{
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
 	})
-	hash, err := entity.NewPasswordHash(passwordHash)
+	hash, err := user.NewPasswordHash(passwordHash)
 	if err != nil {
 		return nil, fmt.Errorf("restore user %s: %w", id, err)
 	}
-	return entity.RestoreUser(id, profile, hash, createdAt), nil
+	return user.RestoreUser(id, profile, hash, createdAt), nil
 }
 
 const (

@@ -1,4 +1,4 @@
-package entity_test
+package user_test
 
 import (
 	"errors"
@@ -7,15 +7,15 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
-var janeDoe = entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
+var janeDoe = user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 
 func TestNewProfile(t *testing.T) {
 	tests := []struct {
 		name      string
-		fields    entity.ProfileFields
+		fields    user.ProfileFields
 		wantErr   error
 		wantField string
 	}{
@@ -25,31 +25,31 @@ func TestNewProfile(t *testing.T) {
 		},
 		{
 			name:      "bad first name",
-			fields:    entity.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"},
-			wantErr:   entity.ErrEmptyName,
+			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"},
+			wantErr:   user.ErrEmptyName,
 			wantField: "firstName",
 		},
 		{
 			name:      "bad last name",
-			fields:    entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "},
-			wantErr:   entity.ErrEmptyName,
+			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "},
+			wantErr:   user.ErrEmptyName,
 			wantField: "lastName",
 		},
 		{
 			name:      "bad email",
-			fields:    entity.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"},
-			wantErr:   entity.ErrMalformedEmail,
+			fields:    user.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"},
+			wantErr:   user.ErrMalformedEmail,
 			wantField: "email",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := entity.NewProfile(tt.fields)
+			p, err := user.NewProfile(tt.fields)
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
+				if !errors.Is(err, tt.wantErr) || !errors.Is(err, user.ErrValidation) {
 					t.Fatalf("NewProfile(%+v) error = %v, want %v", tt.fields, err, tt.wantErr)
 				}
-				if fe, ok := errors.AsType[*entity.FieldError](err); !ok || fe.Field != tt.wantField {
+				if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != tt.wantField {
 					t.Errorf("NewProfile(%+v) error = %v, want FieldError for %q", tt.fields, err, tt.wantField)
 				}
 				return
@@ -64,18 +64,18 @@ func TestNewProfile(t *testing.T) {
 	}
 }
 
-func mustProfile(t *testing.T, f entity.ProfileFields) entity.Profile {
+func mustProfile(t *testing.T, f user.ProfileFields) user.Profile {
 	t.Helper()
-	p, err := entity.NewProfile(f)
+	p, err := user.NewProfile(f)
 	if err != nil {
 		t.Fatalf("NewProfile(%+v) error: %v", f, err)
 	}
 	return p
 }
 
-func mustPassword(t *testing.T, s string) entity.Password {
+func mustPassword(t *testing.T, s string) user.Password {
 	t.Helper()
-	p, err := entity.NewPassword(s)
+	p, err := user.NewPassword(s)
 	if err != nil {
 		t.Fatalf("NewPassword(%q) error: %v", s, err)
 	}
@@ -84,22 +84,22 @@ func mustPassword(t *testing.T, s string) entity.Password {
 
 type fakeHasher struct{}
 
-func (fakeHasher) Hash(p entity.Password) (entity.PasswordHash, error) {
-	return entity.NewPasswordHash("hashed:" + p.Plaintext())
+func (fakeHasher) Hash(p user.Password) (user.PasswordHash, error) {
+	return user.NewPasswordHash("hashed:" + p.Plaintext())
 }
 
-func (fakeHasher) Verify(h entity.PasswordHash, p entity.Password) (bool, error) {
+func (fakeHasher) Verify(h user.PasswordHash, p user.Password) (bool, error) {
 	return h.Encoded() == "hashed:"+p.Plaintext(), nil
 }
 
 type profileView interface {
-	Email() entity.Email
-	FirstName() entity.Name
-	LastName() entity.Name
+	Email() user.Email
+	FirstName() user.Name
+	LastName() user.Name
 }
 
-func fieldsOf(p profileView) entity.ProfileFields {
-	return entity.ProfileFields{
+func fieldsOf(p profileView) user.ProfileFields {
+	return user.ProfileFields{
 		Email:     p.Email().String(),
 		FirstName: p.FirstName().String(),
 		LastName:  p.LastName().String(),
@@ -110,7 +110,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	profile := mustProfile(t, janeDoe)
 	password := mustPassword(t, "s3cret")
 
-	u, err := entity.NewUser(profile, password, fakeHasher{})
+	u, err := user.NewUser(profile, password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -122,14 +122,14 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("Events() returned %d events, want 1", len(events))
 	}
-	reg, ok := events[0].(entity.UserRegistered)
+	reg, ok := events[0].(user.UserRegistered)
 	if !ok {
 		t.Fatalf("Events()[0] is %T, want UserRegistered", events[0])
 	}
 	if reg.ID == uuid.Nil() {
 		t.Errorf("Events()[0].ID = nil, want non-nil")
 	}
-	want := entity.UserRegistered{
+	want := user.UserRegistered{
 		ID:          reg.ID,
 		AggregateID: u.ID(),
 		OccurredAt:  u.CreatedAt(),
@@ -140,14 +140,14 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	}
 
 	again := u.Events()
-	if len(again) != 1 || again[0].(entity.UserRegistered).ID != reg.ID {
+	if len(again) != 1 || again[0].(user.UserRegistered).ID != reg.ID {
 		t.Error("Events must return the same recorded events with stable IDs")
 	}
 }
 
 func TestEventsReturnsCopy(t *testing.T) {
 	password := mustPassword(t, "s3cret")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
+	u, err := user.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -160,16 +160,16 @@ func TestEventsReturnsCopy(t *testing.T) {
 	}
 }
 
-func mustUser(t *testing.T) *entity.User {
+func mustUser(t *testing.T) *user.User {
 	t.Helper()
-	u, err := entity.NewUser(mustProfile(t, janeDoe), mustPassword(t, "s3cret"), fakeHasher{})
+	u, err := user.NewUser(mustProfile(t, janeDoe), mustPassword(t, "s3cret"), fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
 	return u
 }
 
-func mustHash(t *testing.T) entity.PasswordHash {
+func mustHash(t *testing.T) user.PasswordHash {
 	t.Helper()
 	h, err := fakeHasher{}.Hash(mustPassword(t, "s3cret"))
 	if err != nil {
@@ -186,31 +186,31 @@ func TestProfileApply(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		change    entity.ProfileChange
-		want      entity.ProfileFields
+		change    user.ProfileChange
+		want      user.ProfileFields
 		wantErr   error
 		wantField string
 	}{
 		{
 			name:   "no fields",
-			change: entity.ProfileChange{},
+			change: user.ProfileChange{},
 			want:   janeDoe,
 		},
 		{
 			name:   "only last name",
-			change: entity.ProfileChange{LastName: &smith},
-			want:   entity.ProfileFields{Email: janeDoe.Email, FirstName: janeDoe.FirstName, LastName: "Smith"},
+			change: user.ProfileChange{LastName: &smith},
+			want:   user.ProfileFields{Email: janeDoe.Email, FirstName: janeDoe.FirstName, LastName: "Smith"},
 		},
 		{
 			name:      "invalid first name",
-			change:    entity.ProfileChange{FirstName: &empty},
-			wantErr:   entity.ErrEmptyName,
+			change:    user.ProfileChange{FirstName: &empty},
+			wantErr:   user.ErrEmptyName,
 			wantField: "firstName",
 		},
 		{
 			name:      "invalid email",
-			change:    entity.ProfileChange{Email: &bad},
-			wantErr:   entity.ErrMalformedEmail,
+			change:    user.ProfileChange{Email: &bad},
+			wantErr:   user.ErrMalformedEmail,
 			wantField: "email",
 		},
 	}
@@ -218,10 +218,10 @@ func TestProfileApply(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := base.Apply(tt.change)
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
+				if !errors.Is(err, tt.wantErr) || !errors.Is(err, user.ErrValidation) {
 					t.Fatalf("Apply() error = %v, want %v", err, tt.wantErr)
 				}
-				if fe, ok := errors.AsType[*entity.FieldError](err); !ok || fe.Field != tt.wantField {
+				if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != tt.wantField {
 					t.Errorf("Apply() error = %v, want FieldError for %q", err, tt.wantField)
 				}
 				return
@@ -245,7 +245,7 @@ func TestChangeProfile(t *testing.T) {
 
 	t.Run("changed", func(t *testing.T) {
 		u := mustUser(t)
-		changed, err := u.ChangeProfile(entity.ProfileChange{LastName: &smith})
+		changed, err := u.ChangeProfile(user.ProfileChange{LastName: &smith})
 		if err != nil || !changed {
 			t.Fatalf("ChangeProfile() = %v, %v; want true, nil", changed, err)
 		}
@@ -264,7 +264,7 @@ func TestChangeProfile(t *testing.T) {
 	t.Run("same values", func(t *testing.T) {
 		u := mustUser(t)
 		first := janeDoe.FirstName
-		changed, err := u.ChangeProfile(entity.ProfileChange{FirstName: &first})
+		changed, err := u.ChangeProfile(user.ProfileChange{FirstName: &first})
 		if err != nil || changed {
 			t.Errorf("ChangeProfile(same) = %v, %v; want false, nil", changed, err)
 		}
@@ -275,9 +275,9 @@ func TestChangeProfile(t *testing.T) {
 
 	t.Run("invalid leaves profile intact", func(t *testing.T) {
 		u := mustUser(t)
-		_, err := u.ChangeProfile(entity.ProfileChange{LastName: &smith, FirstName: &empty})
-		if !errors.Is(err, entity.ErrEmptyName) {
-			t.Fatalf("ChangeProfile() error = %v, want %v", err, entity.ErrEmptyName)
+		_, err := u.ChangeProfile(user.ProfileChange{LastName: &smith, FirstName: &empty})
+		if !errors.Is(err, user.ErrEmptyName) {
+			t.Fatalf("ChangeProfile() error = %v, want %v", err, user.ErrEmptyName)
 		}
 		if got := fieldsOf(u); got != janeDoe {
 			t.Errorf("profile after failed change = %+v, want %+v", got, janeDoe)
@@ -288,10 +288,10 @@ func TestChangeProfile(t *testing.T) {
 	})
 
 	t.Run("legacy fields are not revalidated", func(t *testing.T) {
-		legacy := entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: strings.Repeat("a", 51)}
-		u := entity.RestoreUser(uuid.New(), entity.RestoreProfile(legacy), mustHash(t), time.Now())
+		legacy := user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: strings.Repeat("a", 51)}
+		u := user.RestoreUser(uuid.New(), user.RestoreProfile(legacy), mustHash(t), time.Now())
 		first := "Janet"
-		changed, err := u.ChangeProfile(entity.ProfileChange{FirstName: &first})
+		changed, err := u.ChangeProfile(user.ProfileChange{FirstName: &first})
 		if err != nil || !changed {
 			t.Fatalf("ChangeProfile() = %v, %v; want true, nil", changed, err)
 		}
@@ -305,10 +305,10 @@ func TestChangeProfile(t *testing.T) {
 	})
 }
 
-func profileChangedEvents(u *entity.User) []entity.UserProfileChanged {
-	var out []entity.UserProfileChanged
+func profileChangedEvents(u *user.User) []user.UserProfileChanged {
+	var out []user.UserProfileChanged
 	for _, e := range u.Events() {
-		if pc, ok := e.(entity.UserProfileChanged); ok {
+		if pc, ok := e.(user.UserProfileChanged); ok {
 			out = append(out, pc)
 		}
 	}
@@ -317,10 +317,10 @@ func profileChangedEvents(u *entity.User) []entity.UserProfileChanged {
 
 func TestRestoreProfile(t *testing.T) {
 	longName := strings.Repeat("a", 51)
-	fields := entity.ProfileFields{Email: "Legacy@Example.com", FirstName: longName, LastName: "Doe"}
-	p := entity.RestoreProfile(fields)
+	fields := user.ProfileFields{Email: "Legacy@Example.com", FirstName: longName, LastName: "Doe"}
+	p := user.RestoreProfile(fields)
 
-	if _, err := entity.NewProfile(fields); err == nil {
+	if _, err := user.NewProfile(fields); err == nil {
 		t.Fatal("NewProfile accepted data that should fail current rules")
 	}
 	if got := fieldsOf(p); got != fields {
@@ -339,7 +339,7 @@ func TestRestoreUser(t *testing.T) {
 	profile := mustProfile(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	u := entity.RestoreUser(id, profile, hash, createdAt)
+	u := user.RestoreUser(id, profile, hash, createdAt)
 	got := fieldsOf(u)
 	matches := u.ID() == id && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
@@ -357,12 +357,12 @@ func TestRestoreUser(t *testing.T) {
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	password := mustPassword(t, "s3cret")
 	other := mustPassword(t, "other")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
+	u, err := user.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
 
-	if err := u.Authenticate(other, fakeHasher{}); !errors.Is(err, entity.ErrInvalidCredentials) {
-		t.Errorf("Authenticate(wrong) = %v, want %v", err, entity.ErrInvalidCredentials)
+	if err := u.Authenticate(other, fakeHasher{}); !errors.Is(err, user.ErrInvalidCredentials) {
+		t.Errorf("Authenticate(wrong) = %v, want %v", err, user.ErrInvalidCredentials)
 	}
 }

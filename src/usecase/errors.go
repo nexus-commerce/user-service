@@ -1,5 +1,5 @@
 package usecase
 
-import "github.com/nexus-commerce/user-service/src/entity"
+import "github.com/nexus-commerce/user-service/src/user"
 
-var ErrPasswordMismatch = entity.NewValidationError("passwords do not match")
+var ErrPasswordMismatch = user.NewValidationError("passwords do not match")

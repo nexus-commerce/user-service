@@ -1,11 +1,11 @@
-package entity_test
+package user_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 func TestNewName(t *testing.T) {
@@ -16,15 +16,15 @@ func TestNewName(t *testing.T) {
 	}{
 		{name: "valid", in: "Jane"},
 		{name: "max length multibyte", in: strings.Repeat("ї", 50)},
-		{name: "empty", in: "", wantErr: entity.ErrEmptyName},
-		{name: "whitespace only", in: " \t ", wantErr: entity.ErrEmptyName},
-		{name: "too long", in: strings.Repeat("a", 51), wantErr: entity.ErrNameTooLong},
+		{name: "empty", in: "", wantErr: user.ErrEmptyName},
+		{name: "whitespace only", in: " \t ", wantErr: user.ErrEmptyName},
+		{name: "too long", in: strings.Repeat("a", 51), wantErr: user.ErrNameTooLong},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := entity.NewName(tt.in)
+			got, err := user.NewName(tt.in)
 			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
+				if !errors.Is(err, tt.wantErr) || !errors.Is(err, user.ErrValidation) {
 					t.Fatalf("NewName(%q) error = %v, want %v", tt.in, err, tt.wantErr)
 				}
 				return

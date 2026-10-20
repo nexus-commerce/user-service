@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type fakeProducer struct {
@@ -22,7 +22,7 @@ func TestPublishProducesEncodedMessages(t *testing.T) {
 	fake := &fakeProducer{}
 	first, second := newUserRegistered(t), newUserRegistered(t)
 
-	if err := pub.Publish(t.Context(), fake, []entity.Event{first, second}); err != nil {
+	if err := pub.Publish(t.Context(), fake, []user.Event{first, second}); err != nil {
 		t.Fatalf("Publish = %v; want nil", err)
 	}
 	if len(fake.calls) != 1 {
@@ -55,7 +55,7 @@ func TestPublishReturnsEncodeError(t *testing.T) {
 	pub := NewPublisher()
 	fake := &fakeProducer{}
 
-	err := pub.Publish(t.Context(), fake, []entity.Event{newUserRegistered(t), unroutedEvent{newUserRegistered(t)}})
+	err := pub.Publish(t.Context(), fake, []user.Event{newUserRegistered(t), unroutedEvent{newUserRegistered(t)}})
 	if err == nil {
 		t.Fatal("Publish = nil; want error")
 	}

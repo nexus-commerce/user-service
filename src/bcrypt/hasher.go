@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 const DefaultCost = bcrypt.DefaultCost
@@ -19,15 +19,15 @@ func NewHasher(cost int) *Hasher {
 	return &Hasher{cost: cost}
 }
 
-func (h *Hasher) Hash(p entity.Password) (entity.PasswordHash, error) {
+func (h *Hasher) Hash(p user.Password) (user.PasswordHash, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(p.Plaintext()), h.cost)
 	if err != nil {
-		return entity.PasswordHash{}, fmt.Errorf("hash password: %w", err)
+		return user.PasswordHash{}, fmt.Errorf("hash password: %w", err)
 	}
-	return entity.NewPasswordHash(string(hash))
+	return user.NewPasswordHash(string(hash))
 }
 
-func (h *Hasher) Verify(hash entity.PasswordHash, p entity.Password) (bool, error) {
+func (h *Hasher) Verify(hash user.PasswordHash, p user.Password) (bool, error) {
 	err := bcrypt.CompareHashAndPassword([]byte(hash.Encoded()), []byte(p.Plaintext()))
 	switch {
 	case err == nil:
@@ -35,6 +35,6 @@ func (h *Hasher) Verify(hash entity.PasswordHash, p entity.Password) (bool, erro
 	case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword), errors.Is(err, bcrypt.ErrPasswordTooLong):
 		return false, nil
 	default:
-		return false, fmt.Errorf("%w: %v", entity.ErrMalformedPasswordHash, err)
+		return false, fmt.Errorf("%w: %v", user.ErrMalformedPasswordHash, err)
 	}
 }

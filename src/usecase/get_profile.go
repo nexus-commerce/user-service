@@ -4,11 +4,11 @@ import (
 	"context"
 	"uuid"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type getProfileUsers interface {
-	ByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
+	ByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 }
 
 type GetProfile struct {
@@ -28,7 +28,7 @@ type ProfileView struct {
 	LastName  string
 }
 
-func toProfileView(u *entity.User) ProfileView {
+func toProfileView(u *user.User) ProfileView {
 	return ProfileView{
 		ID:        u.ID(),
 		Email:     u.Email().String(),

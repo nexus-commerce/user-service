@@ -6,21 +6,21 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type unroutedEvent struct {
-	entity.UserRegistered
+	user.UserRegistered
 }
 
-func newUserRegistered(t *testing.T) entity.UserRegistered {
+func newUserRegistered(t *testing.T) user.UserRegistered {
 	t.Helper()
-	fields := entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
-	profile, err := entity.NewProfile(fields)
+	fields := user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
+	profile, err := user.NewProfile(fields)
 	if err != nil {
 		t.Fatalf("NewProfile(%+v) error: %v", fields, err)
 	}
-	return entity.UserRegistered{
+	return user.UserRegistered{
 		ID:          uuid.New(),
 		AggregateID: uuid.New(),
 		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
@@ -75,7 +75,7 @@ func TestEncodeRejectsUnroutedEvent(t *testing.T) {
 func TestEncodeUserProfileChanged(t *testing.T) {
 	enc := newEncoder()
 	reg := newUserRegistered(t)
-	e := entity.UserProfileChanged{
+	e := user.UserProfileChanged{
 		ID:          uuid.New(),
 		AggregateID: reg.AggregateID,
 		OccurredAt:  time.Date(2026, 10, 20, 10, 15, 0, 0, time.UTC),

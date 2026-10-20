@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type Producer interface {
@@ -19,7 +19,7 @@ func NewPublisher() *Publisher {
 	return &Publisher{encoder: newEncoder()}
 }
 
-func (p *Publisher) Publish(ctx context.Context, pr Producer, events []entity.Event) error {
+func (p *Publisher) Publish(ctx context.Context, pr Producer, events []user.Event) error {
 	if len(events) == 0 {
 		return nil
 	}

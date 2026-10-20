@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type Register struct {
@@ -63,10 +63,10 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
 		switch {
-		case errors.Is(err, entity.ErrValidation):
+		case errors.Is(err, user.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, err.Error())
 			return
-		case errors.Is(err, entity.ErrEmailTaken):
+		case errors.Is(err, user.ErrEmailTaken):
 			writeError(rw, r, http.StatusConflict, err.Error())
 			return
 		}

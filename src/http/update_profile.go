@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"uuid"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type UpdateProfile struct {
@@ -66,13 +66,13 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	profile, err := h.uc.Execute(r.Context(), reqBody.toProfileUpdate(userID))
 	if err != nil {
 		switch {
-		case errors.Is(err, entity.ErrValidation):
+		case errors.Is(err, user.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, err.Error())
 			return
-		case errors.Is(err, entity.ErrUserNotFound):
+		case errors.Is(err, user.ErrUserNotFound):
 			writeError(rw, r, http.StatusNotFound, err.Error())
 			return
-		case errors.Is(err, entity.ErrEmailTaken):
+		case errors.Is(err, user.ErrEmailTaken):
 			writeError(rw, r, http.StatusConflict, err.Error())
 			return
 		}

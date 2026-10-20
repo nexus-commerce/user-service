@@ -3,20 +3,20 @@ package usecase
 import (
 	"context"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type registerUsers interface {
-	Add(ctx context.Context, user *entity.User) error
+	Add(ctx context.Context, user *user.User) error
 }
 
 type Register struct {
 	users  registerUsers
 	tokens tokenIssuer
-	hasher entity.Hasher
+	hasher user.Hasher
 }
 
-func NewRegister(users registerUsers, tokens tokenIssuer, hasher entity.Hasher) *Register {
+func NewRegister(users registerUsers, tokens tokenIssuer, hasher user.Hasher) *Register {
 	return &Register{
 		users:  users,
 		tokens: tokens,
@@ -34,10 +34,10 @@ type Registration struct {
 
 func (r *Register) Execute(ctx context.Context, reg Registration) (string, error) {
 	if reg.Password != reg.PasswordConfirmation {
-		return "", &entity.FieldError{Field: "passwordConfirmation", Err: ErrPasswordMismatch}
+		return "", &user.FieldError{Field: "passwordConfirmation", Err: ErrPasswordMismatch}
 	}
 
-	profile, err := entity.NewProfile(entity.ProfileFields{
+	profile, err := user.NewProfile(user.ProfileFields{
 		Email:     reg.Email,
 		FirstName: reg.FirstName,
 		LastName:  reg.LastName,
@@ -45,11 +45,11 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 	if err != nil {
 		return "", err
 	}
-	password, err := entity.NewPassword(reg.Password)
+	password, err := user.NewPassword(reg.Password)
 	if err != nil {
-		return "", &entity.FieldError{Field: "password", Err: err}
+		return "", &user.FieldError{Field: "password", Err: err}
 	}
-	user, err := entity.NewUser(profile, password, r.hasher)
+	user, err := user.NewUser(profile, password, r.hasher)
 	if err != nil {
 		return "", err
 	}

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type GetProfile struct {
@@ -60,7 +60,7 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	profile, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
-		if errors.Is(err, entity.ErrUserNotFound) {
+		if errors.Is(err, user.ErrUserNotFound) {
 			writeError(rw, r, http.StatusNotFound, err.Error())
 			return
 		}

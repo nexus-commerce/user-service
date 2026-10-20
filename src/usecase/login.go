@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"uuid"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type loginUsers interface {
-	ByEmail(ctx context.Context, email entity.Email) (*entity.User, error)
+	ByEmail(ctx context.Context, email user.Email) (*user.User, error)
 }
 
 type tokenIssuer interface {
@@ -20,11 +20,11 @@ type tokenIssuer interface {
 type Login struct {
 	users  loginUsers
 	tokens tokenIssuer
-	hasher entity.Hasher
+	hasher user.Hasher
 	dummy  dummyCredentials
 }
 
-func NewLogin(users loginUsers, tokens tokenIssuer, hasher entity.Hasher) (*Login, error) {
+func NewLogin(users loginUsers, tokens tokenIssuer, hasher user.Hasher) (*Login, error) {
 	d, err := newDummyCredentials(hasher)
 	if err != nil {
 		return nil, fmt.Errorf("dummy credentials: %w", err)
@@ -50,18 +50,18 @@ func (l *Login) Execute(ctx context.Context, creds Credentials) (string, error) 
 	return l.tokens.Issue(user.ID())
 }
 
-func (l *Login) authenticate(ctx context.Context, creds Credentials) (*entity.User, error) {
-	email, err := entity.NewEmail(creds.Email)
+func (l *Login) authenticate(ctx context.Context, creds Credentials) (*user.User, error) {
+	email, err := user.NewEmail(creds.Email)
 	if err != nil {
 		return nil, l.rejectTimingSafe()
 	}
-	password, err := entity.NewPassword(creds.Password)
+	password, err := user.NewPassword(creds.Password)
 	if err != nil {
 		return nil, l.rejectTimingSafe()
 	}
 
 	user, err := l.users.ByEmail(ctx, email)
-	if errors.Is(err, entity.ErrUserNotFound) {
+	if errors.Is(err, user.ErrUserNotFound) {
 		return nil, l.rejectTimingSafe()
 	}
 	if err != nil {
@@ -75,12 +75,12 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*entity.Us
 }
 
 type dummyCredentials struct {
-	password entity.Password
-	hash     entity.PasswordHash
+	password user.Password
+	hash     user.PasswordHash
 }
 
-func newDummyCredentials(hasher entity.Hasher) (dummyCredentials, error) {
-	password, err := entity.NewPassword("dummy")
+func newDummyCredentials(hasher user.Hasher) (dummyCredentials, error) {
+	password, err := user.NewPassword("dummy")
 	if err != nil {
 		return dummyCredentials{}, fmt.Errorf("create password: %w", err)
 	}
@@ -94,5 +94,5 @@ func newDummyCredentials(hasher entity.Hasher) (dummyCredentials, error) {
 func (l *Login) rejectTimingSafe() error {
 	// Burns hashing time so unknown emails are indistinguishable by latency; the result is irrelevant.
 	_, _ = l.hasher.Verify(l.dummy.hash, l.dummy.password)
-	return entity.ErrInvalidCredentials
+	return user.ErrInvalidCredentials
 }

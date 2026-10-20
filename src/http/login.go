@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/src/entity"
 	"github.com/nexus-commerce/user-service/src/usecase"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 type Login struct {
@@ -56,7 +56,7 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	token, err := h.uc.Execute(r.Context(), reqBody.toCredentials())
 	if err != nil {
-		if errors.Is(err, entity.ErrInvalidCredentials) {
+		if errors.Is(err, user.ErrInvalidCredentials) {
 			writeError(rw, r, http.StatusUnauthorized, "Invalid credentials")
 			return
 		}

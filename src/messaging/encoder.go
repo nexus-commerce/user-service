@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/nexus-commerce/user-service/src/entity"
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 const (
@@ -25,14 +25,14 @@ type destination struct {
 type route struct {
 	destination
 	event   reflect.Type
-	convert func(entity.Event) any
+	convert func(user.Event) any
 }
 
-func newRoute[E entity.Event](dst destination, fn func(E) any) route {
+func newRoute[E user.Event](dst destination, fn func(E) any) route {
 	return route{
 		destination: dst,
 		event:       reflect.TypeFor[E](),
-		convert:     func(e entity.Event) any { return fn(e.(E)) },
+		convert:     func(e user.Event) any { return fn(e.(E)) },
 	}
 }
 
@@ -70,7 +70,7 @@ type envelope struct {
 	Data      any       `json:"data"`
 }
 
-func (enc *encoder) encode(e entity.Event) (Message, error) {
+func (enc *encoder) encode(e user.Event) (Message, error) {
 	r, ok := enc.routes[reflect.TypeOf(e)]
 	if !ok {
 		return Message{}, fmt.Errorf("no route for event %T", e)
@@ -102,7 +102,7 @@ type userRegistered struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-func convertUserRegistered(e entity.UserRegistered) any {
+func convertUserRegistered(e user.UserRegistered) any {
 	return userRegistered{
 		UserID:    e.AggregateID.String(),
 		Email:     e.Profile.Email().String(),
@@ -120,7 +120,7 @@ type userProfileChanged struct {
 	ChangedAt time.Time `json:"changedAt"`
 }
 
-func convertUserProfileChanged(e entity.UserProfileChanged) any {
+func convertUserProfileChanged(e user.UserProfileChanged) any {
 	return userProfileChanged{
 		UserID:    e.AggregateID.String(),
 		Email:     e.Profile.Email().String(),
