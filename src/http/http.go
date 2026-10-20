@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
+	"github.com/nexus-commerce/user-service/src/user"
 )
 
 const maxBodySize = 1 << 20 // 1 MB
@@ -31,6 +33,17 @@ type errorResponse struct {
 func writeError(rw http.ResponseWriter, r *http.Request, status int, msg string) {
 	rw.Header().Set("X-Content-Type-Options", "nosniff")
 	writeJSON(rw, r, status, errorResponse{Error: msg})
+}
+
+type wireFields map[user.Field]string
+
+func validationMessage(err error, fields wireFields) string {
+	if fe, ok := errors.AsType[*user.FieldError](err); ok {
+		if name, ok := fields[fe.Field]; ok {
+			return name + ": " + fe.Err.Error()
+		}
+	}
+	return err.Error()
 }
 
 func writeInvalidBody(rw http.ResponseWriter, r *http.Request, err error) {

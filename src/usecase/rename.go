@@ -28,11 +28,11 @@ type NameChange struct {
 }
 
 func (r *Rename) Execute(ctx context.Context, c NameChange) (ProfileView, error) {
-	first, err := parseName(c.FirstName, "firstName")
+	first, err := parseName(c.FirstName, user.FieldFirstName)
 	if err != nil {
 		return ProfileView{}, err
 	}
-	last, err := parseName(c.LastName, "lastName")
+	last, err := parseName(c.LastName, user.FieldLastName)
 	if err != nil {
 		return ProfileView{}, err
 	}
@@ -50,7 +50,7 @@ func (r *Rename) Execute(ctx context.Context, c NameChange) (ProfileView, error)
 	return toProfileView(usr), nil
 }
 
-func parseName(s *string, field string) (*user.Name, error) {
+func parseName(s *string, field user.Field) (*user.Name, error) {
 	if s == nil {
 		return nil, nil
 	}

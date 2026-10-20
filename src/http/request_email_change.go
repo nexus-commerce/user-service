@@ -24,6 +24,8 @@ type requestEmailChangeRequest struct {
 	Password string `json:"password"`
 }
 
+var requestEmailChangeFields = wireFields{user.FieldEmail: "newEmail"}
+
 func (r *requestEmailChangeRequest) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
 	return usecase.EmailChangeRequest{
 		UserID:   userID,
@@ -66,10 +68,10 @@ func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
-			writeError(rw, r, http.StatusBadRequest, err.Error())
+			writeError(rw, r, http.StatusBadRequest, validationMessage(err, requestEmailChangeFields))
 			return
 		case errors.Is(err, user.ErrInvalidCredentials):
-			writeError(rw, r, http.StatusForbidden, "Invalid password")
+			writeError(rw, r, http.StatusForbidden, err.Error())
 			return
 		case errors.Is(err, user.ErrUserNotFound):
 			writeError(rw, r, http.StatusNotFound, err.Error())

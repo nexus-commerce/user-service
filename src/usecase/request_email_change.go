@@ -34,7 +34,7 @@ type EmailChangeRequest struct {
 func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest) error {
 	email, err := user.NewEmail(req.NewEmail)
 	if err != nil {
-		return &user.FieldError{Field: "newEmail", Err: err}
+		return &user.FieldError{Field: user.FieldEmail, Err: err}
 	}
 	password, err := user.NewPassword(req.Password)
 	if err != nil {
@@ -52,7 +52,7 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 	_, err = r.users.Update(ctx, req.UserID, func(usr *user.User) error {
 		err := usr.RequestEmailChange(email, password, r.hasher)
 		if errors.Is(err, user.ErrEmailUnchanged) {
-			return &user.FieldError{Field: "newEmail", Err: err}
+			return &user.FieldError{Field: user.FieldEmail, Err: err}
 		}
 		return err
 	})

@@ -57,7 +57,7 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	token, err := h.uc.Execute(r.Context(), reqBody.toCredentials())
 	if err != nil {
 		if errors.Is(err, user.ErrInvalidCredentials) {
-			writeError(rw, r, http.StatusUnauthorized, "Invalid credentials")
+			writeError(rw, r, http.StatusUnauthorized, err.Error())
 			return
 		}
 		writeInternalError(rw, r, err)

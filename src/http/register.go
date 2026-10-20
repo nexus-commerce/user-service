@@ -26,6 +26,13 @@ type registerRequest struct {
 	PasswordConfirmation string `json:"passwordConfirmation"`
 }
 
+var registerFields = wireFields{
+	user.FieldFirstName: "firstName",
+	user.FieldLastName:  "lastName",
+	user.FieldEmail:     "email",
+	user.FieldPassword:  "password",
+}
+
 func (r *registerRequest) toRegistration() usecase.Registration {
 	return usecase.Registration{
 		FirstName:            r.FirstName,
@@ -63,8 +70,11 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
 		switch {
+		case errors.Is(err, usecase.ErrPasswordMismatch):
+			writeError(rw, r, http.StatusBadRequest, "passwordConfirmation: "+err.Error())
+			return
 		case errors.Is(err, user.ErrValidation):
-			writeError(rw, r, http.StatusBadRequest, err.Error())
+			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registerFields))
 			return
 		case errors.Is(err, user.ErrEmailTaken):
 			writeError(rw, r, http.StatusConflict, err.Error())

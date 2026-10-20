@@ -22,15 +22,15 @@ type ProfileFields struct {
 func NewProfile(f ProfileFields) (Profile, error) {
 	fn, err := NewName(f.FirstName)
 	if err != nil {
-		return Profile{}, &FieldError{Field: "firstName", Err: err}
+		return Profile{}, &FieldError{Field: FieldFirstName, Err: err}
 	}
 	ln, err := NewName(f.LastName)
 	if err != nil {
-		return Profile{}, &FieldError{Field: "lastName", Err: err}
+		return Profile{}, &FieldError{Field: FieldLastName, Err: err}
 	}
 	e, err := NewEmail(f.Email)
 	if err != nil {
-		return Profile{}, &FieldError{Field: "email", Err: err}
+		return Profile{}, &FieldError{Field: FieldEmail, Err: err}
 	}
 	return Profile{email: e, firstName: fn, lastName: ln}, nil
 }

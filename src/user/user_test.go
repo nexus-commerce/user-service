@@ -18,7 +18,7 @@ func TestNewProfile(t *testing.T) {
 		name      string
 		fields    user.ProfileFields
 		wantErr   error
-		wantField string
+		wantField user.Field
 	}{
 		{
 			name:   "valid",
@@ -28,19 +28,19 @@ func TestNewProfile(t *testing.T) {
 			name:      "bad first name",
 			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"},
 			wantErr:   user.ErrEmptyName,
-			wantField: "firstName",
+			wantField: user.FieldFirstName,
 		},
 		{
 			name:      "bad last name",
 			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "},
 			wantErr:   user.ErrEmptyName,
-			wantField: "lastName",
+			wantField: user.FieldLastName,
 		},
 		{
 			name:      "bad email",
 			fields:    user.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"},
 			wantErr:   user.ErrMalformedEmail,
-			wantField: "email",
+			wantField: user.FieldEmail,
 		},
 	}
 	for _, tt := range tests {
@@ -51,7 +51,7 @@ func TestNewProfile(t *testing.T) {
 					t.Fatalf("NewProfile(%+v) error = %v, want %v", tt.fields, err, tt.wantErr)
 				}
 				if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != tt.wantField {
-					t.Errorf("NewProfile(%+v) error = %v, want FieldError for %q", tt.fields, err, tt.wantField)
+					t.Errorf("NewProfile(%+v) error = %v, want FieldError for %v", tt.fields, err, tt.wantField)
 				}
 				return
 			}

@@ -24,6 +24,11 @@ type renameRequest struct {
 	LastName  *string `json:"lastName"`
 }
 
+var renameFields = wireFields{
+	user.FieldFirstName: "firstName",
+	user.FieldLastName:  "lastName",
+}
+
 func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 	return usecase.NameChange{
 		UserID:    userID,
@@ -64,7 +69,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
-			writeError(rw, r, http.StatusBadRequest, err.Error())
+			writeError(rw, r, http.StatusBadRequest, validationMessage(err, renameFields))
 			return
 		case errors.Is(err, user.ErrUserNotFound):
 			writeError(rw, r, http.StatusNotFound, err.Error())
