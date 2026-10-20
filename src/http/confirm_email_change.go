@@ -46,13 +46,13 @@ func (h *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrInvalidEmailChangeToken):
-			writeError(rw, r, http.StatusBadRequest, "invalid or already used confirmation link")
+			writeError(rw, r, http.StatusBadRequest, msgInvalidConfirmationLink)
 			return
 		case errors.Is(err, user.ErrEmailChangeTokenExpired):
-			writeError(rw, r, http.StatusBadRequest, "confirmation link has expired")
+			writeError(rw, r, http.StatusBadRequest, msgExpiredConfirmationLink)
 			return
 		case errors.Is(err, user.ErrEmailTaken):
-			writeError(rw, r, http.StatusConflict, err.Error())
+			writeError(rw, r, http.StatusConflict, msgEmailTaken)
 			return
 		}
 		writeInternalError(rw, r, err)

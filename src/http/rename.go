@@ -72,7 +72,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, renameFields))
 			return
 		case errors.Is(err, user.ErrUserNotFound):
-			writeError(rw, r, http.StatusNotFound, err.Error())
+			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
 			return
 		}
 		writeInternalError(rw, r, err)

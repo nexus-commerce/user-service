@@ -71,13 +71,13 @@ func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, requestEmailChangeFields))
 			return
 		case errors.Is(err, user.ErrInvalidCredentials):
-			writeError(rw, r, http.StatusForbidden, err.Error())
+			writeError(rw, r, http.StatusForbidden, msgInvalidPassword)
 			return
 		case errors.Is(err, user.ErrUserNotFound):
-			writeError(rw, r, http.StatusNotFound, err.Error())
+			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
 			return
 		case errors.Is(err, user.ErrEmailTaken):
-			writeError(rw, r, http.StatusConflict, err.Error())
+			writeError(rw, r, http.StatusConflict, msgEmailTaken)
 			return
 		}
 		writeInternalError(rw, r, err)

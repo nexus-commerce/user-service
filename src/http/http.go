@@ -30,6 +30,16 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+const (
+	msgInvalidCredentials      = "invalid credentials"
+	msgInvalidPassword         = "invalid password"
+	msgUserNotFound            = "user not found"
+	msgEmailTaken              = "user email already exists"
+	msgPasswordMismatch        = "passwordConfirmation: passwords do not match"
+	msgInvalidConfirmationLink = "invalid or already used confirmation link"
+	msgExpiredConfirmationLink = "confirmation link has expired"
+)
+
 func writeError(rw http.ResponseWriter, r *http.Request, status int, msg string) {
 	rw.Header().Set("X-Content-Type-Options", "nosniff")
 	writeJSON(rw, r, status, errorResponse{Error: msg})

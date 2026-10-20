@@ -71,13 +71,13 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrPasswordMismatch):
-			writeError(rw, r, http.StatusBadRequest, "passwordConfirmation: "+err.Error())
+			writeError(rw, r, http.StatusBadRequest, msgPasswordMismatch)
 			return
 		case errors.Is(err, user.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registerFields))
 			return
 		case errors.Is(err, user.ErrEmailTaken):
-			writeError(rw, r, http.StatusConflict, err.Error())
+			writeError(rw, r, http.StatusConflict, msgEmailTaken)
 			return
 		}
 		writeInternalError(rw, r, err)

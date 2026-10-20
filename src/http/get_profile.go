@@ -61,7 +61,7 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	profile, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
-			writeError(rw, r, http.StatusNotFound, err.Error())
+			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
 			return
 		}
 		writeInternalError(rw, r, err)
