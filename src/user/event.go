@@ -22,6 +22,7 @@ type Event interface {
 
 type Registered struct {
 	EventMeta
+	Email   Email
 	Profile Profile
 }
 

@@ -8,30 +8,25 @@ import (
 )
 
 type Profile struct {
-	email     Email
 	firstName Name
 	lastName  Name
 }
 
 type ProfileFields struct {
-	Email     string
 	FirstName string
 	LastName  string
 }
 
-func NewProfile(email Email, firstName, lastName Name) Profile {
-	return Profile{email: email, firstName: firstName, lastName: lastName}
+func NewProfile(firstName, lastName Name) Profile {
+	return Profile{firstName: firstName, lastName: lastName}
 }
 
 func RestoreProfile(f ProfileFields) Profile {
 	return Profile{
-		email:     Email{value: f.Email},
 		firstName: Name{value: f.FirstName},
 		lastName:  Name{value: f.LastName},
 	}
 }
-
-func (p Profile) Email() Email { return p.email }
 
 func (p Profile) FirstName() Name { return p.firstName }
 
@@ -46,6 +41,7 @@ var (
 
 type User struct {
 	id           uuid.UUID
+	email        Email
 	profile      Profile
 	passwordHash PasswordHash
 	createdAt    time.Time
@@ -54,27 +50,30 @@ type User struct {
 	events []Event
 }
 
-func NewUser(p Profile, password Password, hasher Hasher) (*User, error) {
+func NewUser(email Email, p Profile, password Password, hasher Hasher) (*User, error) {
 	hash, err := hasher.Hash(password)
 	if err != nil {
 		return nil, err
 	}
 	u := &User{
 		id:           uuid.New(),
+		email:        email,
 		profile:      p,
 		passwordHash: hash,
 		createdAt:    time.Now().UTC(),
 	}
 	u.events = append(u.events, Registered{
 		EventMeta: u.newEventMeta(u.createdAt),
+		Email:     u.email,
 		Profile:   u.profile,
 	})
 	return u, nil
 }
 
-func RestoreUser(id uuid.UUID, p Profile, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
+func RestoreUser(id uuid.UUID, email string, p Profile, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
 	return &User{
 		id:           id,
+		email:        Email{value: email},
 		profile:      p,
 		passwordHash: passwordHash,
 		createdAt:    createdAt,
@@ -84,7 +83,7 @@ func RestoreUser(id uuid.UUID, p Profile, passwordHash PasswordHash, createdAt t
 
 func (u *User) ID() uuid.UUID { return u.id }
 
-func (u *User) Email() Email { return u.profile.email }
+func (u *User) Email() Email { return u.email }
 
 func (u *User) FirstName() Name { return u.profile.firstName }
 
@@ -102,10 +101,11 @@ func (u *User) PendingEmailChange() (PendingEmailChange, bool) {
 }
 
 func (u *User) Rename(first, last Name) {
-	if first == u.profile.firstName && last == u.profile.lastName {
+	p := NewProfile(first, last)
+	if p == u.profile {
 		return
 	}
-	u.profile.firstName, u.profile.lastName = first, last
+	u.profile = p
 	u.events = append(u.events, Renamed{
 		EventMeta: u.newEventMeta(time.Now().UTC()),
 		FirstName: first,
@@ -117,7 +117,7 @@ func (u *User) RequestEmailChange(newEmail Email, password Password, hasher Hash
 	if err := u.Authenticate(password, hasher); err != nil {
 		return err
 	}
-	if newEmail == u.profile.email {
+	if newEmail == u.email {
 		return ErrEmailUnchanged
 	}
 	now := time.Now().UTC()
@@ -144,13 +144,13 @@ func (u *User) ConfirmEmailChange(token EmailChangeToken) error {
 	if now.After(u.pending.expiresAt) {
 		return ErrEmailChangeTokenExpired
 	}
-	old := u.profile.email
-	u.profile.email = u.pending.email
+	old := u.email
+	u.email = u.pending.email
 	u.pending = nil
 	u.events = append(u.events, EmailChanged{
 		EventMeta: u.newEventMeta(now),
 		OldEmail:  old,
-		NewEmail:  u.profile.email,
+		NewEmail:  u.email,
 	})
 	return nil
 }

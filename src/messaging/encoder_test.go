@@ -29,12 +29,12 @@ func newUserRegistered(t *testing.T) user.Registered {
 	if err != nil {
 		t.Fatalf("NewName() error: %v", err)
 	}
-	profile := user.NewProfile(email, first, last)
 	return user.Registered{
 		ID:          uuid.New(),
 		AggregateID: uuid.New(),
 		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
-		Profile:     profile,
+		Email:       email,
+		Profile:     user.NewProfile(first, last),
 	}
 }
 

@@ -127,7 +127,7 @@ type userRegistered struct {
 func convertRegistered(e user.Registered) (any, error) {
 	return userRegistered{
 		UserID:    e.AggregateID.String(),
-		Email:     e.Profile.Email().String(),
+		Email:     e.Email.String(),
 		FirstName: e.Profile.FirstName().String(),
 		LastName:  e.Profile.LastName().String(),
 		CreatedAt: e.OccurredAt,
