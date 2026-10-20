@@ -54,3 +54,11 @@ func RestoreFullName(f FullNameFields) FullName {
 func (n FullName) FirstName() Name { return n.firstName }
 
 func (n FullName) LastName() Name { return n.lastName }
+
+func (n FullName) WithFirstName(first Name) FullName {
+	return FullName{firstName: first, lastName: n.lastName}
+}
+
+func (n FullName) WithLastName(last Name) FullName {
+	return FullName{firstName: n.firstName, lastName: last}
+}

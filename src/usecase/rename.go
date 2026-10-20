@@ -38,11 +38,14 @@ func (r *Rename) Execute(ctx context.Context, c NameChange) (UserView, error) {
 	}
 
 	usr, err := r.users.Update(ctx, c.UserID, func(usr *user.User) error {
-		if first == nil && last == nil {
-			return nil
+		name := usr.FullName()
+		if first != nil {
+			name = name.WithFirstName(*first)
 		}
-		cur := usr.FullName()
-		usr.Rename(user.NewFullName(valueOr(first, cur.FirstName()), valueOr(last, cur.LastName())))
+		if last != nil {
+			name = name.WithLastName(*last)
+		}
+		usr.Rename(name)
 		return nil
 	})
 	if err != nil {
@@ -60,11 +63,4 @@ func parseName(s *string, field Field) (*user.Name, error) {
 		return nil, &FieldError{Field: field, Err: err}
 	}
 	return &n, nil
-}
-
-func valueOr[T any](v *T, fallback T) T {
-	if v == nil {
-		return fallback
-	}
-	return *v
 }

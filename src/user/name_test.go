@@ -42,3 +42,21 @@ func TestNewName(t *testing.T) {
 		})
 	}
 }
+
+func TestFullNameWith(t *testing.T) {
+	jane, _ := user.NewName("Jane")
+	doe, _ := user.NewName("Doe")
+	janet, _ := user.NewName("Janet")
+	smith, _ := user.NewName("Smith")
+	orig := user.NewFullName(jane, doe)
+
+	if got := orig.WithFirstName(janet); got != user.NewFullName(janet, doe) {
+		t.Errorf("WithFirstName() = %s %s, want Janet Doe", got.FirstName(), got.LastName())
+	}
+	if got := orig.WithLastName(smith); got != user.NewFullName(jane, smith) {
+		t.Errorf("WithLastName() = %s %s, want Jane Smith", got.FirstName(), got.LastName())
+	}
+	if orig != user.NewFullName(jane, doe) {
+		t.Errorf("original mutated: %s %s", orig.FirstName(), orig.LastName())
+	}
+}
