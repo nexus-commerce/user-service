@@ -4,11 +4,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/nexus-commerce/user-service/src/usecase"
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
 func TestValidationMessage(t *testing.T) {
-	fields := wireFields{user.FieldEmail: "newEmail"}
+	fields := wireFields{usecase.FieldEmail: "newEmail"}
 	tests := []struct {
 		name string
 		err  error
@@ -16,13 +17,13 @@ func TestValidationMessage(t *testing.T) {
 	}{
 		{
 			name: "mapped field",
-			err:  &user.FieldError{Field: user.FieldEmail, Err: user.ErrMalformedEmail},
+			err:  &usecase.FieldError{Field: usecase.FieldEmail, Err: user.ErrMalformedEmail},
 			want: "newEmail: must be a valid email address",
 		},
 		{
 			name: "unmapped field",
-			err:  &user.FieldError{Field: user.FieldFirstName, Err: user.ErrEmptyName},
-			want: "first name: must not be empty",
+			err:  &usecase.FieldError{Field: usecase.FieldFirstName, Err: user.ErrEmptyName},
+			want: "FirstName: must not be empty",
 		},
 		{
 			name: "no field",
@@ -31,7 +32,7 @@ func TestValidationMessage(t *testing.T) {
 		},
 		{
 			name: "wrapped",
-			err:  errors.Join(errors.New("ctx"), &user.FieldError{Field: user.FieldEmail, Err: user.ErrEmptyEmail}),
+			err:  errors.Join(errors.New("ctx"), &usecase.FieldError{Field: usecase.FieldEmail, Err: user.ErrEmptyEmail}),
 			want: "newEmail: must not be empty",
 		},
 	}

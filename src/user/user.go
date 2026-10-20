@@ -19,20 +19,8 @@ type ProfileFields struct {
 	LastName  string
 }
 
-func NewProfile(f ProfileFields) (Profile, error) {
-	fn, err := NewName(f.FirstName)
-	if err != nil {
-		return Profile{}, &FieldError{Field: FieldFirstName, Err: err}
-	}
-	ln, err := NewName(f.LastName)
-	if err != nil {
-		return Profile{}, &FieldError{Field: FieldLastName, Err: err}
-	}
-	e, err := NewEmail(f.Email)
-	if err != nil {
-		return Profile{}, &FieldError{Field: FieldEmail, Err: err}
-	}
-	return Profile{email: e, firstName: fn, lastName: ln}, nil
+func NewProfile(email Email, firstName, lastName Name) Profile {
+	return Profile{email: email, firstName: firstName, lastName: lastName}
 }
 
 func RestoreProfile(f ProfileFields) Profile {

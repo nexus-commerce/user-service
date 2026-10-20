@@ -13,65 +13,9 @@ import (
 
 var janeDoe = user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 
-func TestNewProfile(t *testing.T) {
-	tests := []struct {
-		name      string
-		fields    user.ProfileFields
-		wantErr   error
-		wantField user.Field
-	}{
-		{
-			name:   "valid",
-			fields: janeDoe,
-		},
-		{
-			name:      "bad first name",
-			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "", LastName: "Doe"},
-			wantErr:   user.ErrEmptyName,
-			wantField: user.FieldFirstName,
-		},
-		{
-			name:      "bad last name",
-			fields:    user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: " "},
-			wantErr:   user.ErrEmptyName,
-			wantField: user.FieldLastName,
-		},
-		{
-			name:      "bad email",
-			fields:    user.ProfileFields{Email: "x", FirstName: "Jane", LastName: "Doe"},
-			wantErr:   user.ErrMalformedEmail,
-			wantField: user.FieldEmail,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p, err := user.NewProfile(tt.fields)
-			if tt.wantErr != nil {
-				if !errors.Is(err, tt.wantErr) || !errors.Is(err, user.ErrValidation) {
-					t.Fatalf("NewProfile(%+v) error = %v, want %v", tt.fields, err, tt.wantErr)
-				}
-				if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != tt.wantField {
-					t.Errorf("NewProfile(%+v) error = %v, want FieldError for %v", tt.fields, err, tt.wantField)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("NewProfile(%+v) unexpected error: %v", tt.fields, err)
-			}
-			if got := fieldsOf(p); got != tt.fields {
-				t.Errorf("NewProfile(%+v) = %+v, want %+v", tt.fields, got, tt.fields)
-			}
-		})
-	}
-}
-
 func mustProfile(t *testing.T, f user.ProfileFields) user.Profile {
 	t.Helper()
-	p, err := user.NewProfile(f)
-	if err != nil {
-		t.Fatalf("NewProfile(%+v) error: %v", f, err)
-	}
-	return p
+	return user.NewProfile(mustEmail(t, f.Email), mustName(t, f.FirstName), mustName(t, f.LastName))
 }
 
 func mustPassword(t *testing.T, s string) user.Password {
@@ -184,8 +128,8 @@ func TestRestoreProfile(t *testing.T) {
 	fields := user.ProfileFields{Email: "Legacy@Example.com", FirstName: longName, LastName: "Doe"}
 	p := user.RestoreProfile(fields)
 
-	if _, err := user.NewProfile(fields); err == nil {
-		t.Fatal("NewProfile accepted data that should fail current rules")
+	if _, err := user.NewName(longName); err == nil {
+		t.Fatal("NewName accepted data that should fail current rules")
 	}
 	if got := fieldsOf(p); got != fields {
 		t.Errorf("RestoreProfile(%+v) = %+v, want %+v", fields, got, fields)

@@ -21,7 +21,7 @@ func TestRenameRejectsInvalidName(t *testing.T) {
 	usr, users := newJane(t)
 	empty := ""
 	_, err := usecase.NewRename(users).Execute(t.Context(), usecase.NameChange{UserID: usr.ID(), LastName: &empty})
-	if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != user.FieldLastName || !errors.Is(err, user.ErrEmptyName) {
+	if fe, ok := errors.AsType[*usecase.FieldError](err); !ok || fe.Field != usecase.FieldLastName || !errors.Is(err, user.ErrEmptyName) {
 		t.Errorf("Execute() error = %v, want FieldError lastName / %v", err, user.ErrEmptyName)
 	}
 }

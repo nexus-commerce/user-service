@@ -72,15 +72,23 @@ func (f *fakeUsers) IDByEmailChangeToken(_ context.Context, hash user.EmailChang
 
 func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.User {
 	t.Helper()
-	profile, err := user.NewProfile(user.ProfileFields{Email: email, FirstName: first, LastName: last})
+	e, err := user.NewEmail(email)
 	if err != nil {
-		t.Fatalf("NewProfile() error: %v", err)
+		t.Fatalf("NewEmail(%q) error: %v", email, err)
+	}
+	fn, err := user.NewName(first)
+	if err != nil {
+		t.Fatalf("NewName(%q) error: %v", first, err)
+	}
+	ln, err := user.NewName(last)
+	if err != nil {
+		t.Fatalf("NewName(%q) error: %v", last, err)
 	}
 	password, err := user.NewPassword("s3cretpass")
 	if err != nil {
 		t.Fatalf("NewPassword() error: %v", err)
 	}
-	usr, err := user.NewUser(profile, password, fakeHasher{})
+	usr, err := user.NewUser(user.NewProfile(e, fn, ln), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}

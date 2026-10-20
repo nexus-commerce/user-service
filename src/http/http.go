@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/src/user"
+	"github.com/nexus-commerce/user-service/src/usecase"
 )
 
 const maxBodySize = 1 << 20 // 1 MB
@@ -35,7 +35,6 @@ const (
 	msgInvalidPassword         = "invalid password"
 	msgUserNotFound            = "user not found"
 	msgEmailTaken              = "user email already exists"
-	msgPasswordMismatch        = "passwordConfirmation: passwords do not match"
 	msgInvalidConfirmationLink = "invalid or already used confirmation link"
 	msgExpiredConfirmationLink = "confirmation link has expired"
 )
@@ -45,10 +44,10 @@ func writeError(rw http.ResponseWriter, r *http.Request, status int, msg string)
 	writeJSON(rw, r, status, errorResponse{Error: msg})
 }
 
-type wireFields map[user.Field]string
+type wireFields map[usecase.Field]string
 
 func validationMessage(err error, fields wireFields) string {
-	if fe, ok := errors.AsType[*user.FieldError](err); ok {
+	if fe, ok := errors.AsType[*usecase.FieldError](err); ok {
 		if name, ok := fields[fe.Field]; ok {
 			return name + ": " + fe.Err.Error()
 		}

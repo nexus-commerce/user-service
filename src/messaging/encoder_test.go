@@ -17,11 +17,19 @@ type unroutedEvent struct {
 
 func newUserRegistered(t *testing.T) user.Registered {
 	t.Helper()
-	fields := user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
-	profile, err := user.NewProfile(fields)
+	email, err := user.NewEmail("jane@example.com")
 	if err != nil {
-		t.Fatalf("NewProfile(%+v) error: %v", fields, err)
+		t.Fatalf("NewEmail() error: %v", err)
 	}
+	first, err := user.NewName("Jane")
+	if err != nil {
+		t.Fatalf("NewName() error: %v", err)
+	}
+	last, err := user.NewName("Doe")
+	if err != nil {
+		t.Fatalf("NewName() error: %v", err)
+	}
+	profile := user.NewProfile(email, first, last)
 	return user.Registered{
 		ID:          uuid.New(),
 		AggregateID: uuid.New(),

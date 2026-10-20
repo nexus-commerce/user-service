@@ -34,22 +34,26 @@ type Registration struct {
 
 func (r *Register) Execute(ctx context.Context, reg Registration) (string, error) {
 	if reg.Password != reg.PasswordConfirmation {
-		return "", ErrPasswordMismatch
+		return "", &FieldError{Field: FieldPasswordConfirmation, Err: ErrPasswordMismatch}
 	}
 
-	profile, err := user.NewProfile(user.ProfileFields{
-		Email:     reg.Email,
-		FirstName: reg.FirstName,
-		LastName:  reg.LastName,
-	})
+	first, err := user.NewName(reg.FirstName)
 	if err != nil {
-		return "", err
+		return "", &FieldError{Field: FieldFirstName, Err: err}
+	}
+	last, err := user.NewName(reg.LastName)
+	if err != nil {
+		return "", &FieldError{Field: FieldLastName, Err: err}
+	}
+	email, err := user.NewEmail(reg.Email)
+	if err != nil {
+		return "", &FieldError{Field: FieldEmail, Err: err}
 	}
 	password, err := user.NewPassword(reg.Password)
 	if err != nil {
-		return "", &user.FieldError{Field: user.FieldPassword, Err: err}
+		return "", &FieldError{Field: FieldPassword, Err: err}
 	}
-	usr, err := user.NewUser(profile, password, r.hasher)
+	usr, err := user.NewUser(user.NewProfile(email, first, last), password, r.hasher)
 	if err != nil {
 		return "", err
 	}

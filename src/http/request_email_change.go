@@ -24,7 +24,7 @@ type requestEmailChangeRequest struct {
 	Password string `json:"password"`
 }
 
-var requestEmailChangeFields = wireFields{user.FieldEmail: "newEmail"}
+var requestEmailChangeFields = wireFields{usecase.FieldEmail: "newEmail"}
 
 func (r *requestEmailChangeRequest) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
 	return usecase.EmailChangeRequest{

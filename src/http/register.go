@@ -27,10 +27,11 @@ type registerRequest struct {
 }
 
 var registerFields = wireFields{
-	user.FieldFirstName: "firstName",
-	user.FieldLastName:  "lastName",
-	user.FieldEmail:     "email",
-	user.FieldPassword:  "password",
+	usecase.FieldFirstName:            "firstName",
+	usecase.FieldLastName:             "lastName",
+	usecase.FieldEmail:                "email",
+	usecase.FieldPassword:             "password",
+	usecase.FieldPasswordConfirmation: "passwordConfirmation",
 }
 
 func (r *registerRequest) toRegistration() usecase.Registration {
@@ -70,9 +71,6 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
 		switch {
-		case errors.Is(err, usecase.ErrPasswordMismatch):
-			writeError(rw, r, http.StatusBadRequest, msgPasswordMismatch)
-			return
 		case errors.Is(err, user.ErrValidation):
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registerFields))
 			return

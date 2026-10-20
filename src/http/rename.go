@@ -25,8 +25,8 @@ type renameRequest struct {
 }
 
 var renameFields = wireFields{
-	user.FieldFirstName: "firstName",
-	user.FieldLastName:  "lastName",
+	usecase.FieldFirstName: "firstName",
+	usecase.FieldLastName:  "lastName",
 }
 
 func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {

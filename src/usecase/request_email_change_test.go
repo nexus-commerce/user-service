@@ -14,11 +14,11 @@ func TestRequestEmailChange(t *testing.T) {
 		newEmail  string
 		password  string
 		wantErr   error
-		wantField user.Field
+		wantField usecase.Field
 	}{
 		{name: "success", newEmail: "new@example.com", password: "s3cretpass"},
-		{name: "malformed email", newEmail: "x", password: "s3cretpass", wantErr: user.ErrMalformedEmail, wantField: user.FieldEmail},
-		{name: "same email", newEmail: "JANE@example.com", password: "s3cretpass", wantErr: user.ErrEmailUnchanged, wantField: user.FieldEmail},
+		{name: "malformed email", newEmail: "x", password: "s3cretpass", wantErr: user.ErrMalformedEmail, wantField: usecase.FieldEmail},
+		{name: "same email", newEmail: "JANE@example.com", password: "s3cretpass", wantErr: user.ErrEmailUnchanged, wantField: usecase.FieldEmail},
 		{name: "wrong password", newEmail: "new@example.com", password: "wrongpass", wantErr: user.ErrInvalidCredentials},
 		{name: "password fails format", newEmail: "new@example.com", password: "short", wantErr: user.ErrInvalidCredentials},
 		{name: "taken", newEmail: "john@example.com", password: "s3cretpass", wantErr: user.ErrEmailTaken},
@@ -39,7 +39,7 @@ func TestRequestEmailChange(t *testing.T) {
 					t.Fatalf("Execute() error = %v, want %v", err, tt.wantErr)
 				}
 				if tt.wantField != 0 {
-					if fe, ok := errors.AsType[*user.FieldError](err); !ok || fe.Field != tt.wantField {
+					if fe, ok := errors.AsType[*usecase.FieldError](err); !ok || fe.Field != tt.wantField {
 						t.Errorf("Execute() error = %v, want FieldError for %v", err, tt.wantField)
 					}
 				}
