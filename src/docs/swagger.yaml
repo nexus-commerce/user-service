@@ -22,11 +22,6 @@ definitions:
       token:
         type: string
     type: object
-  http.profileResponse:
-    properties:
-      user:
-        $ref: '#/definitions/http.userResponse'
-    type: object
   http.registerRequest:
     properties:
       email:
@@ -58,6 +53,11 @@ definitions:
         type: string
       password:
         type: string
+    type: object
+  http.userEnvelope:
+    properties:
+      user:
+        $ref: '#/definitions/http.userResponse'
     type: object
   http.userResponse:
     properties:
@@ -332,16 +332,16 @@ paths:
       summary: Confirm email change
       tags:
       - Users
-  /users/profile:
+  /users/me:
     get:
-      description: Returns the profile of the authenticated user
+      description: Returns the authenticated user
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.profileResponse'
+            $ref: '#/definitions/http.userEnvelope'
         "401":
           description: Missing or invalid token
           schema:
@@ -356,9 +356,10 @@ paths:
             $ref: '#/definitions/http.errorResponse'
       security:
       - BearerAuth: []
-      summary: Get profile
+      summary: Get current user
       tags:
       - Users
+  /users/profile:
     patch:
       consumes:
       - application/json
@@ -377,7 +378,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.profileResponse'
+            $ref: '#/definitions/http.userEnvelope'
         "400":
           description: Invalid request, empty or too long fields
           schema:

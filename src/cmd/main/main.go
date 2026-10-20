@@ -90,7 +90,7 @@ func run() error {
 		return fmt.Errorf("create login use case: %w", err)
 	}
 	register := usecase.NewRegister(users, tokens, hasher)
-	getProfile := usecase.NewGetProfile(users)
+	getUser := usecase.NewGetUser(users)
 	rename := usecase.NewRename(users)
 	requestEmailChange := usecase.NewRequestEmailChange(users, hasher)
 	confirmEmailChange := usecase.NewConfirmEmailChange(users)
@@ -109,7 +109,7 @@ func run() error {
 		http.NewHealth(),
 		http.NewLogin(login),
 		http.NewRegister(register),
-		http.NewGetProfile(getProfile),
+		http.NewGetUser(getUser),
 		http.NewRename(rename),
 		http.NewRequestEmailChange(requestEmailChange),
 		http.NewConfirmEmailChange(confirmEmailChange),

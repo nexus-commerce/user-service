@@ -8,17 +8,17 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-type GetProfile struct {
-	uc *usecase.GetProfile
+type GetUser struct {
+	uc *usecase.GetUser
 }
 
-func NewGetProfile(uc *usecase.GetProfile) *GetProfile {
-	return &GetProfile{
+func NewGetUser(uc *usecase.GetUser) *GetUser {
+	return &GetUser{
 		uc: uc,
 	}
 }
 
-type profileResponse struct {
+type userEnvelope struct {
 	User *userResponse `json:"user"`
 }
 
@@ -29,8 +29,8 @@ type userResponse struct {
 	LastName  string `json:"lastName"`
 }
 
-func toProfileResponse(v usecase.ProfileView) profileResponse {
-	return profileResponse{
+func toUserEnvelope(v usecase.UserView) userEnvelope {
+	return userEnvelope{
 		User: &userResponse{
 			ID:        v.ID.String(),
 			Email:     v.Email,
@@ -41,24 +41,24 @@ func toProfileResponse(v usecase.ProfileView) profileResponse {
 }
 
 // ServeHTTP godoc
-// @Summary     Get profile
-// @Description Returns the profile of the authenticated user
+// @Summary     Get current user
+// @Description Returns the authenticated user
 // @Tags        Users
 // @Produce     json
 // @Security    BearerAuth
-// @Success     200  {object}  profileResponse
+// @Success     200  {object}  userEnvelope
 // @Failure     401  {object}  errorResponse  "Missing or invalid token"
 // @Failure     404  {object}  errorResponse  "User not found"
 // @Failure     500  {object}  errorResponse  "Internal server error"
-// @Router      /users/profile [get]
-func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+// @Router      /users/me [get]
+func (h *GetUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := UserIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return
 	}
 
-	profile, err := h.uc.Execute(r.Context(), userID)
+	usr, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
@@ -68,12 +68,12 @@ func (h *GetProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, toProfileResponse(profile))
+	writeJSON(rw, r, http.StatusOK, toUserEnvelope(usr))
 }
 
-func (h *GetProfile) Route() Route {
+func (h *GetUser) Route() Route {
 	return Route{
-		Pattern: "GET /users/profile",
+		Pattern: "GET /users/me",
 		Handler: h,
 		Auth:    AuthBearer,
 	}

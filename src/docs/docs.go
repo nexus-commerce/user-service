@@ -405,26 +405,26 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/profile": {
+        "/users/me": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the profile of the authenticated user",
+                "description": "Returns the authenticated user",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Users"
                 ],
-                "summary": "Get profile",
+                "summary": "Get current user",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.profileResponse"
+                            "$ref": "#/definitions/http.userEnvelope"
                         }
                     },
                     "401": {
@@ -446,7 +446,9 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/users/profile": {
             "patch": {
                 "security": [
                     {
@@ -479,7 +481,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.profileResponse"
+                            "$ref": "#/definitions/http.userEnvelope"
                         }
                     },
                     "400": {
@@ -552,14 +554,6 @@ const docTemplate = `{
                 }
             }
         },
-        "http.profileResponse": {
-            "type": "object",
-            "properties": {
-                "user": {
-                    "$ref": "#/definitions/http.userResponse"
-                }
-            }
-        },
         "http.registerRequest": {
             "type": "object",
             "properties": {
@@ -607,6 +601,14 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                }
+            }
+        },
+        "http.userEnvelope": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/http.userResponse"
                 }
             }
         },

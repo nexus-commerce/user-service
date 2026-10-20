@@ -45,7 +45,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 // @Produce     json
 // @Security    BearerAuth
 // @Param       request  body      renameRequest  true  "Fields to change"
-// @Success     200      {object}  profileResponse
+// @Success     200      {object}  userEnvelope
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields"
 // @Failure     401      {object}  errorResponse  "Missing or invalid token"
 // @Failure     404      {object}  errorResponse  "User not found"
@@ -65,7 +65,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := h.uc.Execute(r.Context(), reqBody.toNameChange(userID))
+	usr, err := h.uc.Execute(r.Context(), reqBody.toNameChange(userID))
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
@@ -79,7 +79,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, toProfileResponse(profile))
+	writeJSON(rw, r, http.StatusOK, toUserEnvelope(usr))
 }
 
 func (h *Rename) Route() Route {
