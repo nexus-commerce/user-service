@@ -9,12 +9,13 @@ import (
 )
 
 type Config struct {
-	Postgres Postgres
-	HTTP     HTTP
-	Kafka    Kafka
-	Outbox   Outbox
-	JWT      JWT
-	Docs     Docs
+	Postgres     Postgres
+	HTTP         HTTP
+	Kafka        Kafka
+	Outbox       Outbox
+	JWT          JWT
+	Docs         Docs
+	Notification Notification
 }
 
 type Postgres struct {
@@ -63,6 +64,11 @@ type JWT struct {
 type Docs struct {
 	Username string `env:"DOCS_USERNAME" envDefault:"admin"`
 	Password string `env:"DOCS_PASSWORD" envDefault:"admin"`
+}
+
+type Notification struct {
+	PublicKey string `env:"NOTIFICATION_PUBLIC_KEY"`
+	KeyID     string `env:"NOTIFICATION_KEY_ID"`
 }
 
 func New() (*Config, error) {

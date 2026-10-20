@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httpapi.loginRequest"
+                            "$ref": "#/definitions/http.loginRequest"
                         }
                     }
                 ],
@@ -43,31 +43,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.loginResponse"
+                            "$ref": "#/definitions/http.loginResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "413": {
                         "description": "Request body too large",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -93,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httpapi.registerRequest"
+                            "$ref": "#/definitions/http.registerRequest"
                         }
                     }
                 ],
@@ -101,31 +101,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.registerResponse"
+                            "$ref": "#/definitions/http.registerResponse"
                         }
                     },
                     "400": {
                         "description": "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "409": {
                         "description": "User with this email already exists",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "413": {
                         "description": "Request body too large",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -156,7 +156,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Missing or invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -187,7 +187,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Missing or invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -218,7 +218,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Missing or invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -249,7 +249,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Missing or invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -267,6 +267,139 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Request email change",
+                "parameters": [
+                    {
+                        "description": "New email and current password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.requestEmailChangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Invalid request, malformed email or email equal to the current one",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Invalid password",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User with this email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/email/confirm": {
+            "post": {
+                "description": "Confirms a pending email change with the token from the confirmation link and makes the new email current",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Confirm email change",
+                "parameters": [
+                    {
+                        "description": "Confirmation token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.confirmEmailChangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Invalid request, invalid, already used or expired confirmation link",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User with this email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -291,25 +424,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.profileResponse"
+                            "$ref": "#/definitions/http.profileResponse"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid token",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -320,7 +453,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially updates the profile of the authenticated user; only provided fields are changed",
+                "description": "Partially changes the first and last name of the authenticated user; only provided fields are changed",
                 "consumes": [
                     "application/json"
                 ],
@@ -330,15 +463,15 @@ const docTemplate = `{
                 "tags": [
                     "Users"
                 ],
-                "summary": "Update profile",
+                "summary": "Change profile",
                 "parameters": [
                     {
-                        "description": "Fields to update",
+                        "description": "Fields to change",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httpapi.updateProfileRequest"
+                            "$ref": "#/definitions/http.renameRequest"
                         }
                     }
                 ],
@@ -346,43 +479,37 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.profileResponse"
+                            "$ref": "#/definitions/http.profileResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request, empty or too long fields or malformed email",
+                        "description": "Invalid request, empty or too long fields",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "401": {
                         "description": "Missing or invalid token",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "User with this email already exists",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "413": {
                         "description": "Request body too large",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/httpapi.errorResponse"
+                            "$ref": "#/definitions/http.errorResponse"
                         }
                     }
                 }
@@ -390,7 +517,15 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "httpapi.errorResponse": {
+        "http.confirmEmailChangeRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.errorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -398,7 +533,7 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.loginRequest": {
+        "http.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -409,7 +544,7 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.loginResponse": {
+        "http.loginResponse": {
             "type": "object",
             "properties": {
                 "token": {
@@ -417,15 +552,15 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.profileResponse": {
+        "http.profileResponse": {
             "type": "object",
             "properties": {
                 "user": {
-                    "$ref": "#/definitions/httpapi.userResponse"
+                    "$ref": "#/definitions/http.userResponse"
                 }
             }
         },
-        "httpapi.registerRequest": {
+        "http.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -445,7 +580,7 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.registerResponse": {
+        "http.registerResponse": {
             "type": "object",
             "properties": {
                 "token": {
@@ -453,12 +588,9 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.updateProfileRequest": {
+        "http.renameRequest": {
             "type": "object",
             "properties": {
-                "email": {
-                    "type": "string"
-                },
                 "firstName": {
                     "type": "string"
                 },
@@ -467,7 +599,18 @@ const docTemplate = `{
                 }
             }
         },
-        "httpapi.userResponse": {
+        "http.requestEmailChangeRequest": {
+            "type": "object",
+            "properties": {
+                "newEmail": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.userResponse": {
             "type": "object",
             "properties": {
                 "email": {

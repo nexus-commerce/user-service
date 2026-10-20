@@ -1,7 +1,9 @@
 package messaging
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 	"uuid"
@@ -10,17 +12,17 @@ import (
 )
 
 type unroutedEvent struct {
-	user.UserRegistered
+	user.Registered
 }
 
-func newUserRegistered(t *testing.T) user.UserRegistered {
+func newUserRegistered(t *testing.T) user.Registered {
 	t.Helper()
 	fields := user.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 	profile, err := user.NewProfile(fields)
 	if err != nil {
 		t.Fatalf("NewProfile(%+v) error: %v", fields, err)
 	}
-	return user.UserRegistered{
+	return user.Registered{
 		ID:          uuid.New(),
 		AggregateID: uuid.New(),
 		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
@@ -29,7 +31,7 @@ func newUserRegistered(t *testing.T) user.UserRegistered {
 }
 
 func TestEncodeUserRegistered(t *testing.T) {
-	enc := newEncoder()
+	enc := newEncoder(fakeSealer{})
 	e := newUserRegistered(t)
 
 	msg, err := enc.encode(e)
@@ -40,7 +42,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 	gotHeader := header{msg.ID, msg.Topic, msg.Key}
 	wantHeader := header{e.ID.String(), "users", e.AggregateID.String()}
 	if gotHeader != wantHeader {
-		t.Errorf("encode(UserRegistered) header = %+v, want %+v", gotHeader, wantHeader)
+		t.Errorf("encode(Registered) header = %+v, want %+v", gotHeader, wantHeader)
 	}
 
 	type payload struct {
@@ -60,58 +62,203 @@ func TestEncodeUserRegistered(t *testing.T) {
 	want.Data.UserID = e.AggregateID.String()
 	want.Data.Email = "jane@example.com"
 	if got != want {
-		t.Errorf("encode(UserRegistered) payload = %+v, want %+v", got, want)
+		t.Errorf("encode(Registered) payload = %+v, want %+v", got, want)
 	}
 }
 
 func TestEncodeRejectsUnroutedEvent(t *testing.T) {
-	enc := newEncoder()
+	enc := newEncoder(fakeSealer{})
 
 	if _, err := enc.encode(unroutedEvent{newUserRegistered(t)}); err == nil {
 		t.Error("Encode(unroutedEvent) = _, nil; want error")
 	}
 }
 
-func TestEncodeUserProfileChanged(t *testing.T) {
-	enc := newEncoder()
-	reg := newUserRegistered(t)
-	e := user.UserProfileChanged{
-		ID:          uuid.New(),
-		AggregateID: reg.AggregateID,
-		OccurredAt:  time.Date(2026, 10, 20, 10, 15, 0, 0, time.UTC),
-		Profile:     reg.Profile,
-	}
+type fakeSealer struct {
+	out []byte
+	err error
+}
 
-	msg, err := enc.encode(e)
+func (s fakeSealer) Seal(p []byte) ([]byte, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.out != nil {
+		return s.out, nil
+	}
+	return append([]byte("sealed:"), p...), nil
+}
+
+func (fakeSealer) KeyID() string { return "test-key" }
+
+func mustEmail(t *testing.T, s string) user.Email {
+	t.Helper()
+	e, err := user.NewEmail(s)
 	if err != nil {
-		t.Fatalf("Encode = _, %v; want _, nil", err)
+		t.Fatalf("NewEmail(%q) error: %v", s, err)
 	}
+	return e
+}
+
+func mustName(t *testing.T, s string) user.Name {
+	t.Helper()
+	n, err := user.NewName(s)
+	if err != nil {
+		t.Fatalf("NewName(%q) error: %v", s, err)
+	}
+	return n
+}
+
+func newMeta() user.EventMeta {
+	return user.EventMeta{
+		ID:          uuid.New(),
+		AggregateID: uuid.New(),
+		OccurredAt:  time.Date(2026, 10, 20, 10, 15, 0, 0, time.UTC),
+	}
+}
+
+func assertHeader(t *testing.T, msg Message, meta user.EventMeta) {
+	t.Helper()
 	type header struct{ ID, Topic, Key string }
-	gotHeader := header{msg.ID, msg.Topic, msg.Key}
-	wantHeader := header{e.ID.String(), "users", e.AggregateID.String()}
-	if gotHeader != wantHeader {
-		t.Errorf("encode(UserProfileChanged) header = %+v, want %+v", gotHeader, wantHeader)
+	got := header{msg.ID, msg.Topic, msg.Key}
+	want := header{meta.ID.String(), "users", meta.AggregateID.String()}
+	if got != want {
+		t.Errorf("header = %+v, want %+v", got, want)
 	}
+}
+
+func decode[T any](t *testing.T, msg Message) T {
+	t.Helper()
+	var v T
+	if err := json.Unmarshal(msg.Value, &v); err != nil {
+		t.Fatalf("json.Unmarshal(%s) error: %v", msg.Value, err)
+	}
+	return v
+}
+
+func TestEncodeUserRenamed(t *testing.T) {
+	e := user.Renamed{EventMeta: newMeta(), FirstName: mustName(t, "Jane"), LastName: mustName(t, "Smith")}
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(Renamed) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
 
 	type payload struct {
-		ID      string `json:"eventId"`
 		Type    string `json:"eventType"`
 		Version string `json:"version"`
 		Data    struct {
 			UserID    string    `json:"userId"`
-			Email     string    `json:"email"`
+			FirstName string    `json:"firstName"`
+			LastName  string    `json:"lastName"`
+			RenamedAt time.Time `json:"renamedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	want := payload{Type: "user.renamed", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.FirstName = "Jane"
+	want.Data.LastName = "Smith"
+	want.Data.RenamedAt = e.OccurredAt
+	if got != want {
+		t.Errorf("encode(Renamed) payload = %+v, want %+v", got, want)
+	}
+}
+
+func newUserEmailChangeRequested(t *testing.T) user.EmailChangeRequested {
+	t.Helper()
+	meta := newMeta()
+	return user.EmailChangeRequested{
+		EventMeta: meta,
+		NewEmail:  mustEmail(t, "new@example.com"),
+		Token:     user.NewEmailChangeToken(),
+		ExpiresAt: meta.OccurredAt.Add(24 * time.Hour),
+	}
+}
+
+func TestEncodeUserEmailChangeRequested(t *testing.T) {
+	e := newUserEmailChangeRequested(t)
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(EmailChangeRequested) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID         string    `json:"userId"`
+			NewEmail       string    `json:"newEmail"`
+			EncryptedToken []byte    `json:"encryptedToken"`
+			KeyID          string    `json:"keyId"`
+			ExpiresAt      time.Time `json:"expiresAt"`
+			RequestedAt    time.Time `json:"requestedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	if got.Type != "user.email_change_requested" || got.Version != "1.0" {
+		t.Errorf("type, version = %q, %q; want user.email_change_requested, 1.0", got.Type, got.Version)
+	}
+	d := got.Data
+	if d.UserID != e.AggregateID.String() || d.NewEmail != "new@example.com" || d.KeyID != "test-key" ||
+		!d.ExpiresAt.Equal(e.ExpiresAt) || !d.RequestedAt.Equal(e.OccurredAt) {
+		t.Errorf("data = %+v", d)
+	}
+	if want := "sealed:" + e.Token.Plaintext(); string(d.EncryptedToken) != want {
+		t.Errorf("encryptedToken = %q, want %q", d.EncryptedToken, want)
+	}
+}
+
+func TestEncodeUserEmailChangeRequestedHidesPlaintextToken(t *testing.T) {
+	e := newUserEmailChangeRequested(t)
+
+	msg, err := newEncoder(fakeSealer{out: []byte("opaque")}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(EmailChangeRequested) error: %v", err)
+	}
+	if bytes.Contains(msg.Value, []byte(e.Token.Plaintext())) {
+		t.Errorf("encoded message %s contains plaintext token", msg.Value)
+	}
+}
+
+func TestEncodeReturnsSealError(t *testing.T) {
+	sealErr := errors.New("boom")
+
+	_, err := newEncoder(fakeSealer{err: sealErr}).encode(newUserEmailChangeRequested(t))
+	if !errors.Is(err, sealErr) {
+		t.Errorf("encode() error = %v, want %v", err, sealErr)
+	}
+}
+
+func TestEncodeUserEmailChanged(t *testing.T) {
+	e := user.EmailChanged{EventMeta: newMeta(), OldEmail: mustEmail(t, "jane@example.com"), NewEmail: mustEmail(t, "new@example.com")}
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(EmailChanged) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID    string    `json:"userId"`
+			OldEmail  string    `json:"oldEmail"`
+			NewEmail  string    `json:"newEmail"`
 			ChangedAt time.Time `json:"changedAt"`
 		} `json:"data"`
 	}
-	var got payload
-	if err := json.Unmarshal(msg.Value, &got); err != nil {
-		t.Fatalf("json.Unmarshal(%s) error: %v", msg.Value, err)
-	}
-	want := payload{ID: e.ID.String(), Type: "user.profile_changed", Version: "1.0"}
+	got := decode[payload](t, msg)
+	want := payload{Type: "user.email_changed", Version: "1.0"}
 	want.Data.UserID = e.AggregateID.String()
-	want.Data.Email = "jane@example.com"
+	want.Data.OldEmail = "jane@example.com"
+	want.Data.NewEmail = "new@example.com"
 	want.Data.ChangedAt = e.OccurredAt
 	if got != want {
-		t.Errorf("encode(UserProfileChanged) payload = %+v, want %+v", got, want)
+		t.Errorf("encode(EmailChanged) payload = %+v, want %+v", got, want)
 	}
 }

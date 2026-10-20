@@ -49,41 +49,11 @@ func (p Profile) FirstName() Name { return p.firstName }
 
 func (p Profile) LastName() Name { return p.lastName }
 
-type ProfileChange struct {
-	Email     *string
-	FirstName *string
-	LastName  *string
-}
-
-func (p Profile) Apply(c ProfileChange) (Profile, error) {
-	if err := applyField(&p.firstName, c.FirstName, "firstName", NewName); err != nil {
-		return Profile{}, err
-	}
-	if err := applyField(&p.lastName, c.LastName, "lastName", NewName); err != nil {
-		return Profile{}, err
-	}
-	if err := applyField(&p.email, c.Email, "email", NewEmail); err != nil {
-		return Profile{}, err
-	}
-	return p, nil
-}
-
-func applyField[T any](dst *T, v *string, field string, parse func(string) (T, error)) error {
-	if v == nil {
-		return nil
-	}
-	parsed, err := parse(*v)
-	if err != nil {
-		return &FieldError{Field: field, Err: err}
-	}
-	*dst = parsed
-	return nil
-}
-
 var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrEmailTaken         = errors.New("user email already exists")
+	ErrEmailUnchanged     = NewValidationError("must differ from the current email")
 )
 
 type User struct {
@@ -91,6 +61,7 @@ type User struct {
 	profile      Profile
 	passwordHash PasswordHash
 	createdAt    time.Time
+	pending      *PendingEmailChange
 
 	events []Event
 }
@@ -106,19 +77,20 @@ func NewUser(p Profile, password Password, hasher Hasher) (*User, error) {
 		passwordHash: hash,
 		createdAt:    time.Now().UTC(),
 	}
-	u.events = append(u.events, UserRegistered{
+	u.events = append(u.events, Registered{
 		EventMeta: u.newEventMeta(u.createdAt),
 		Profile:   u.profile,
 	})
 	return u, nil
 }
 
-func RestoreUser(id uuid.UUID, p Profile, passwordHash PasswordHash, createdAt time.Time) *User {
+func RestoreUser(id uuid.UUID, p Profile, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
 	return &User{
 		id:           id,
 		profile:      p,
 		passwordHash: passwordHash,
 		createdAt:    createdAt,
+		pending:      pending,
 	}
 }
 
@@ -134,20 +106,65 @@ func (u *User) PasswordHash() PasswordHash { return u.passwordHash }
 
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 
-func (u *User) ChangeProfile(c ProfileChange) (bool, error) {
-	p, err := u.profile.Apply(c)
-	if err != nil {
-		return false, err
+func (u *User) PendingEmailChange() (PendingEmailChange, bool) {
+	if u.pending == nil {
+		return PendingEmailChange{}, false
 	}
-	if p == u.profile {
-		return false, nil
+	return *u.pending, true
+}
+
+func (u *User) Rename(first, last Name) {
+	if first == u.profile.firstName && last == u.profile.lastName {
+		return
 	}
-	u.profile = p
-	u.events = append(u.events, UserProfileChanged{
+	u.profile.firstName, u.profile.lastName = first, last
+	u.events = append(u.events, Renamed{
 		EventMeta: u.newEventMeta(time.Now().UTC()),
-		Profile:   u.profile,
+		FirstName: first,
+		LastName:  last,
 	})
-	return true, nil
+}
+
+func (u *User) RequestEmailChange(newEmail Email, password Password, hasher Hasher) error {
+	if err := u.Authenticate(password, hasher); err != nil {
+		return err
+	}
+	if newEmail == u.profile.email {
+		return ErrEmailUnchanged
+	}
+	now := time.Now().UTC()
+	token := NewEmailChangeToken()
+	u.pending = &PendingEmailChange{
+		email:     newEmail,
+		tokenHash: token.Hash(),
+		expiresAt: now.Add(emailChangeTokenTTL),
+	}
+	u.events = append(u.events, EmailChangeRequested{
+		EventMeta: u.newEventMeta(now),
+		NewEmail:  newEmail,
+		Token:     token,
+		ExpiresAt: u.pending.expiresAt,
+	})
+	return nil
+}
+
+func (u *User) ConfirmEmailChange(token EmailChangeToken) error {
+	if u.pending == nil || token.Hash() != u.pending.tokenHash {
+		return ErrInvalidEmailChangeToken
+	}
+	now := time.Now().UTC()
+	if now.After(u.pending.expiresAt) {
+		return ErrEmailChangeTokenExpired
+	}
+	old := u.profile.email
+	u.profile.email = u.pending.email
+	u.pending = nil
+	u.events = append(u.events, EmailChanged{
+		EventMeta: u.newEventMeta(now),
+		OldEmail:  old,
+		NewEmail:  u.profile.email,
+	})
+	return nil
 }
 
 func (u *User) Authenticate(password Password, hasher Hasher) error {

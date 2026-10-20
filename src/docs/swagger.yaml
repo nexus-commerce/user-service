@@ -1,28 +1,33 @@
 basePath: /api
 definitions:
-  httpapi.errorResponse:
+  http.confirmEmailChangeRequest:
+    properties:
+      token:
+        type: string
+    type: object
+  http.errorResponse:
     properties:
       error:
         type: string
     type: object
-  httpapi.loginRequest:
+  http.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  httpapi.loginResponse:
+  http.loginResponse:
     properties:
       token:
         type: string
     type: object
-  httpapi.profileResponse:
+  http.profileResponse:
     properties:
       user:
-        $ref: '#/definitions/httpapi.userResponse'
+        $ref: '#/definitions/http.userResponse'
     type: object
-  httpapi.registerRequest:
+  http.registerRequest:
     properties:
       email:
         type: string
@@ -35,21 +40,26 @@ definitions:
       passwordConfirmation:
         type: string
     type: object
-  httpapi.registerResponse:
+  http.registerResponse:
     properties:
       token:
         type: string
     type: object
-  httpapi.updateProfileRequest:
+  http.renameRequest:
     properties:
-      email:
-        type: string
       firstName:
         type: string
       lastName:
         type: string
     type: object
-  httpapi.userResponse:
+  http.requestEmailChangeRequest:
+    properties:
+      newEmail:
+        type: string
+      password:
+        type: string
+    type: object
+  http.userResponse:
     properties:
       email:
         type: string
@@ -77,30 +87,30 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/httpapi.loginRequest'
+          $ref: '#/definitions/http.loginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpapi.loginResponse'
+            $ref: '#/definitions/http.loginResponse'
         "400":
           description: Invalid request body
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "401":
           description: Invalid credentials
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       summary: Login
       tags:
       - Auth
@@ -116,31 +126,31 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/httpapi.registerRequest'
+          $ref: '#/definitions/http.registerRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpapi.registerResponse'
+            $ref: '#/definitions/http.registerResponse'
         "400":
           description: Invalid request, empty or too long fields, too short password,
             malformed email or passwords do not match
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "409":
           description: User with this email already exists
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       summary: Register
       tags:
       - Auth
@@ -157,7 +167,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BasicAuth: []
       summary: API Documentation
@@ -177,7 +187,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BasicAuth: []
       summary: Events Documentation
@@ -196,7 +206,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BasicAuth: []
       summary: Events Specification
@@ -215,7 +225,7 @@ paths:
         "401":
           description: Missing or invalid credentials
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BasicAuth: []
       summary: API Specification
@@ -232,6 +242,96 @@ paths:
       summary: Health Check
       tags:
       - System
+  /users/email:
+    post:
+      consumes:
+      - application/json
+      description: Starts an email change for the authenticated user; the new email
+        takes effect only after it is confirmed via the link sent to it
+      parameters:
+      - description: New email and current password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.requestEmailChangeRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Invalid request, malformed email or email equal to the current
+            one
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "401":
+          description: Missing or invalid token
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "403":
+          description: Invalid password
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request email change
+      tags:
+      - Users
+  /users/email/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Confirms a pending email change with the token from the confirmation
+        link and makes the new email current
+      parameters:
+      - description: Confirmation token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.confirmEmailChangeRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid request, invalid, already used or expired confirmation
+            link
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      summary: Confirm email change
+      tags:
+      - Users
   /users/profile:
     get:
       description: Returns the profile of the authenticated user
@@ -241,19 +341,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpapi.profileResponse'
+            $ref: '#/definitions/http.profileResponse'
         "401":
           description: Missing or invalid token
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BearerAuth: []
       summary: Get profile
@@ -262,49 +362,45 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Partially updates the profile of the authenticated user; only provided
-        fields are changed
+      description: Partially changes the first and last name of the authenticated
+        user; only provided fields are changed
       parameters:
-      - description: Fields to update
+      - description: Fields to change
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/httpapi.updateProfileRequest'
+          $ref: '#/definitions/http.renameRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httpapi.profileResponse'
+            $ref: '#/definitions/http.profileResponse'
         "400":
-          description: Invalid request, empty or too long fields or malformed email
+          description: Invalid request, empty or too long fields
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "401":
           description: Missing or invalid token
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
-        "409":
-          description: User with this email already exists
-          schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "413":
           description: Request body too large
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/httpapi.errorResponse'
+            $ref: '#/definitions/http.errorResponse'
       security:
       - BearerAuth: []
-      summary: Update profile
+      summary: Change profile
       tags:
       - Users
 securityDefinitions:

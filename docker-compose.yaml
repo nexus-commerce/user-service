@@ -20,7 +20,41 @@ services:
       KAFKA_HOST: kafka
       KAFKA_PORT: 29092
     restart: on-failure
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:80/api/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
     depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  outbox-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: user-service-dev
+    container_name: outbox-relay
+    hostname: outbox-relay
+    networks:
+      - user-service-network
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      KAFKA_HOST: kafka
+      KAFKA_PORT: 29092
+    command: [ "air", "-c", ".air.relay.toml" ]
+    restart: on-failure
+    depends_on:
+      user-service:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       kafka-init:

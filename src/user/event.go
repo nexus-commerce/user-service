@@ -20,16 +20,34 @@ type Event interface {
 	isEvent()
 }
 
-type UserRegistered struct {
+type Registered struct {
 	EventMeta
 	Profile Profile
 }
 
-func (UserRegistered) isEvent() {}
+func (Registered) isEvent() {}
 
-type UserProfileChanged struct {
+type Renamed struct {
 	EventMeta
-	Profile Profile
+	FirstName Name
+	LastName  Name
 }
 
-func (UserProfileChanged) isEvent() {}
+func (Renamed) isEvent() {}
+
+type EmailChangeRequested struct {
+	EventMeta
+	NewEmail  Email
+	Token     EmailChangeToken
+	ExpiresAt time.Time
+}
+
+func (EmailChangeRequested) isEvent() {}
+
+type EmailChanged struct {
+	EventMeta
+	OldEmail Email
+	NewEmail Email
+}
+
+func (EmailChanged) isEvent() {}

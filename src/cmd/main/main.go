@@ -19,6 +19,7 @@ import (
 	"github.com/nexus-commerce/user-service/src/http"
 	"github.com/nexus-commerce/user-service/src/jwt"
 	"github.com/nexus-commerce/user-service/src/messaging"
+	"github.com/nexus-commerce/user-service/src/nacl"
 	"github.com/nexus-commerce/user-service/src/postgres"
 	"github.com/nexus-commerce/user-service/src/usecase"
 )
@@ -71,7 +72,12 @@ func run() error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	users := postgres.NewUsers(db, messaging.NewPublisher())
+	sealer, err := nacl.NewSealer(cfg.Notification.PublicKey, cfg.Notification.KeyID)
+	if err != nil {
+		return fmt.Errorf("create token sealer: %w", err)
+	}
+
+	users := postgres.NewUsers(db, messaging.NewPublisher(sealer))
 	tokens := jwt.NewTokens(jwt.Options{
 		Secret: cfg.JWT.Secret,
 		Issuer: cfg.JWT.Issuer,
@@ -85,7 +91,9 @@ func run() error {
 	}
 	register := usecase.NewRegister(users, tokens, hasher)
 	getProfile := usecase.NewGetProfile(users)
-	changeProfile := usecase.NewChangeProfile(users)
+	rename := usecase.NewRename(users)
+	requestEmailChange := usecase.NewRequestEmailChange(users, hasher)
+	confirmEmailChange := usecase.NewConfirmEmailChange(users)
 
 	server := http.New(http.Options{
 		Port:       cfg.HTTP.Port,
@@ -102,7 +110,9 @@ func run() error {
 		http.NewLogin(login),
 		http.NewRegister(register),
 		http.NewGetProfile(getProfile),
-		http.NewChangeProfile(changeProfile),
+		http.NewRename(rename),
+		http.NewRequestEmailChange(requestEmailChange),
+		http.NewConfirmEmailChange(confirmEmailChange),
 	)
 
 	return server.Run(ctx)

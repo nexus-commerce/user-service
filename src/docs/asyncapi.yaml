@@ -2,7 +2,7 @@ asyncapi: 3.0.0
 
 info:
   title: User Service Events
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Events published by the User Service.
 
@@ -29,8 +29,12 @@ channels:
     messages:
       userRegistered:
         $ref: '#/components/messages/UserRegistered'
-      userProfileChanged:
-        $ref: '#/components/messages/UserProfileChanged'
+      userRenamed:
+        $ref: '#/components/messages/UserRenamed'
+      userEmailChangeRequested:
+        $ref: '#/components/messages/UserEmailChangeRequested'
+      userEmailChanged:
+        $ref: '#/components/messages/UserEmailChanged'
 
 operations:
   publishUserRegistered:
@@ -40,44 +44,30 @@ operations:
     summary: Announces that a new user has signed up.
     messages:
       - $ref: '#/channels/users/messages/userRegistered'
-  publishUserProfileChanged:
+  publishUserRenamed:
     action: send
     channel:
       $ref: '#/channels/users'
-    summary: Announces that a user changed their profile.
+    summary: Announces that a user changed their first or last name.
     messages:
-      - $ref: '#/channels/users/messages/userProfileChanged'
+      - $ref: '#/channels/users/messages/userRenamed'
+  publishUserEmailChangeRequested:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Asks for a confirmation link to be sent to the new email of a user.
+    messages:
+      - $ref: '#/channels/users/messages/userEmailChangeRequested'
+  publishUserEmailChanged:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Announces that a user confirmed and switched to a new email.
+    messages:
+      - $ref: '#/channels/users/messages/userEmailChanged'
 
 components:
   messages:
-    UserProfileChanged:
-      name: UserProfileChanged
-      title: User profile changed
-      summary: A user changed their email or name; carries the full current profile.
-      contentType: application/json
-      payload:
-        $ref: '#/components/schemas/UserProfileChangedEnvelope'
-      bindings:
-        kafka:
-          key:
-            type: string
-            format: uuid
-            description: ID of the user.
-      examples:
-        - name: userProfileChanged
-          summary: A user changes their last name.
-          payload:
-            eventId: 3d1f7a52-8b4e-4c0a-b6f2-9e1d2c3a4b5c
-            eventType: user.profile_changed
-            timestamp: '2026-10-20T10:15:00Z'
-            version: '1.0'
-            data:
-              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
-              email: jane.doe@example.com
-              firstName: Jane
-              lastName: Smith
-              changedAt: '2026-10-20T10:15:00Z'
-
     UserRegistered:
       name: UserRegistered
       title: User registered
@@ -105,6 +95,89 @@ components:
               firstName: Jane
               lastName: Doe
               createdAt: '2026-10-14T19:30:00Z'
+
+    UserRenamed:
+      name: UserRenamed
+      title: User renamed
+      summary: A user changed their first or last name; carries both current names.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserRenamedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the user.
+      examples:
+        - name: userRenamed
+          summary: A user changes their last name.
+          payload:
+            eventId: 3d1f7a52-8b4e-4c0a-b6f2-9e1d2c3a4b5c
+            eventType: user.renamed
+            timestamp: '2026-10-20T10:15:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              firstName: Jane
+              lastName: Smith
+              renamedAt: '2026-10-20T10:15:00Z'
+
+    UserEmailChangeRequested:
+      name: UserEmailChangeRequested
+      title: Email change requested
+      summary: A user asked to change their email; the change takes effect only after the link sent to the new email is opened.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserEmailChangeRequestedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the user.
+      examples:
+        - name: userEmailChangeRequested
+          summary: A user asks to switch to a new email.
+          payload:
+            eventId: 5a2e9c4d-1f3b-4e8a-9c7d-6b5a4e3d2c1b
+            eventType: user.email_change_requested
+            timestamp: '2026-10-20T11:00:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              newEmail: jane.smith@example.com
+              encryptedToken: q3J0bXlFbmNyeXB0ZWRUb2tlbkV4YW1wbGVCeXRlcw==
+              keyId: '2026-10'
+              expiresAt: '2026-10-21T11:00:00Z'
+              requestedAt: '2026-10-20T11:00:00Z'
+
+    UserEmailChanged:
+      name: UserEmailChanged
+      title: User email changed
+      summary: A user confirmed a new email, which is now used for login; carries the old email so it can be notified.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserEmailChangedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the user.
+      examples:
+        - name: userEmailChanged
+          summary: A user confirms the new email.
+          payload:
+            eventId: 9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b
+            eventType: user.email_changed
+            timestamp: '2026-10-20T11:05:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              oldEmail: jane.doe@example.com
+              newEmail: jane.smith@example.com
+              changedAt: '2026-10-20T11:05:00Z'
 
   schemas:
     UserRegisteredEnvelope:
@@ -148,7 +221,7 @@ components:
           type: string
           format: date-time
 
-    UserProfileChangedEnvelope:
+    UserRenamedEnvelope:
       type: object
       required: [eventId, eventType, timestamp, version, data]
       properties:
@@ -158,7 +231,7 @@ components:
           description: Unique ID of the event; use it to deduplicate.
         eventType:
           type: string
-          const: user.profile_changed
+          const: user.renamed
         timestamp:
           type: string
           format: date-time
@@ -168,23 +241,109 @@ components:
           const: '1.0'
           description: Version of the data schema.
         data:
-          $ref: '#/components/schemas/UserProfileChangedData'
+          $ref: '#/components/schemas/UserRenamedData'
 
-    UserProfileChangedData:
+    UserRenamedData:
       type: object
-      required: [userId, email, firstName, lastName, changedAt]
+      required: [userId, firstName, lastName, renamedAt]
       properties:
         userId:
           type: string
           format: uuid
-        email:
-          type: string
-          format: email
-          description: Normalized to lowercase.
         firstName:
           type: string
         lastName:
           type: string
+        renamedAt:
+          type: string
+          format: date-time
+
+    UserEmailChangeRequestedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.email_change_requested
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserEmailChangeRequestedData'
+
+    UserEmailChangeRequestedData:
+      type: object
+      required: [userId, newEmail, encryptedToken, keyId, expiresAt, requestedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        newEmail:
+          type: string
+          format: email
+          description: Normalized to lowercase. The confirmation link must be sent here.
+        encryptedToken:
+          type: string
+          contentEncoding: base64
+          description: >-
+            Base64 NaCl anonymous sealed box of the confirmation token, sealed with the
+            notification-service public key identified by `keyId`.
+        keyId:
+          type: string
+          description: ID of the notification-service key pair used to seal `encryptedToken`.
+        expiresAt:
+          type: string
+          format: date-time
+          description: The confirmation link stops working after this time.
+        requestedAt:
+          type: string
+          format: date-time
+
+    UserEmailChangedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.email_changed
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserEmailChangedData'
+
+    UserEmailChangedData:
+      type: object
+      required: [userId, oldEmail, newEmail, changedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        oldEmail:
+          type: string
+          format: email
+        newEmail:
+          type: string
+          format: email
+          description: Normalized to lowercase; now used for login.
         changedAt:
           type: string
           format: date-time
