@@ -50,23 +50,22 @@ func (p Profile) FirstName() Name { return p.firstName }
 func (p Profile) LastName() Name { return p.lastName }
 
 var (
-	ErrUserNotFound          = errors.New("user not found")
-	ErrInvalidCredentials    = errors.New("invalid credentials")
-	ErrEmailTaken            = errors.New("user email already exists")
-	ErrMalformedPasswordHash = errors.New("malformed password hash")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrEmailTaken         = errors.New("user email already exists")
 )
 
 type User struct {
 	id           uuid.UUID
 	profile      Profile
-	passwordHash string
+	passwordHash PasswordHash
 	createdAt    time.Time
 
 	events []Event
 }
 
-func NewUser(p Profile, password Password) (*User, error) {
-	hash, err := password.Hash()
+func NewUser(p Profile, password Password, hasher Hasher) (*User, error) {
+	hash, err := hasher.Hash(password)
 	if err != nil {
 		return nil, err
 	}
@@ -83,16 +82,13 @@ func NewUser(p Profile, password Password) (*User, error) {
 	return u, nil
 }
 
-func RestoreUser(id uuid.UUID, p Profile, passwordHash string, createdAt time.Time) (*User, error) {
-	if !validPasswordHash(passwordHash) {
-		return nil, ErrMalformedPasswordHash
-	}
+func RestoreUser(id uuid.UUID, p Profile, passwordHash PasswordHash, createdAt time.Time) *User {
 	return &User{
 		id:           id,
 		profile:      p,
 		passwordHash: passwordHash,
 		createdAt:    createdAt,
-	}, nil
+	}
 }
 
 func (u *User) ID() uuid.UUID { return u.id }
@@ -103,7 +99,7 @@ func (u *User) FirstName() Name { return u.profile.firstName }
 
 func (u *User) LastName() Name { return u.profile.lastName }
 
-func (u *User) PasswordHash() string { return u.passwordHash }
+func (u *User) PasswordHash() PasswordHash { return u.passwordHash }
 
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 
@@ -115,8 +111,8 @@ func (u *User) ChangeProfile(p Profile) bool {
 	return true
 }
 
-func (u *User) Authenticate(password Password) error {
-	ok, err := password.Matches(u.passwordHash)
+func (u *User) Authenticate(password Password, hasher Hasher) error {
+	ok, err := hasher.Verify(u.passwordHash, password)
 	if err != nil {
 		return err
 	}

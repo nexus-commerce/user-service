@@ -20,17 +20,19 @@ type tokenIssuer interface {
 type Login struct {
 	users  loginUsers
 	tokens tokenIssuer
+	hasher entity.Hasher
 	dummy  dummyCredentials
 }
 
-func NewLogin(users loginUsers, tokens tokenIssuer) (*Login, error) {
-	d, err := newDummyCredentials()
+func NewLogin(users loginUsers, tokens tokenIssuer, hasher entity.Hasher) (*Login, error) {
+	d, err := newDummyCredentials(hasher)
 	if err != nil {
 		return nil, fmt.Errorf("dummy credentials: %w", err)
 	}
 	return &Login{
 		users:  users,
 		tokens: tokens,
+		hasher: hasher,
 		dummy:  d,
 	}, nil
 }
@@ -66,7 +68,7 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*entity.Us
 		return nil, err
 	}
 
-	if err = user.Authenticate(password); err != nil {
+	if err = user.Authenticate(password, l.hasher); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -74,15 +76,15 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*entity.Us
 
 type dummyCredentials struct {
 	password entity.Password
-	hash     string
+	hash     entity.PasswordHash
 }
 
-func newDummyCredentials() (dummyCredentials, error) {
+func newDummyCredentials(hasher entity.Hasher) (dummyCredentials, error) {
 	password, err := entity.NewPassword("dummy")
 	if err != nil {
 		return dummyCredentials{}, fmt.Errorf("create password: %w", err)
 	}
-	hash, err := password.Hash()
+	hash, err := hasher.Hash(password)
 	if err != nil {
 		return dummyCredentials{}, err
 	}
@@ -90,7 +92,7 @@ func newDummyCredentials() (dummyCredentials, error) {
 }
 
 func (l *Login) rejectTimingSafe() error {
-	// Burns bcrypt time so unknown emails are indistinguishable by latency; the result is irrelevant.
-	_, _ = l.dummy.password.Matches(l.dummy.hash)
+	// Burns hashing time so unknown emails are indistinguishable by latency; the result is irrelevant.
+	_, _ = l.hasher.Verify(l.dummy.hash, l.dummy.password)
 	return entity.ErrInvalidCredentials
 }

@@ -82,6 +82,16 @@ func mustPassword(t *testing.T, s string) entity.Password {
 	return p
 }
 
+type fakeHasher struct{}
+
+func (fakeHasher) Hash(p entity.Password) (entity.PasswordHash, error) {
+	return entity.NewPasswordHash("hashed:" + p.Plaintext())
+}
+
+func (fakeHasher) Verify(h entity.PasswordHash, p entity.Password) (bool, error) {
+	return h.Encoded() == "hashed:"+p.Plaintext(), nil
+}
+
 type profileView interface {
 	Email() entity.Email
 	FirstName() entity.Name
@@ -100,11 +110,11 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	profile := mustProfile(t, janeDoe)
 	password := mustPassword(t, "s3cret")
 
-	u, err := entity.NewUser(profile, password)
+	u, err := entity.NewUser(profile, password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
-	if err := u.Authenticate(password); err != nil {
+	if err := u.Authenticate(password, fakeHasher{}); err != nil {
 		t.Errorf("Authenticate = %v, want nil", err)
 	}
 
@@ -137,7 +147,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 
 func TestEventsReturnsCopy(t *testing.T) {
 	password := mustPassword(t, "s3cret")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -152,7 +162,7 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func TestChangeProfile(t *testing.T) {
 	password := mustPassword(t, "s3cret")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -186,7 +196,7 @@ func TestRestoreProfile(t *testing.T) {
 
 func TestRestoreUser(t *testing.T) {
 	password := mustPassword(t, "s3cret")
-	hash, err := password.Hash()
+	hash, err := fakeHasher{}.Hash(password)
 	if err != nil {
 		t.Fatalf("Hash() error: %v", err)
 	}
@@ -195,46 +205,30 @@ func TestRestoreUser(t *testing.T) {
 	profile := mustProfile(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	t.Run("valid", func(t *testing.T) {
-		u, err := entity.RestoreUser(id, profile, hash, createdAt)
-		if err != nil {
-			t.Fatalf("RestoreUser() error: %v", err)
-		}
-		got := fieldsOf(u)
-		matches := u.ID() == id && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
-		if !matches {
-			t.Errorf("RestoreUser() = {id: %v, profile: %+v, hash: %q, createdAt: %v}, want {id: %v, profile: %+v, hash: %q, createdAt: %v}",
-				u.ID(), got, u.PasswordHash(), u.CreatedAt(), id, fields, hash, createdAt)
-		}
-		if err := u.Authenticate(password); err != nil {
-			t.Errorf("Authenticate = %v, want nil", err)
-		}
-		if events := u.Events(); len(events) != 0 {
-			t.Errorf("Events() after RestoreUser returned %d events, want 0", len(events))
-		}
-	})
-
-	t.Run("malformed hash", func(t *testing.T) {
-		const malformed = "not-a-bcrypt-hash"
-		_, err := entity.RestoreUser(id, profile, malformed, createdAt)
-		if !errors.Is(err, entity.ErrMalformedPasswordHash) {
-			t.Fatalf("RestoreUser(hash=%q) error = %v, want %v", malformed, err, entity.ErrMalformedPasswordHash)
-		}
-		if errors.Is(err, entity.ErrValidation) {
-			t.Error("malformed hash must not be a validation error")
-		}
-	})
+	u := entity.RestoreUser(id, profile, hash, createdAt)
+	got := fieldsOf(u)
+	matches := u.ID() == id && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
+	if !matches {
+		t.Errorf("RestoreUser() = {id: %v, profile: %+v, hash: %q, createdAt: %v}, want {id: %v, profile: %+v, hash: %q, createdAt: %v}",
+			u.ID(), got, u.PasswordHash().Encoded(), u.CreatedAt(), id, fields, hash.Encoded(), createdAt)
+	}
+	if err := u.Authenticate(password, fakeHasher{}); err != nil {
+		t.Errorf("Authenticate = %v, want nil", err)
+	}
+	if events := u.Events(); len(events) != 0 {
+		t.Errorf("Events() after RestoreUser returned %d events, want 0", len(events))
+	}
 }
 
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	password := mustPassword(t, "s3cret")
 	other := mustPassword(t, "other")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password)
+	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
 
-	if err := u.Authenticate(other); !errors.Is(err, entity.ErrInvalidCredentials) {
+	if err := u.Authenticate(other, fakeHasher{}); !errors.Is(err, entity.ErrInvalidCredentials) {
 		t.Errorf("Authenticate(wrong) = %v, want %v", err, entity.ErrInvalidCredentials)
 	}
 }

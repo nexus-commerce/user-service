@@ -13,9 +13,10 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/nexus-commerce/user-service/src/bcrypt"
 	"github.com/nexus-commerce/user-service/src/config"
 	"github.com/nexus-commerce/user-service/src/docs"
-	"github.com/nexus-commerce/user-service/src/httpapi"
+	"github.com/nexus-commerce/user-service/src/http"
 	"github.com/nexus-commerce/user-service/src/jwt"
 	"github.com/nexus-commerce/user-service/src/messaging"
 	"github.com/nexus-commerce/user-service/src/postgres"
@@ -76,30 +77,32 @@ func run() error {
 		Issuer: cfg.JWT.Issuer,
 	})
 
-	login, err := usecase.NewLogin(users, tokens)
+	hasher := bcrypt.NewHasher(bcrypt.DefaultCost)
+
+	login, err := usecase.NewLogin(users, tokens, hasher)
 	if err != nil {
 		return fmt.Errorf("create login use case: %w", err)
 	}
-	register := usecase.NewRegister(users, tokens)
+	register := usecase.NewRegister(users, tokens, hasher)
 	getProfile := usecase.NewGetProfile(users)
 	updateProfile := usecase.NewUpdateProfile(users)
 
-	server := httpapi.New(httpapi.Options{
+	server := http.New(http.Options{
 		Port:       cfg.HTTP.Port,
-		BasicAuth:  httpapi.BasicAuth(cfg.Docs.Username, cfg.Docs.Password),
-		BearerAuth: httpapi.BearerAuth(tokens),
+		BasicAuth:  http.BasicAuth(cfg.Docs.Username, cfg.Docs.Password),
+		BearerAuth: http.BearerAuth(tokens),
 	})
 
 	server.Register(
-		httpapi.NewOpenAPIDocs(),
-		httpapi.NewOpenAPI(docs.SwaggerInfo.ReadDoc()),
-		httpapi.NewAsyncAPIDocs(),
-		httpapi.NewAsyncAPI(docs.AsyncAPI),
-		httpapi.NewHealth(),
-		httpapi.NewLogin(login),
-		httpapi.NewRegister(register),
-		httpapi.NewGetProfile(getProfile),
-		httpapi.NewUpdateProfile(updateProfile),
+		http.NewOpenAPIDocs(),
+		http.NewOpenAPI(docs.SwaggerInfo.ReadDoc()),
+		http.NewAsyncAPIDocs(),
+		http.NewAsyncAPI(docs.AsyncAPI),
+		http.NewHealth(),
+		http.NewLogin(login),
+		http.NewRegister(register),
+		http.NewGetProfile(getProfile),
+		http.NewUpdateProfile(updateProfile),
 	)
 
 	return server.Run(ctx)

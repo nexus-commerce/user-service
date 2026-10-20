@@ -75,7 +75,7 @@ func (u *Users) Update(
 			user.FirstName().String(),
 			user.LastName().String(),
 			user.Email().String(),
-			user.PasswordHash(),
+			user.PasswordHash().Encoded(),
 			user.ID().String(),
 		)
 		if err != nil {
@@ -102,7 +102,7 @@ func (u *Users) Add(ctx context.Context, user *entity.User) error {
 			user.FirstName().String(),
 			user.LastName().String(),
 			user.Email().String(),
-			user.PasswordHash(),
+			user.PasswordHash().Encoded(),
 			user.CreatedAt(),
 		)
 		if err != nil {
@@ -145,11 +145,11 @@ func scanUser(row *sql.Row) (*entity.User, error) {
 		FirstName: firstName,
 		LastName:  lastName,
 	})
-	user, err := entity.RestoreUser(id, profile, passwordHash, createdAt)
+	hash, err := entity.NewPasswordHash(passwordHash)
 	if err != nil {
 		return nil, fmt.Errorf("restore user %s: %w", id, err)
 	}
-	return user, nil
+	return entity.RestoreUser(id, profile, hash, createdAt), nil
 }
 
 const (

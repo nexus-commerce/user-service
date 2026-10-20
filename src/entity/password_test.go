@@ -49,18 +49,34 @@ func TestPasswordIsRedacted(t *testing.T) {
 	}
 }
 
-func TestPasswordHashMatches(t *testing.T) {
-	p := mustPassword(t, "s3cret")
-	other := mustPassword(t, "other")
-
-	hash, err := p.Hash()
+func TestNewPasswordHash(t *testing.T) {
+	const encoded = "$2a$10$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuvwxyz01234"
+	h, err := entity.NewPasswordHash(encoded)
 	if err != nil {
-		t.Fatalf("Hash() error: %v", err)
+		t.Fatalf("NewPasswordHash(%q) error: %v", encoded, err)
 	}
-	if ok, err := p.Matches(hash); err != nil || !ok {
-		t.Errorf("Matches(own hash) = %v, %v; want true, nil", ok, err)
+	if got := h.Encoded(); got != encoded {
+		t.Errorf("Encoded() = %q, want %q", got, encoded)
 	}
-	if ok, err := other.Matches(hash); err != nil || ok {
-		t.Errorf("Matches(foreign hash) = %v, %v; want false, nil", ok, err)
+
+	_, err = entity.NewPasswordHash("")
+	if !errors.Is(err, entity.ErrMalformedPasswordHash) {
+		t.Fatalf("NewPasswordHash(\"\") error = %v, want %v", err, entity.ErrMalformedPasswordHash)
+	}
+	if errors.Is(err, entity.ErrValidation) {
+		t.Error("malformed hash must not be a validation error")
+	}
+}
+
+func TestPasswordHashIsRedacted(t *testing.T) {
+	const encoded = "$2a$10$secret"
+	h, err := entity.NewPasswordHash(encoded)
+	if err != nil {
+		t.Fatalf("NewPasswordHash(%q) error: %v", encoded, err)
+	}
+	for _, verb := range []string{"%s", "%v", "%+v"} {
+		if out := fmt.Sprintf(verb, h); strings.Contains(out, encoded) {
+			t.Errorf("Sprintf(%q) leaks password hash: %s", verb, out)
+		}
 	}
 }

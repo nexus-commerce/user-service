@@ -3,15 +3,14 @@ package entity
 import (
 	"errors"
 	"fmt"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const maxPasswordBytes = 72
 
 var (
-	ErrEmptyPassword   = NewValidationError("must not be empty")
-	ErrPasswordTooLong = NewValidationError(fmt.Sprintf("must be at most %d bytes", maxPasswordBytes))
+	ErrEmptyPassword         = NewValidationError("must not be empty")
+	ErrPasswordTooLong       = NewValidationError(fmt.Sprintf("must be at most %d bytes", maxPasswordBytes))
+	ErrMalformedPasswordHash = errors.New("malformed password hash")
 )
 
 type Password struct {
@@ -30,27 +29,24 @@ func NewPassword(s string) (Password, error) {
 
 func (Password) String() string { return "[REDACTED]" }
 
-func (p Password) Hash() (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(p.value), bcrypt.DefaultCost)
-	if err != nil {
-		return "", fmt.Errorf("hash password: %w", err)
-	}
-	return string(hash), nil
+func (p Password) Plaintext() string { return p.value }
+
+type PasswordHash struct {
+	value string
 }
 
-func (p Password) Matches(hash string) (bool, error) {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(p.value))
-	switch {
-	case err == nil:
-		return true, nil
-	case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword), errors.Is(err, bcrypt.ErrPasswordTooLong):
-		return false, nil
-	default:
-		return false, fmt.Errorf("compare password hash: %w", err)
+func NewPasswordHash(s string) (PasswordHash, error) {
+	if s == "" {
+		return PasswordHash{}, ErrMalformedPasswordHash
 	}
+	return PasswordHash{value: s}, nil
 }
 
-func validPasswordHash(h string) bool {
-	_, err := bcrypt.Cost([]byte(h))
-	return err == nil
+func (PasswordHash) String() string { return "[REDACTED]" }
+
+func (h PasswordHash) Encoded() string { return h.value }
+
+type Hasher interface {
+	Hash(Password) (PasswordHash, error)
+	Verify(PasswordHash, Password) (bool, error)
 }

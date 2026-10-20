@@ -13,12 +13,14 @@ type registerUsers interface {
 type Register struct {
 	users  registerUsers
 	tokens tokenIssuer
+	hasher entity.Hasher
 }
 
-func NewRegister(users registerUsers, tokens tokenIssuer) *Register {
+func NewRegister(users registerUsers, tokens tokenIssuer, hasher entity.Hasher) *Register {
 	return &Register{
 		users:  users,
 		tokens: tokens,
+		hasher: hasher,
 	}
 }
 
@@ -47,7 +49,7 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 	if err != nil {
 		return "", &entity.FieldError{Field: "password", Err: err}
 	}
-	user, err := entity.NewUser(profile, password)
+	user, err := entity.NewUser(profile, password, r.hasher)
 	if err != nil {
 		return "", err
 	}
