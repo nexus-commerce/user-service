@@ -7,7 +7,7 @@ import (
 )
 
 type registerUsers interface {
-	Add(ctx context.Context, user *user.User) error
+	Add(ctx context.Context, usr *user.User) error
 }
 
 type Register struct {
@@ -49,15 +49,15 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 	if err != nil {
 		return "", &user.FieldError{Field: "password", Err: err}
 	}
-	user, err := user.NewUser(profile, password, r.hasher)
+	usr, err := user.NewUser(profile, password, r.hasher)
 	if err != nil {
 		return "", err
 	}
 
-	err = r.users.Add(ctx, user)
+	err = r.users.Add(ctx, usr)
 	if err != nil {
 		return "", err
 	}
 
-	return r.tokens.Issue(user.ID())
+	return r.tokens.Issue(usr.ID())
 }

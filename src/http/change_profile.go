@@ -9,24 +9,24 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-type UpdateProfile struct {
-	uc *usecase.UpdateProfile
+type ChangeProfile struct {
+	uc *usecase.ChangeProfile
 }
 
-func NewUpdateProfile(uc *usecase.UpdateProfile) *UpdateProfile {
-	return &UpdateProfile{
+func NewChangeProfile(uc *usecase.ChangeProfile) *ChangeProfile {
+	return &ChangeProfile{
 		uc: uc,
 	}
 }
 
-type updateProfileRequest struct {
+type changeProfileRequest struct {
 	FirstName *string `json:"firstName"`
 	LastName  *string `json:"lastName"`
 	Email     *string `json:"email"`
 }
 
-func (r *updateProfileRequest) toProfileUpdate(userID uuid.UUID) usecase.ProfileUpdate {
-	return usecase.ProfileUpdate{
+func (r *changeProfileRequest) toProfileChange(userID uuid.UUID) usecase.ProfileChange {
+	return usecase.ProfileChange{
 		UserID:    userID,
 		FirstName: r.FirstName,
 		LastName:  r.LastName,
@@ -35,13 +35,13 @@ func (r *updateProfileRequest) toProfileUpdate(userID uuid.UUID) usecase.Profile
 }
 
 // ServeHTTP godoc
-// @Summary     Update profile
-// @Description Partially updates the profile of the authenticated user; only provided fields are changed
+// @Summary     Change profile
+// @Description Partially changes the profile of the authenticated user; only provided fields are changed
 // @Tags        Users
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       request  body      updateProfileRequest  true  "Fields to update"
+// @Param       request  body      changeProfileRequest  true  "Fields to change"
 // @Success     200      {object}  profileResponse
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields or malformed email"
 // @Failure     401      {object}  errorResponse  "Missing or invalid token"
@@ -50,20 +50,20 @@ func (r *updateProfileRequest) toProfileUpdate(userID uuid.UUID) usecase.Profile
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /users/profile [patch]
-func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (h *ChangeProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := UserIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return
 	}
 
-	reqBody, err := readJSON[updateProfileRequest](rw, r)
+	reqBody, err := readJSON[changeProfileRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
 	}
 
-	profile, err := h.uc.Execute(r.Context(), reqBody.toProfileUpdate(userID))
+	profile, err := h.uc.Execute(r.Context(), reqBody.toProfileChange(userID))
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
@@ -83,7 +83,7 @@ func (h *UpdateProfile) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, r, http.StatusOK, toProfileResponse(profile))
 }
 
-func (h *UpdateProfile) Route() Route {
+func (h *ChangeProfile) Route() Route {
 	return Route{
 		Pattern: "PATCH /users/profile",
 		Handler: h,

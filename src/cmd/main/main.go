@@ -85,7 +85,7 @@ func run() error {
 	}
 	register := usecase.NewRegister(users, tokens, hasher)
 	getProfile := usecase.NewGetProfile(users)
-	updateProfile := usecase.NewUpdateProfile(users)
+	changeProfile := usecase.NewChangeProfile(users)
 
 	server := http.New(http.Options{
 		Port:       cfg.HTTP.Port,
@@ -102,7 +102,7 @@ func run() error {
 		http.NewLogin(login),
 		http.NewRegister(register),
 		http.NewGetProfile(getProfile),
-		http.NewUpdateProfile(updateProfile),
+		http.NewChangeProfile(changeProfile),
 	)
 
 	return server.Run(ctx)

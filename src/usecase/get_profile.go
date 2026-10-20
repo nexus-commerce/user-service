@@ -38,9 +38,9 @@ func toProfileView(u *user.User) ProfileView {
 }
 
 func (gp *GetProfile) Execute(ctx context.Context, userID uuid.UUID) (ProfileView, error) {
-	user, err := gp.users.ByID(ctx, userID)
+	usr, err := gp.users.ByID(ctx, userID)
 	if err != nil {
 		return ProfileView{}, err
 	}
-	return toProfileView(user), nil
+	return toProfileView(usr), nil
 }

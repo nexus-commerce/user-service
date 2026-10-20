@@ -30,21 +30,21 @@ func NewUsers(db *Database, events eventPublisher) *Users {
 func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, error) {
 	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE email = $1`
 
-	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
+	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return nil, fmt.Errorf("select user by email: %w", err)
 	}
-	return user, err
+	return usr, err
 }
 
 func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	query := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1`
 
-	user, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
+	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
 	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
 		return nil, fmt.Errorf("select user by id: %w", err)
 	}
-	return user, err
+	return usr, err
 }
 
 func (u *Users) Update(
@@ -55,10 +55,10 @@ func (u *Users) Update(
 	selectQuery := `SELECT id, first_name, last_name, email, password_hash, created_at FROM users WHERE id = $1 FOR UPDATE`
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
-	var user *user.User
+	var usr *user.User
 	err := u.db.runInTx(ctx, func(tx *sql.Tx) error {
 		var err error
-		user, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id.String()))
+		usr, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id.String()))
 		if err != nil {
 			if errors.Is(err, user.ErrUserNotFound) {
 				return err
@@ -66,17 +66,17 @@ func (u *Users) Update(
 			return fmt.Errorf("select user for update: %w", err)
 		}
 
-		updated, err := updateFn(user)
+		updated, err := updateFn(usr)
 		if err != nil || !updated {
 			return err
 		}
 
 		_, err = tx.ExecContext(ctx, updateQuery,
-			user.FirstName().String(),
-			user.LastName().String(),
-			user.Email().String(),
-			user.PasswordHash().Encoded(),
-			user.ID().String(),
+			usr.FirstName().String(),
+			usr.LastName().String(),
+			usr.Email().String(),
+			usr.PasswordHash().Encoded(),
+			usr.ID().String(),
 		)
 		if err != nil {
 			if isEmailTaken(err) {
@@ -85,25 +85,25 @@ func (u *Users) Update(
 			return fmt.Errorf("update user: %w", err)
 		}
 
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, user.Events())
+		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
 	})
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+	return usr, nil
 }
 
-func (u *Users) Add(ctx context.Context, user *user.User) error {
+func (u *Users) Add(ctx context.Context, usr *user.User) error {
 	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
 
 	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, query,
-			user.ID().String(),
-			user.FirstName().String(),
-			user.LastName().String(),
-			user.Email().String(),
-			user.PasswordHash().Encoded(),
-			user.CreatedAt(),
+			usr.ID().String(),
+			usr.FirstName().String(),
+			usr.LastName().String(),
+			usr.Email().String(),
+			usr.PasswordHash().Encoded(),
+			usr.CreatedAt(),
 		)
 		if err != nil {
 			if isEmailTaken(err) {
@@ -112,7 +112,7 @@ func (u *Users) Add(ctx context.Context, user *user.User) error {
 			return fmt.Errorf("insert user: %w", err)
 		}
 
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, user.Events())
+		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
 	})
 }
 
