@@ -49,6 +49,37 @@ func (p Profile) FirstName() Name { return p.firstName }
 
 func (p Profile) LastName() Name { return p.lastName }
 
+type ProfileChange struct {
+	Email     *string
+	FirstName *string
+	LastName  *string
+}
+
+func (p Profile) Apply(c ProfileChange) (Profile, error) {
+	if err := applyField(&p.firstName, c.FirstName, "firstName", NewName); err != nil {
+		return Profile{}, err
+	}
+	if err := applyField(&p.lastName, c.LastName, "lastName", NewName); err != nil {
+		return Profile{}, err
+	}
+	if err := applyField(&p.email, c.Email, "email", NewEmail); err != nil {
+		return Profile{}, err
+	}
+	return p, nil
+}
+
+func applyField[T any](dst *T, v *string, field string, parse func(string) (T, error)) error {
+	if v == nil {
+		return nil
+	}
+	parsed, err := parse(*v)
+	if err != nil {
+		return &FieldError{Field: field, Err: err}
+	}
+	*dst = parsed
+	return nil
+}
+
 var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidCredentials = errors.New("invalid credentials")
@@ -103,12 +134,16 @@ func (u *User) PasswordHash() PasswordHash { return u.passwordHash }
 
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 
-func (u *User) ChangeProfile(p Profile) bool {
-	if u.profile == p {
-		return false
+func (u *User) ChangeProfile(c ProfileChange) (bool, error) {
+	p, err := u.profile.Apply(c)
+	if err != nil {
+		return false, err
+	}
+	if p == u.profile {
+		return false, nil
 	}
 	u.profile = p
-	return true
+	return true, nil
 }
 
 func (u *User) Authenticate(password Password, hasher Hasher) error {

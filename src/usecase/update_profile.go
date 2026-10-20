@@ -28,28 +28,20 @@ type ProfileUpdate struct {
 	Email     *string
 }
 
+func (pu *ProfileUpdate) toProfileChange() entity.ProfileChange {
+	return entity.ProfileChange{
+		Email:     pu.Email,
+		FirstName: pu.FirstName,
+		LastName:  pu.LastName,
+	}
+}
+
 func (up *UpdateProfile) Execute(ctx context.Context, update ProfileUpdate) (ProfileView, error) {
 	user, err := up.users.Update(ctx, update.UserID, func(user *entity.User) (bool, error) {
-		p, err := entity.NewProfile(entity.ProfileFields{
-			Email:     valueOr(update.Email, user.Email().String()),
-			FirstName: valueOr(update.FirstName, user.FirstName().String()),
-			LastName:  valueOr(update.LastName, user.LastName().String()),
-		})
-		if err != nil {
-			return false, err
-		}
-
-		return user.ChangeProfile(p), nil
+		return user.ChangeProfile(update.toProfileChange())
 	})
 	if err != nil {
 		return ProfileView{}, err
 	}
 	return toProfileView(user), nil
-}
-
-func valueOr(v *string, fallback string) string {
-	if v == nil {
-		return fallback
-	}
-	return *v
 }

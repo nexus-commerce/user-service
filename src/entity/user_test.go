@@ -160,25 +160,132 @@ func TestEventsReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestChangeProfile(t *testing.T) {
-	password := mustPassword(t, "s3cret")
-	u, err := entity.NewUser(mustProfile(t, janeDoe), password, fakeHasher{})
+func mustUser(t *testing.T) *entity.User {
+	t.Helper()
+	u, err := entity.NewUser(mustProfile(t, janeDoe), mustPassword(t, "s3cret"), fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
+	return u
+}
 
-	changed := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
-	if !u.ChangeProfile(changed) {
-		t.Error("ChangeProfile(new profile) = false, want true")
+func mustHash(t *testing.T) entity.PasswordHash {
+	t.Helper()
+	h, err := fakeHasher{}.Hash(mustPassword(t, "s3cret"))
+	if err != nil {
+		t.Fatalf("Hash() error: %v", err)
 	}
-	if got, want := fieldsOf(u), fieldsOf(changed); got != want {
-		t.Errorf("after ChangeProfile, user profile = %+v, want %+v", got, want)
-	}
+	return h
+}
 
-	same := mustProfile(t, entity.ProfileFields{Email: "jane.smith@example.com", FirstName: "Jane", LastName: "Smith"})
-	if u.ChangeProfile(same) {
-		t.Error("ChangeProfile(same profile) = true, want false")
+func TestProfileApply(t *testing.T) {
+	base := mustProfile(t, janeDoe)
+	smith := "Smith"
+	empty := ""
+	bad := "x"
+
+	tests := []struct {
+		name      string
+		change    entity.ProfileChange
+		want      entity.ProfileFields
+		wantErr   error
+		wantField string
+	}{
+		{
+			name:   "no fields",
+			change: entity.ProfileChange{},
+			want:   janeDoe,
+		},
+		{
+			name:   "only last name",
+			change: entity.ProfileChange{LastName: &smith},
+			want:   entity.ProfileFields{Email: janeDoe.Email, FirstName: janeDoe.FirstName, LastName: "Smith"},
+		},
+		{
+			name:      "invalid first name",
+			change:    entity.ProfileChange{FirstName: &empty},
+			wantErr:   entity.ErrEmptyName,
+			wantField: "firstName",
+		},
+		{
+			name:      "invalid email",
+			change:    entity.ProfileChange{Email: &bad},
+			wantErr:   entity.ErrMalformedEmail,
+			wantField: "email",
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := base.Apply(tt.change)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) || !errors.Is(err, entity.ErrValidation) {
+					t.Fatalf("Apply() error = %v, want %v", err, tt.wantErr)
+				}
+				if fe, ok := errors.AsType[*entity.FieldError](err); !ok || fe.Field != tt.wantField {
+					t.Errorf("Apply() error = %v, want FieldError for %q", err, tt.wantField)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Apply() unexpected error: %v", err)
+			}
+			if got := fieldsOf(got); got != tt.want {
+				t.Errorf("Apply() = %+v, want %+v", got, tt.want)
+			}
+			if fieldsOf(base) != janeDoe {
+				t.Error("Apply() mutated the receiver")
+			}
+		})
+	}
+}
+
+func TestChangeProfile(t *testing.T) {
+	smith := "Smith"
+	empty := ""
+
+	t.Run("changed", func(t *testing.T) {
+		u := mustUser(t)
+		changed, err := u.ChangeProfile(entity.ProfileChange{LastName: &smith})
+		if err != nil || !changed {
+			t.Fatalf("ChangeProfile() = %v, %v; want true, nil", changed, err)
+		}
+		if got := u.LastName().String(); got != "Smith" {
+			t.Errorf("LastName() = %q, want %q", got, "Smith")
+		}
+	})
+
+	t.Run("same values", func(t *testing.T) {
+		u := mustUser(t)
+		first := janeDoe.FirstName
+		changed, err := u.ChangeProfile(entity.ProfileChange{FirstName: &first})
+		if err != nil || changed {
+			t.Errorf("ChangeProfile(same) = %v, %v; want false, nil", changed, err)
+		}
+	})
+
+	t.Run("invalid leaves profile intact", func(t *testing.T) {
+		u := mustUser(t)
+		_, err := u.ChangeProfile(entity.ProfileChange{LastName: &smith, FirstName: &empty})
+		if !errors.Is(err, entity.ErrEmptyName) {
+			t.Fatalf("ChangeProfile() error = %v, want %v", err, entity.ErrEmptyName)
+		}
+		if got := fieldsOf(u); got != janeDoe {
+			t.Errorf("profile after failed change = %+v, want %+v", got, janeDoe)
+		}
+	})
+
+	t.Run("legacy fields are not revalidated", func(t *testing.T) {
+		legacy := entity.ProfileFields{Email: "jane@example.com", FirstName: "Jane", LastName: strings.Repeat("a", 51)}
+		u := entity.RestoreUser(uuid.New(), entity.RestoreProfile(legacy), mustHash(t), time.Now())
+		first := "Janet"
+		changed, err := u.ChangeProfile(entity.ProfileChange{FirstName: &first})
+		if err != nil || !changed {
+			t.Fatalf("ChangeProfile() = %v, %v; want true, nil", changed, err)
+		}
+		if got := u.LastName().String(); got != legacy.LastName {
+			t.Errorf("LastName() = %q, want legacy value kept", got)
+		}
+	})
 }
 
 func TestRestoreProfile(t *testing.T) {
