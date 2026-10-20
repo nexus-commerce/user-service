@@ -128,8 +128,8 @@ func convertRegistered(e user.Registered) (any, error) {
 	return userRegistered{
 		UserID:    e.AggregateID.String(),
 		Email:     e.Email.String(),
-		FirstName: e.Profile.FirstName().String(),
-		LastName:  e.Profile.LastName().String(),
+		FirstName: e.FullName.FirstName().String(),
+		LastName:  e.FullName.LastName().String(),
 		CreatedAt: e.OccurredAt,
 	}, nil
 }
@@ -144,8 +144,8 @@ type userRenamed struct {
 func convertRenamed(e user.Renamed) (any, error) {
 	return userRenamed{
 		UserID:    e.AggregateID.String(),
-		FirstName: e.FirstName.String(),
-		LastName:  e.LastName.String(),
+		FirstName: e.FullName.FirstName().String(),
+		LastName:  e.FullName.LastName().String(),
 		RenamedAt: e.OccurredAt,
 	}, nil
 }

@@ -29,3 +29,28 @@ func NewName(s string) (Name, error) {
 }
 
 func (n Name) String() string { return n.value }
+
+type FullName struct {
+	firstName Name
+	lastName  Name
+}
+
+type FullNameFields struct {
+	FirstName string
+	LastName  string
+}
+
+func NewFullName(firstName, lastName Name) FullName {
+	return FullName{firstName: firstName, lastName: lastName}
+}
+
+func RestoreFullName(f FullNameFields) FullName {
+	return FullName{
+		firstName: Name{value: f.FirstName},
+		lastName:  Name{value: f.LastName},
+	}
+}
+
+func (n FullName) FirstName() Name { return n.firstName }
+
+func (n FullName) LastName() Name { return n.lastName }

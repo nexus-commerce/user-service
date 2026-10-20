@@ -41,7 +41,8 @@ func (r *Rename) Execute(ctx context.Context, c NameChange) (UserView, error) {
 		if first == nil && last == nil {
 			return nil
 		}
-		usr.Rename(valueOr(first, usr.FirstName()), valueOr(last, usr.LastName()))
+		cur := usr.FullName()
+		usr.Rename(user.NewFullName(valueOr(first, cur.FirstName()), valueOr(last, cur.LastName())))
 		return nil
 	})
 	if err != nil {

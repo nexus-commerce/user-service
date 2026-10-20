@@ -38,7 +38,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 }
 
 // ServeHTTP godoc
-// @Summary     Change profile
+// @Summary     Rename user
 // @Description Partially changes the first and last name of the authenticated user; only provided fields are changed
 // @Tags        Users
 // @Accept      json
@@ -51,7 +51,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 // @Failure     404      {object}  errorResponse  "User not found"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
-// @Router      /users/profile [patch]
+// @Router      /users/me/name [patch]
 func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := UserIDFromContext(r.Context())
 	if err != nil {
@@ -84,7 +84,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 func (h *Rename) Route() Route {
 	return Route{
-		Pattern: "PATCH /users/profile",
+		Pattern: "PATCH /users/me/name",
 		Handler: h,
 		Auth:    AuthBearer,
 	}

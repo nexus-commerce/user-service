@@ -13,11 +13,11 @@ import (
 
 const janeEmail = "jane@example.com"
 
-var janeDoe = user.ProfileFields{FirstName: "Jane", LastName: "Doe"}
+var janeDoe = user.FullNameFields{FirstName: "Jane", LastName: "Doe"}
 
-func mustProfile(t *testing.T, f user.ProfileFields) user.Profile {
+func mustFullName(t *testing.T, f user.FullNameFields) user.FullName {
 	t.Helper()
-	return user.NewProfile(mustName(t, f.FirstName), mustName(t, f.LastName))
+	return user.NewFullName(mustName(t, f.FirstName), mustName(t, f.LastName))
 }
 
 func mustPassword(t *testing.T, s string) user.Password {
@@ -39,24 +39,19 @@ func (fakeHasher) Verify(h user.PasswordHash, p user.Password) (bool, error) {
 	return h.Encoded() == "hashed:"+p.Plaintext(), nil
 }
 
-type profileView interface {
-	FirstName() user.Name
-	LastName() user.Name
-}
-
-func fieldsOf(p profileView) user.ProfileFields {
-	return user.ProfileFields{
-		FirstName: p.FirstName().String(),
-		LastName:  p.LastName().String(),
+func fieldsOf(n user.FullName) user.FullNameFields {
+	return user.FullNameFields{
+		FirstName: n.FirstName().String(),
+		LastName:  n.LastName().String(),
 	}
 }
 
 func TestNewUserRecordsRegistration(t *testing.T) {
 	email := mustEmail(t, janeEmail)
-	profile := mustProfile(t, janeDoe)
+	name := mustFullName(t, janeDoe)
 	password := mustPassword(t, "s3cretpass")
 
-	u, err := user.NewUser(email, profile, password, fakeHasher{})
+	u, err := user.NewUser(email, name, password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -80,7 +75,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 		AggregateID: u.ID(),
 		OccurredAt:  u.CreatedAt(),
 		Email:       email,
-		Profile:     profile,
+		FullName:    name,
 	}
 	if reg != want {
 		t.Errorf("Events()[0] = %+v, want %+v", reg, want)
@@ -94,7 +89,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 
 func TestEventsReturnsCopy(t *testing.T) {
 	password := mustPassword(t, "s3cretpass")
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustProfile(t, janeDoe), password, fakeHasher{})
+	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -109,7 +104,7 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func mustUser(t *testing.T) *user.User {
 	t.Helper()
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustProfile(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
+	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -125,16 +120,16 @@ func mustHash(t *testing.T) user.PasswordHash {
 	return h
 }
 
-func TestRestoreProfile(t *testing.T) {
+func TestRestoreFullName(t *testing.T) {
 	longName := strings.Repeat("a", 51)
-	fields := user.ProfileFields{FirstName: longName, LastName: "Doe"}
-	p := user.RestoreProfile(fields)
+	fields := user.FullNameFields{FirstName: longName, LastName: "Doe"}
+	p := user.RestoreFullName(fields)
 
 	if _, err := user.NewName(longName); err == nil {
 		t.Fatal("NewName accepted data that should fail current rules")
 	}
 	if got := fieldsOf(p); got != fields {
-		t.Errorf("RestoreProfile(%+v) = %+v, want %+v", fields, got, fields)
+		t.Errorf("RestoreFullName(%+v) = %+v, want %+v", fields, got, fields)
 	}
 }
 
@@ -147,14 +142,14 @@ func TestRestoreUser(t *testing.T) {
 	id := uuid.New()
 	const legacyEmail = "Legacy@Example.com"
 	fields := janeDoe
-	profile := mustProfile(t, fields)
+	name := mustFullName(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	u := user.RestoreUser(id, legacyEmail, profile, hash, createdAt, nil)
-	got := fieldsOf(u)
+	u := user.RestoreUser(id, legacyEmail, name, hash, createdAt, nil)
+	got := fieldsOf(u.FullName())
 	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
-		t.Errorf("RestoreUser() = {id: %v, email: %q, profile: %+v, hash: %q, createdAt: %v}, want {id: %v, email: %q, profile: %+v, hash: %q, createdAt: %v}",
+		t.Errorf("RestoreUser() = {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}, want {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}",
 			u.ID(), u.Email(), got, u.PasswordHash().Encoded(), u.CreatedAt(), id, legacyEmail, fields, hash.Encoded(), createdAt)
 	}
 	if err := u.Authenticate(password, fakeHasher{}); err != nil {
@@ -168,7 +163,7 @@ func TestRestoreUser(t *testing.T) {
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	password := mustPassword(t, "s3cretpass")
 	other := mustPassword(t, "otherpass")
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustProfile(t, janeDoe), password, fakeHasher{})
+	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -209,18 +204,18 @@ func eventsOf[E user.Event](u *user.User) []E {
 func TestRename(t *testing.T) {
 	t.Run("changed", func(t *testing.T) {
 		u := mustUser(t)
-		u.Rename(mustName(t, "Jane"), mustName(t, "Smith"))
+		u.Rename(user.NewFullName(mustName(t, "Jane"), mustName(t, "Smith")))
 		events := eventsOf[user.Renamed](u)
-		if u.LastName().String() != "Smith" || len(events) != 1 {
-			t.Fatalf("after Rename: lastName=%q, %d Renamed; want Smith, 1", u.LastName(), len(events))
+		if u.FullName().LastName().String() != "Smith" || len(events) != 1 {
+			t.Fatalf("after Rename: lastName=%q, %d Renamed; want Smith, 1", u.FullName().LastName(), len(events))
 		}
-		if e := events[0]; e.AggregateID != u.ID() || e.FirstName.String() != "Jane" || e.LastName.String() != "Smith" {
+		if e := events[0]; e.AggregateID != u.ID() || e.FullName.FirstName().String() != "Jane" || e.FullName.LastName().String() != "Smith" {
 			t.Errorf("Renamed = %+v", e)
 		}
 	})
 	t.Run("same values", func(t *testing.T) {
 		u := mustUser(t)
-		u.Rename(mustName(t, "Jane"), mustName(t, "Doe"))
+		u.Rename(user.NewFullName(mustName(t, "Jane"), mustName(t, "Doe")))
 		if n := len(eventsOf[user.Renamed](u)); n != 0 {
 			t.Errorf("recorded %d Renamed, want 0", n)
 		}
@@ -326,7 +321,7 @@ func TestRestoreUserWithPendingEmailChange(t *testing.T) {
 	tok := user.NewEmailChangeToken()
 	expiresAt := time.Now().Add(time.Hour)
 	pending := user.RestorePendingEmailChange("new@example.com", tok.Hash(), expiresAt)
-	u := user.RestoreUser(uuid.New(), janeEmail, mustProfile(t, janeDoe), mustHash(t), time.Now(), &pending)
+	u := user.RestoreUser(uuid.New(), janeEmail, mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
 	if err := u.ConfirmEmailChange(tok); err != nil {
 		t.Errorf("ConfirmEmailChange() on restored user error: %v", err)
 	}

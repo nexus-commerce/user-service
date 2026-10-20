@@ -34,7 +34,7 @@ func newUserRegistered(t *testing.T) user.Registered {
 		AggregateID: uuid.New(),
 		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
 		Email:       email,
-		Profile:     user.NewProfile(first, last),
+		FullName:    user.NewFullName(first, last),
 	}
 }
 
@@ -145,7 +145,7 @@ func decode[T any](t *testing.T, msg Message) T {
 }
 
 func TestEncodeUserRenamed(t *testing.T) {
-	e := user.Renamed{EventMeta: newMeta(), FirstName: mustName(t, "Jane"), LastName: mustName(t, "Smith")}
+	e := user.Renamed{EventMeta: newMeta(), FullName: user.NewFullName(mustName(t, "Jane"), mustName(t, "Smith"))}
 
 	msg, err := newEncoder(fakeSealer{}).encode(e)
 	if err != nil {

@@ -32,8 +32,8 @@ func toUserView(u *user.User) UserView {
 	return UserView{
 		ID:        u.ID(),
 		Email:     u.Email().String(),
-		FirstName: u.FirstName().String(),
-		LastName:  u.LastName().String(),
+		FirstName: u.FullName().FirstName().String(),
+		LastName:  u.FullName().LastName().String(),
 	}
 }
 

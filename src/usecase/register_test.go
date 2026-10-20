@@ -71,8 +71,8 @@ func TestRegister(t *testing.T) {
 				t.Fatalf("Add called %d times, want 1", len(users.added))
 			}
 			usr := users.added[0]
-			if usr.Email().String() != "jane@example.com" || usr.FirstName().String() != "Jane" || usr.LastName().String() != "Doe" {
-				t.Errorf("added user = %s %s <%s>, want Jane Doe <jane@example.com>", usr.FirstName(), usr.LastName(), usr.Email())
+			if usr.Email().String() != "jane@example.com" || usr.FullName().FirstName().String() != "Jane" || usr.FullName().LastName().String() != "Doe" {
+				t.Errorf("added user = %s %s <%s>, want Jane Doe <jane@example.com>", usr.FullName().FirstName(), usr.FullName().LastName(), usr.Email())
 			}
 			if token != "token:"+usr.ID().String() {
 				t.Errorf("Execute() token = %q, want token for %v", token, usr.ID())

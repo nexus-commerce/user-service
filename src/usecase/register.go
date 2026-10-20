@@ -53,7 +53,7 @@ func (r *Register) Execute(ctx context.Context, reg Registration) (string, error
 	if err != nil {
 		return "", &FieldError{Field: FieldPassword, Err: err}
 	}
-	usr, err := user.NewUser(email, user.NewProfile(first, last), password, r.hasher)
+	usr, err := user.NewUser(email, user.NewFullName(first, last), password, r.hasher)
 	if err != nil {
 		return "", err
 	}

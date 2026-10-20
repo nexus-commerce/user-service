@@ -88,7 +88,7 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err != nil {
 		t.Fatalf("NewPassword() error: %v", err)
 	}
-	usr, err := user.NewUser(e, user.NewProfile(fn, ln), password, fakeHasher{})
+	usr, err := user.NewUser(e, user.NewFullName(fn, ln), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}

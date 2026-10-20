@@ -22,16 +22,15 @@ type Event interface {
 
 type Registered struct {
 	EventMeta
-	Email   Email
-	Profile Profile
+	Email    Email
+	FullName FullName
 }
 
 func (Registered) isEvent() {}
 
 type Renamed struct {
 	EventMeta
-	FirstName Name
-	LastName  Name
+	FullName FullName
 }
 
 func (Renamed) isEvent() {}

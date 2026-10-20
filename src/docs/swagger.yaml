@@ -242,58 +242,6 @@ paths:
       summary: Health Check
       tags:
       - System
-  /users/email:
-    post:
-      consumes:
-      - application/json
-      description: Starts an email change for the authenticated user; the new email
-        takes effect only after it is confirmed via the link sent to it
-      parameters:
-      - description: New email and current password
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/http.requestEmailChangeRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-        "400":
-          description: Invalid request, malformed email or email equal to the current
-            one
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "401":
-          description: Missing or invalid token
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "403":
-          description: Invalid password
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "404":
-          description: User not found
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "409":
-          description: User with this email already exists
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "413":
-          description: Request body too large
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-      security:
-      - BearerAuth: []
-      summary: Request email change
-      tags:
-      - Users
   /users/email/confirm:
     post:
       consumes:
@@ -359,7 +307,59 @@ paths:
       summary: Get current user
       tags:
       - Users
-  /users/profile:
+  /users/me/email:
+    post:
+      consumes:
+      - application/json
+      description: Starts an email change for the authenticated user; the new email
+        takes effect only after it is confirmed via the link sent to it
+      parameters:
+      - description: New email and current password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.requestEmailChangeRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Invalid request, malformed email or email equal to the current
+            one
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "401":
+          description: Missing or invalid token
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "403":
+          description: Invalid password
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "409":
+          description: User with this email already exists
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request email change
+      tags:
+      - Users
+  /users/me/name:
     patch:
       consumes:
       - application/json
@@ -401,7 +401,7 @@ paths:
             $ref: '#/definitions/http.errorResponse'
       security:
       - BearerAuth: []
-      summary: Change profile
+      summary: Rename user
       tags:
       - Users
 securityDefinitions:

@@ -79,8 +79,8 @@ func (u *Users) Update(
 		}
 
 		_, err = tx.ExecContext(ctx, updateQuery,
-			usr.FirstName().String(),
-			usr.LastName().String(),
+			usr.FullName().FirstName().String(),
+			usr.FullName().LastName().String(),
 			usr.Email().String(),
 			usr.PasswordHash().Encoded(),
 			usr.ID().String(),
@@ -110,8 +110,8 @@ func (u *Users) Add(ctx context.Context, usr *user.User) error {
 	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, query,
 			usr.ID().String(),
-			usr.FirstName().String(),
-			usr.LastName().String(),
+			usr.FullName().FirstName().String(),
+			usr.FullName().LastName().String(),
 			usr.Email().String(),
 			usr.PasswordHash().Encoded(),
 			usr.CreatedAt(),
@@ -199,7 +199,7 @@ func scanUser(row *sql.Row) (*user.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restore user: %w", err)
 	}
-	profile := user.RestoreProfile(user.ProfileFields{
+	fullName := user.RestoreFullName(user.FullNameFields{
 		FirstName: firstName,
 		LastName:  lastName,
 	})
@@ -216,7 +216,7 @@ func scanUser(row *sql.Row) (*user.User, error) {
 		p := user.RestorePendingEmailChange(pendingEmail.String, tokenHash, pendingExpiresAt.Time)
 		pending = &p
 	}
-	return user.RestoreUser(id, email, profile, hash, createdAt, pending), nil
+	return user.RestoreUser(id, email, fullName, hash, createdAt, pending), nil
 }
 
 const (

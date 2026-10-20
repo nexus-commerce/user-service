@@ -50,7 +50,7 @@ func (r *requestEmailChangeRequest) toEmailChangeRequest(userID uuid.UUID) useca
 // @Failure     409  {object}  errorResponse  "User with this email already exists"
 // @Failure     413  {object}  errorResponse  "Request body too large"
 // @Failure     500  {object}  errorResponse  "Internal server error"
-// @Router      /users/email [post]
+// @Router      /users/me/email [post]
 func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := UserIDFromContext(r.Context())
 	if err != nil {
@@ -89,7 +89,7 @@ func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 
 func (h *RequestEmailChange) Route() Route {
 	return Route{
-		Pattern: "POST /users/email",
+		Pattern: "POST /users/me/email",
 		Handler: h,
 		Auth:    AuthBearer,
 	}
