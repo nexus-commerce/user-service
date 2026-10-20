@@ -196,24 +196,17 @@ func scanUser(row *sql.Row) (*user.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restore user: %w", err)
 	}
-	fullName := user.RestoreFullName(user.FullNameFields{
-		FirstName: firstName,
-		LastName:  lastName,
-	})
-	hash, err := user.NewPasswordHash(passwordHash)
-	if err != nil {
-		return nil, fmt.Errorf("restore user %s: %w", id, err)
-	}
+	fullName := user.NewFullName(user.RestoreName(firstName), user.RestoreName(lastName))
 	var pending *user.PendingEmailChange
 	if pendingEmail.Valid {
-		tokenHash, err := user.NewEmailChangeTokenHash(pendingTokenHash.String)
-		if err != nil {
-			return nil, fmt.Errorf("restore user %s: %w", id, err)
-		}
-		p := user.RestorePendingEmailChange(pendingEmail.String, tokenHash, pendingExpiresAt.Time)
+		p := user.RestorePendingEmailChange(
+			user.RestoreEmail(pendingEmail.String),
+			user.RestoreEmailChangeTokenHash(pendingTokenHash.String),
+			pendingExpiresAt.Time,
+		)
 		pending = &p
 	}
-	return user.RestoreUser(id, email, fullName, hash, createdAt, pending), nil
+	return user.RestoreUser(id, user.RestoreEmail(email), fullName, user.RestorePasswordHash(passwordHash), createdAt, pending), nil
 }
 
 const (

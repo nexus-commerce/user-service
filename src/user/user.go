@@ -45,10 +45,10 @@ func NewUser(email Email, name FullName, password Password, hasher Hasher) (*Use
 	return u, nil
 }
 
-func RestoreUser(id uuid.UUID, email string, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
+func RestoreUser(id uuid.UUID, email Email, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
 	return &User{
 		id:           id,
-		email:        Email{value: email},
+		email:        email,
 		fullName:     name,
 		passwordHash: passwordHash,
 		createdAt:    createdAt,

@@ -28,6 +28,8 @@ func NewName(s string) (Name, error) {
 	return Name{value: s}, nil
 }
 
+func RestoreName(s string) Name { return Name{value: s} }
+
 func (n Name) String() string { return n.value }
 
 type FullName struct {
@@ -35,20 +37,8 @@ type FullName struct {
 	lastName  Name
 }
 
-type FullNameFields struct {
-	FirstName string
-	LastName  string
-}
-
 func NewFullName(firstName, lastName Name) FullName {
 	return FullName{firstName: firstName, lastName: lastName}
-}
-
-func RestoreFullName(f FullNameFields) FullName {
-	return FullName{
-		firstName: Name{value: f.FirstName},
-		lastName:  Name{value: f.LastName},
-	}
 }
 
 func (n FullName) FirstName() Name { return n.firstName }

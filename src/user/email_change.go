@@ -16,9 +16,8 @@ const (
 )
 
 var (
-	ErrInvalidEmailChangeToken       = errors.New("invalid email change token")
-	ErrEmailChangeTokenExpired       = errors.New("email change token expired")
-	ErrMalformedEmailChangeTokenHash = errors.New("malformed email change token hash")
+	ErrInvalidEmailChangeToken = errors.New("invalid email change token")
+	ErrEmailChangeTokenExpired = errors.New("email change token expired")
 )
 
 type EmailChangeToken struct {
@@ -55,16 +54,8 @@ type EmailChangeTokenHash struct {
 	value string
 }
 
-func NewEmailChangeTokenHash(s string) (EmailChangeTokenHash, error) {
-	if len(s) != hex.EncodedLen(sha256.Size) {
-		return EmailChangeTokenHash{}, ErrMalformedEmailChangeTokenHash
-	}
-	for _, c := range s {
-		if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f') {
-			return EmailChangeTokenHash{}, ErrMalformedEmailChangeTokenHash
-		}
-	}
-	return EmailChangeTokenHash{value: s}, nil
+func RestoreEmailChangeTokenHash(s string) EmailChangeTokenHash {
+	return EmailChangeTokenHash{value: s}
 }
 
 func (h EmailChangeTokenHash) Encoded() string { return h.value }
@@ -75,9 +66,9 @@ type PendingEmailChange struct {
 	expiresAt time.Time
 }
 
-func RestorePendingEmailChange(email string, tokenHash EmailChangeTokenHash, expiresAt time.Time) PendingEmailChange {
+func RestorePendingEmailChange(email Email, tokenHash EmailChangeTokenHash, expiresAt time.Time) PendingEmailChange {
 	return PendingEmailChange{
-		email:     Email{value: email},
+		email:     email,
 		tokenHash: tokenHash,
 		expiresAt: expiresAt,
 	}

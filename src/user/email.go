@@ -35,4 +35,6 @@ func NewEmail(s string) (Email, error) {
 	return Email{value: s}, nil
 }
 
+func RestoreEmail(s string) Email { return Email{value: s} }
+
 func (e Email) String() string { return e.value }

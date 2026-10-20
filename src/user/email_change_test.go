@@ -37,14 +37,8 @@ func TestEmailChangeTokenHash(t *testing.T) {
 	if len(h) != 64 || strings.ToLower(h) != h {
 		t.Errorf("Hash().Encoded() = %q, want 64 lowercase hex chars", h)
 	}
-	restored, err := user.NewEmailChangeTokenHash(h)
-	if err != nil || restored != tok.Hash() {
-		t.Errorf("NewEmailChangeTokenHash(%q) = %v, %v; want equal hash, nil", h, restored.Encoded(), err)
-	}
-	for _, s := range []string{"", "abc", strings.Repeat("G", 64)} {
-		if _, err := user.NewEmailChangeTokenHash(s); !errors.Is(err, user.ErrMalformedEmailChangeTokenHash) {
-			t.Errorf("NewEmailChangeTokenHash(%q) error = %v, want %v", s, err, user.ErrMalformedEmailChangeTokenHash)
-		}
+	if restored := user.RestoreEmailChangeTokenHash(h); restored != tok.Hash() {
+		t.Errorf("RestoreEmailChangeTokenHash(%q) = %q, want equal hash", h, restored.Encoded())
 	}
 }
 

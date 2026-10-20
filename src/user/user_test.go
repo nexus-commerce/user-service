@@ -13,9 +13,14 @@ import (
 
 const janeEmail = "jane@example.com"
 
-var janeDoe = user.FullNameFields{FirstName: "Jane", LastName: "Doe"}
+type nameFields struct {
+	FirstName string
+	LastName  string
+}
 
-func mustFullName(t *testing.T, f user.FullNameFields) user.FullName {
+var janeDoe = nameFields{FirstName: "Jane", LastName: "Doe"}
+
+func mustFullName(t *testing.T, f nameFields) user.FullName {
 	t.Helper()
 	return user.NewFullName(mustName(t, f.FirstName), mustName(t, f.LastName))
 }
@@ -39,8 +44,8 @@ func (fakeHasher) Verify(h user.PasswordHash, p user.Password) (bool, error) {
 	return h.Encoded() == "hashed:"+p.Plaintext(), nil
 }
 
-func fieldsOf(n user.FullName) user.FullNameFields {
-	return user.FullNameFields{
+func fieldsOf(n user.FullName) nameFields {
+	return nameFields{
 		FirstName: n.FirstName().String(),
 		LastName:  n.LastName().String(),
 	}
@@ -120,16 +125,14 @@ func mustHash(t *testing.T) user.PasswordHash {
 	return h
 }
 
-func TestRestoreFullName(t *testing.T) {
+func TestRestoreName(t *testing.T) {
 	longName := strings.Repeat("a", 51)
-	fields := user.FullNameFields{FirstName: longName, LastName: "Doe"}
-	p := user.RestoreFullName(fields)
 
 	if _, err := user.NewName(longName); err == nil {
 		t.Fatal("NewName accepted data that should fail current rules")
 	}
-	if got := fieldsOf(p); got != fields {
-		t.Errorf("RestoreFullName(%+v) = %+v, want %+v", fields, got, fields)
+	if got := user.RestoreName(longName).String(); got != longName {
+		t.Errorf("RestoreName(%q) = %q, want %q", longName, got, longName)
 	}
 }
 
@@ -145,7 +148,7 @@ func TestRestoreUser(t *testing.T) {
 	name := mustFullName(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	u := user.RestoreUser(id, legacyEmail, name, hash, createdAt, nil)
+	u := user.RestoreUser(id, user.RestoreEmail(legacyEmail), name, hash, createdAt, nil)
 	got := fieldsOf(u.FullName())
 	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
@@ -320,8 +323,8 @@ func TestConfirmEmailChange(t *testing.T) {
 func TestRestoreUserWithPendingEmailChange(t *testing.T) {
 	tok := user.NewEmailChangeToken()
 	expiresAt := time.Now().Add(time.Hour)
-	pending := user.RestorePendingEmailChange("new@example.com", tok.Hash(), expiresAt)
-	u := user.RestoreUser(uuid.New(), janeEmail, mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
+	pending := user.RestorePendingEmailChange(user.RestoreEmail("new@example.com"), tok.Hash(), expiresAt)
+	u := user.RestoreUser(uuid.New(), user.RestoreEmail(janeEmail), mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
 	if err := u.ConfirmEmailChange(tok); err != nil {
 		t.Errorf("ConfirmEmailChange() on restored user error: %v", err)
 	}

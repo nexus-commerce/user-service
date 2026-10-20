@@ -50,6 +50,8 @@ func NewPasswordHash(s string) (PasswordHash, error) {
 	return PasswordHash{value: s}, nil
 }
 
+func RestorePasswordHash(s string) PasswordHash { return PasswordHash{value: s} }
+
 func (PasswordHash) String() string { return "[REDACTED]" }
 
 func (h PasswordHash) Encoded() string { return h.value }
