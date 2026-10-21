@@ -1,0 +1,25 @@
+#:schema https://json.schemastore.org/any.json
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/purge"
+  cmd = "go build -o ./tmp/purge ./src/cmd/purge"
+  delay = 1000
+  entrypoint = ["./tmp/purge"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "src/docs"]
+  exclude_regex = ["_test.go"]
+  include_ext = ["go", "env"]
+  log = "build-errors-purge.log"
+  poll = true
+  poll_interval = 1000
+  send_interrupt = true
+  kill_delay = "5s"
+
+[log]
+  main_only = false
+  time = false
+
+[misc]
+  clean_on_exit = false

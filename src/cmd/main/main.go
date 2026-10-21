@@ -26,6 +26,14 @@ import (
 
 const dbConnectTimeout = 10 * time.Second
 
+type appConfig struct {
+	Postgres     config.Postgres
+	HTTP         config.HTTP
+	JWT          config.JWT
+	Docs         config.Docs
+	Notification config.Notification
+}
+
 // @title           User Service API
 // @version         0.1.0
 // @description		This is the API documentation for the User Service
@@ -48,7 +56,7 @@ func run() error {
 		return err
 	}
 
-	cfg, err := config.New()
+	cfg, err := config.Load[appConfig]()
 	if err != nil {
 		return fmt.Errorf("load config (check env vars or .env): %w", err)
 	}

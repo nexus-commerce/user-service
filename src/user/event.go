@@ -11,6 +11,10 @@ type EventMeta struct {
 	OccurredAt  time.Time
 }
 
+func newEventMeta(aggregateID uuid.UUID, at time.Time) EventMeta {
+	return EventMeta{ID: uuid.New(), AggregateID: aggregateID, OccurredAt: at}
+}
+
 func (m EventMeta) Meta() EventMeta {
 	return m
 }

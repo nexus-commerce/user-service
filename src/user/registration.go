@@ -35,7 +35,7 @@ func RequestRegistration(email Email, name FullName, password Password, hasher H
 		expiresAt:    now.Add(registrationTTL),
 	}
 	p.events = append(p.events, RegistrationRequested{
-		ID: uuid.New(), AggregateID: p.userID, OccurredAt: now,
+		EventMeta: p.newEventMeta(now),
 		Email:     p.email,
 		FullName:  p.fullName,
 		Token:     token,
@@ -66,6 +66,10 @@ func (p *PendingRegistration) PasswordHash() PasswordHash { return p.passwordHas
 func (p *PendingRegistration) TokenHash() ConfirmationTokenHash { return p.tokenHash }
 
 func (p *PendingRegistration) ExpiresAt() time.Time { return p.expiresAt }
+
+func (p *PendingRegistration) newEventMeta(at time.Time) EventMeta {
+	return newEventMeta(p.userID, at)
+}
 
 func (p *PendingRegistration) Events() []Event {
 	return slices.Clone(p.events)

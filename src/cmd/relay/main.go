@@ -22,6 +22,12 @@ import (
 
 const dbConnectTimeout = 10 * time.Second
 
+type relayConfig struct {
+	Postgres config.Postgres
+	Kafka    config.Kafka
+	Outbox   config.Outbox
+}
+
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
@@ -33,7 +39,7 @@ func run() error {
 		return err
 	}
 
-	cfg, err := config.New()
+	cfg, err := config.Load[relayConfig]()
 	if err != nil {
 		return fmt.Errorf("load config (check env vars or .env): %w", err)
 	}

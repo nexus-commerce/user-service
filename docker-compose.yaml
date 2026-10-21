@@ -60,6 +60,32 @@ services:
       kafka-init:
         condition: service_completed_successfully
 
+  purge:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: user-service-dev
+    container_name: purge
+    hostname: purge
+    networks:
+      - user-service-network
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      KAFKA_HOST: kafka
+      KAFKA_PORT: 29092
+    command: [ "air", "-c", ".air.purge.toml" ]
+    restart: on-failure
+    depends_on:
+      user-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:15
     container_name: postgres

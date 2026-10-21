@@ -143,7 +143,7 @@ func (u *User) Authenticate(password Password, hasher Hasher) error {
 }
 
 func (u *User) newEventMeta(at time.Time) EventMeta {
-	return EventMeta{ID: uuid.New(), AggregateID: u.id, OccurredAt: at}
+	return newEventMeta(u.id, at)
 }
 
 func (u *User) Events() []Event {

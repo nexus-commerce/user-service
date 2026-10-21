@@ -30,11 +30,9 @@ func newUserRegistered(t *testing.T) user.Registered {
 		t.Fatalf("NewName() error: %v", err)
 	}
 	return user.Registered{
-		ID:          uuid.New(),
-		AggregateID: uuid.New(),
-		OccurredAt:  time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC),
-		Email:       email,
-		FullName:    user.NewFullName(first, last),
+		EventMeta: newMeta(),
+		Email:     email,
+		FullName:  user.NewFullName(first, last),
 	}
 }
 
