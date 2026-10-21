@@ -85,6 +85,16 @@ func (r *Registrations) ConvertToUser(
 	return usr, nil
 }
 
+func (r *Registrations) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
+	query := `DELETE FROM pending_registrations WHERE expires_at < $1`
+
+	res, err := r.db.pool.ExecContext(ctx, query, before)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired registrations: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 func scanPendingRegistration(row *sql.Row) (*user.PendingRegistration, error) {
 	var (
 		email, rawUserID, firstName, lastName, passwordHash, tokenHash string

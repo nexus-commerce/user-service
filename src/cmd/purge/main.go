@@ -57,7 +57,7 @@ func run() error {
 		}
 	}()
 
-	purger := purge.New(postgres.NewPendingRequests(db), purge.Options{
+	purger := purge.New(postgres.NewRegistrations(db, nil), postgres.NewUsers(db, nil), purge.Options{
 		Interval: cfg.Purge.Interval,
 		Grace:    cfg.Purge.Grace,
 	})

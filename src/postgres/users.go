@@ -190,6 +190,16 @@ func savePendingEmailChange(ctx context.Context, tx *sql.Tx, usr *user.User) err
 	return nil
 }
 
+func (u *Users) DeleteExpiredEmailChanges(ctx context.Context, before time.Time) (int64, error) {
+	query := `DELETE FROM pending_email_changes WHERE expires_at < $1`
+
+	res, err := u.db.pool.ExecContext(ctx, query, before)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired email changes: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 func scanUser(row *sql.Row) (*user.User, error) {
 	var (
 		rawID, firstName, lastName, email, passwordHash string

@@ -6,8 +6,11 @@ import (
 	"time"
 )
 
-type Store interface {
-	DeleteExpiredRegistrations(ctx context.Context, before time.Time) (int64, error)
+type purgeRegistrations interface {
+	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
+}
+
+type purgeUsers interface {
 	DeleteExpiredEmailChanges(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -17,12 +20,13 @@ type Options struct {
 }
 
 type Purger struct {
-	store Store
-	opts  Options
+	registrations purgeRegistrations
+	users         purgeUsers
+	opts          Options
 }
 
-func New(store Store, opts Options) *Purger {
-	return &Purger{store: store, opts: opts}
+func New(registrations purgeRegistrations, users purgeUsers, opts Options) *Purger {
+	return &Purger{registrations: registrations, users: users, opts: opts}
 }
 
 func (p *Purger) Run(ctx context.Context) error {
@@ -45,8 +49,8 @@ func (p *Purger) Run(ctx context.Context) error {
 
 func (p *Purger) purge(ctx context.Context) {
 	before := time.Now().Add(-p.opts.Grace)
-	p.delete(ctx, "registrations", before, p.store.DeleteExpiredRegistrations)
-	p.delete(ctx, "email changes", before, p.store.DeleteExpiredEmailChanges)
+	p.delete(ctx, "registrations", before, p.registrations.DeleteExpired)
+	p.delete(ctx, "email changes", before, p.users.DeleteExpiredEmailChanges)
 }
 
 func (p *Purger) delete(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {

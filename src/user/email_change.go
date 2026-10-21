@@ -2,7 +2,7 @@ package user
 
 import "time"
 
-const emailChangeTokenTTL = 24 * time.Hour
+const emailChangeTTL = 24 * time.Hour
 
 type PendingEmailChange struct {
 	email     Email

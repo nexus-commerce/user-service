@@ -80,7 +80,7 @@ func (u *User) RequestEmailChange(newEmail Email, password Password, hasher Hash
 	u.pending = &PendingEmailChange{
 		email:     newEmail,
 		tokenHash: token.Hash(),
-		expiresAt: now.Add(emailChangeTokenTTL),
+		expiresAt: now.Add(emailChangeTTL),
 	}
 	u.events = append(u.events, EmailChangeRequested{
 		EventMeta: u.newEventMeta(now),
