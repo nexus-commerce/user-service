@@ -41,51 +41,59 @@ type encoder struct {
 	sealer Sealer
 }
 
-func newEncoder(sealer Sealer) *encoder {
+func newEncoder(sealer Sealer) (*encoder, error) {
 	enc := &encoder{routes: make(map[reflect.Type]route), sealer: sealer}
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.registered",
-		version: "1.0",
-	}, convertRegistered))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.registration_requested",
-		version: "1.0",
-	}, enc.convertRegistrationRequested))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.duplicate_registration_attempted",
-		version: "1.0",
-	}, convertDuplicateRegistrationAttempted))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.renamed",
-		version: "1.0",
-	}, convertRenamed))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.email_change_requested",
-		version: "1.0",
-	}, enc.convertEmailChangeRequested))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.email_change_to_taken_address_attempted",
-		version: "1.0",
-	}, convertEmailChangeToTakenAddressAttempted))
-	enc.register(newRoute(destination{
-		topic:   topicUsers,
-		typ:     "user.email_changed",
-		version: "1.0",
-	}, convertEmailChanged))
-	return enc
+	routes := []route{
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.registered",
+			version: "1.0",
+		}, convertRegistered),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.registration_requested",
+			version: "1.0",
+		}, enc.convertRegistrationRequested),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.duplicate_registration_attempted",
+			version: "1.0",
+		}, convertDuplicateRegistrationAttempted),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.renamed",
+			version: "1.0",
+		}, convertRenamed),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.email_change_requested",
+			version: "1.0",
+		}, enc.convertEmailChangeRequested),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.email_change_to_taken_address_attempted",
+			version: "1.0",
+		}, convertEmailChangeToTakenAddressAttempted),
+		newRoute(destination{
+			topic:   topicUsers,
+			typ:     "user.email_changed",
+			version: "1.0",
+		}, convertEmailChanged),
+	}
+	for _, r := range routes {
+		if err := enc.register(r); err != nil {
+			return nil, err
+		}
+	}
+	return enc, nil
 }
 
-func (enc *encoder) register(r route) {
+func (enc *encoder) register(r route) error {
 	if _, ok := enc.routes[r.event]; ok {
-		panic(fmt.Sprintf("messaging: duplicate route for event %s", r.event))
+		return fmt.Errorf("duplicate route for event %s", r.event)
 	}
 	enc.routes[r.event] = r
+	return nil
 }
 
 type envelope struct {

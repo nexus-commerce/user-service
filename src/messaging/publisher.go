@@ -15,8 +15,12 @@ type Publisher struct {
 	encoder *encoder
 }
 
-func NewPublisher(sealer Sealer) *Publisher {
-	return &Publisher{encoder: newEncoder(sealer)}
+func NewPublisher(sealer Sealer) (*Publisher, error) {
+	enc, err := newEncoder(sealer)
+	if err != nil {
+		return nil, fmt.Errorf("create encoder: %w", err)
+	}
+	return &Publisher{encoder: enc}, nil
 }
 
 func (p *Publisher) Publish(ctx context.Context, pr Producer, events []user.Event) error {

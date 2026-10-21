@@ -37,7 +37,7 @@ func newUserRegistered(t *testing.T) user.Registered {
 }
 
 func TestEncodeUserRegistered(t *testing.T) {
-	enc := newEncoder(fakeSealer{})
+	enc := mustEncoder(t, fakeSealer{})
 	e := newUserRegistered(t)
 
 	msg, err := enc.encode(e)
@@ -73,7 +73,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 }
 
 func TestEncodeRejectsUnroutedEvent(t *testing.T) {
-	enc := newEncoder(fakeSealer{})
+	enc := mustEncoder(t, fakeSealer{})
 
 	if _, err := enc.encode(unroutedEvent{newUserRegistered(t)}); err == nil {
 		t.Error("Encode(unroutedEvent) = _, nil; want error")
@@ -96,6 +96,24 @@ func (s fakeSealer) Seal(p []byte) ([]byte, error) {
 }
 
 func (fakeSealer) KeyID() string { return "test-key" }
+
+func mustEncoder(t *testing.T, s Sealer) *encoder {
+	t.Helper()
+	enc, err := newEncoder(s)
+	if err != nil {
+		t.Fatalf("newEncoder() error: %v", err)
+	}
+	return enc
+}
+
+func TestRegisterRejectsDuplicateRoute(t *testing.T) {
+	enc := mustEncoder(t, fakeSealer{})
+	r := newRoute(destination{topic: topicUsers, typ: "user.renamed", version: "1.0"}, convertRenamed)
+
+	if err := enc.register(r); err == nil {
+		t.Error("register(duplicate Renamed route) = nil; want error")
+	}
+}
 
 func mustEmail(t *testing.T, s string) user.Email {
 	t.Helper()
@@ -145,7 +163,7 @@ func decode[T any](t *testing.T, msg Message) T {
 func TestEncodeUserRenamed(t *testing.T) {
 	e := user.Renamed{EventMeta: newMeta(), FullName: user.NewFullName(mustName(t, "Jane"), mustName(t, "Smith"))}
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(Renamed) error: %v", err)
 	}
@@ -186,7 +204,7 @@ func newUserEmailChangeRequested(t *testing.T) user.EmailChangeRequested {
 func TestEncodeUserEmailChangeRequested(t *testing.T) {
 	e := newUserEmailChangeRequested(t)
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(EmailChangeRequested) error: %v", err)
 	}
@@ -221,7 +239,7 @@ func TestEncodeUserEmailChangeRequested(t *testing.T) {
 func TestEncodeUserEmailChangeRequestedHidesPlaintextToken(t *testing.T) {
 	e := newUserEmailChangeRequested(t)
 
-	msg, err := newEncoder(fakeSealer{out: []byte("opaque")}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{out: []byte("opaque")}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(EmailChangeRequested) error: %v", err)
 	}
@@ -233,7 +251,7 @@ func TestEncodeUserEmailChangeRequestedHidesPlaintextToken(t *testing.T) {
 func TestEncodeReturnsSealError(t *testing.T) {
 	sealErr := errors.New("boom")
 
-	_, err := newEncoder(fakeSealer{err: sealErr}).encode(newUserEmailChangeRequested(t))
+	_, err := mustEncoder(t, fakeSealer{err: sealErr}).encode(newUserEmailChangeRequested(t))
 	if !errors.Is(err, sealErr) {
 		t.Errorf("encode() error = %v, want %v", err, sealErr)
 	}
@@ -254,7 +272,7 @@ func newUserRegistrationRequested(t *testing.T) user.RegistrationRequested {
 func TestEncodeUserRegistrationRequested(t *testing.T) {
 	e := newUserRegistrationRequested(t)
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(RegistrationRequested) error: %v", err)
 	}
@@ -292,7 +310,7 @@ func TestEncodeUserRegistrationRequested(t *testing.T) {
 func TestEncodeUserRegistrationRequestedHidesPlaintextToken(t *testing.T) {
 	e := newUserRegistrationRequested(t)
 
-	msg, err := newEncoder(fakeSealer{out: []byte("opaque")}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{out: []byte("opaque")}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(RegistrationRequested) error: %v", err)
 	}
@@ -304,7 +322,7 @@ func TestEncodeUserRegistrationRequestedHidesPlaintextToken(t *testing.T) {
 func TestEncodeUserDuplicateRegistrationAttempted(t *testing.T) {
 	e := user.DuplicateRegistrationAttempted{EventMeta: newMeta(), Email: mustEmail(t, "jane@example.com")}
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(DuplicateRegistrationAttempted) error: %v", err)
 	}
@@ -332,7 +350,7 @@ func TestEncodeUserDuplicateRegistrationAttempted(t *testing.T) {
 func TestEncodeUserEmailChangeToTakenAddressAttempted(t *testing.T) {
 	e := user.EmailChangeToTakenAddressAttempted{EventMeta: newMeta(), NewEmail: mustEmail(t, "taken@example.com")}
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(EmailChangeToTakenAddressAttempted) error: %v", err)
 	}
@@ -360,7 +378,7 @@ func TestEncodeUserEmailChangeToTakenAddressAttempted(t *testing.T) {
 func TestEncodeUserEmailChanged(t *testing.T) {
 	e := user.EmailChanged{EventMeta: newMeta(), OldEmail: mustEmail(t, "jane@example.com"), NewEmail: mustEmail(t, "new@example.com")}
 
-	msg, err := newEncoder(fakeSealer{}).encode(e)
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
 	if err != nil {
 		t.Fatalf("encode(EmailChanged) error: %v", err)
 	}

@@ -17,8 +17,17 @@ func (p *fakeProducer) Produce(_ context.Context, msgs ...Message) error {
 	return nil
 }
 
+func mustPublisher(t *testing.T, s Sealer) *Publisher {
+	t.Helper()
+	pub, err := NewPublisher(s)
+	if err != nil {
+		t.Fatalf("NewPublisher() error: %v", err)
+	}
+	return pub
+}
+
 func TestPublishProducesEncodedMessages(t *testing.T) {
-	pub := NewPublisher(fakeSealer{})
+	pub := mustPublisher(t, fakeSealer{})
 	fake := &fakeProducer{}
 	first, second := newUserRegistered(t), newUserRegistered(t)
 
@@ -40,7 +49,7 @@ func TestPublishProducesEncodedMessages(t *testing.T) {
 }
 
 func TestPublishSkipsEmptyEvents(t *testing.T) {
-	pub := NewPublisher(fakeSealer{})
+	pub := mustPublisher(t, fakeSealer{})
 	fake := &fakeProducer{}
 
 	if err := pub.Publish(t.Context(), fake, nil); err != nil {
@@ -52,7 +61,7 @@ func TestPublishSkipsEmptyEvents(t *testing.T) {
 }
 
 func TestPublishReturnsEncodeError(t *testing.T) {
-	pub := NewPublisher(fakeSealer{})
+	pub := mustPublisher(t, fakeSealer{})
 	fake := &fakeProducer{}
 
 	err := pub.Publish(t.Context(), fake, []user.Event{newUserRegistered(t), unroutedEvent{newUserRegistered(t)}})

@@ -85,7 +85,10 @@ func run() error {
 		return fmt.Errorf("create token sealer: %w", err)
 	}
 
-	publisher := messaging.NewPublisher(sealer)
+	publisher, err := messaging.NewPublisher(sealer)
+	if err != nil {
+		return fmt.Errorf("create event publisher: %w", err)
+	}
 	users := postgres.NewUsers(db, publisher)
 	registrations := postgres.NewRegistrations(db, publisher)
 	tokens := jwt.NewTokens(jwt.Options{
