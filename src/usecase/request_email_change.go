@@ -9,7 +9,7 @@ import (
 )
 
 type requestEmailChangeUsers interface {
-	ByEmail(ctx context.Context, email user.Email) (*user.User, error)
+	EmailTaken(ctx context.Context, email user.Email) (bool, error)
 	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
 }
 
@@ -41,7 +41,7 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return user.ErrInvalidCredentials
 	}
 
-	taken, err := r.emailTaken(ctx, email)
+	taken, err := r.users.EmailTaken(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -59,15 +59,4 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return nil
 	})
 	return err
-}
-
-func (r *RequestEmailChange) emailTaken(ctx context.Context, email user.Email) (bool, error) {
-	_, err := r.users.ByEmail(ctx, email)
-	switch {
-	case err == nil:
-		return true, nil
-	case errors.Is(err, user.ErrNotFound):
-		return false, nil
-	}
-	return false, err
 }

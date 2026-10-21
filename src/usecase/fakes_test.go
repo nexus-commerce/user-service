@@ -47,6 +47,11 @@ func (f *fakeUsers) ByEmail(_ context.Context, email user.Email) (*user.User, er
 	return nil, user.ErrNotFound
 }
 
+func (f *fakeUsers) EmailTaken(ctx context.Context, email user.Email) (bool, error) {
+	_, err := f.ByEmail(ctx, email)
+	return err == nil, nil
+}
+
 func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
 	usr, err := f.ByID(ctx, id)
 	if err != nil {

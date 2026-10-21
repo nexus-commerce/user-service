@@ -42,6 +42,16 @@ func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, erro
 	return usr, err
 }
 
+func (u *Users) EmailTaken(ctx context.Context, email user.Email) (bool, error) {
+	query := `SELECT EXISTS (SELECT 1 FROM users WHERE email = $1)`
+
+	var taken bool
+	if err := u.db.pool.QueryRowContext(ctx, query, email.String()).Scan(&taken); err != nil {
+		return false, fmt.Errorf("check email taken: %w", err)
+	}
+	return taken, nil
+}
+
 func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	query := selectUser + ` WHERE u.id = $1`
 
@@ -99,7 +109,7 @@ func (u *Users) update(
 			usr.ID().String(),
 		)
 		if err != nil {
-			if isEmailTaken(err) {
+			if isEmailUniqueViolation(err) {
 				return user.ErrEmailTaken
 			}
 			return fmt.Errorf("update user: %w", err)
@@ -130,7 +140,7 @@ func (u *Users) Add(ctx context.Context, usr *user.User) error {
 			usr.CreatedAt(),
 		)
 		if err != nil {
-			if isEmailTaken(err) {
+			if isEmailUniqueViolation(err) {
 				return user.ErrEmailTaken
 			}
 			return fmt.Errorf("insert user: %w", err)
@@ -212,7 +222,7 @@ const (
 	emailUniqueConstraint = "users_email_key"
 )
 
-func isEmailTaken(err error) bool {
+func isEmailUniqueViolation(err error) bool {
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 	if !ok {
 		return false
