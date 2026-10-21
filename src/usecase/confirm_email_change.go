@@ -30,7 +30,7 @@ func (c *ConfirmEmailChange) Execute(ctx context.Context, rawToken string) error
 	_, err = c.users.UpdateByEmailChangeToken(ctx, token.Hash(), func(usr *user.User) error {
 		return usr.ConfirmEmailChange(token)
 	})
-	if errors.Is(err, user.ErrUserNotFound) {
+	if errors.Is(err, user.ErrNotFound) {
 		return user.ErrInvalidEmailChangeToken
 	}
 	return err

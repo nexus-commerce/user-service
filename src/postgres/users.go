@@ -36,7 +36,7 @@ func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, erro
 	query := selectUser + ` WHERE u.email = $1`
 
 	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
-	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
+	if err != nil && !errors.Is(err, user.ErrNotFound) {
 		return nil, fmt.Errorf("select user by email: %w", err)
 	}
 	return usr, err
@@ -46,7 +46,7 @@ func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	query := selectUser + ` WHERE u.id = $1`
 
 	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
-	if err != nil && !errors.Is(err, user.ErrUserNotFound) {
+	if err != nil && !errors.Is(err, user.ErrNotFound) {
 		return nil, fmt.Errorf("select user by id: %w", err)
 	}
 	return usr, err
@@ -81,7 +81,7 @@ func (u *Users) update(
 		var err error
 		usr, err = scanUser(tx.QueryRowContext(ctx, selectQuery, arg))
 		if err != nil {
-			if errors.Is(err, user.ErrUserNotFound) {
+			if errors.Is(err, user.ErrNotFound) {
 				return err
 			}
 			return fmt.Errorf("select user for update: %w", err)
@@ -185,7 +185,7 @@ func scanUser(row *sql.Row) (*user.User, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, user.ErrUserNotFound
+			return nil, user.ErrNotFound
 		}
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func scanUser(row *sql.Row) (*user.User, error) {
 		)
 		pending = &p
 	}
-	return user.RestoreUser(id, user.RestoreEmail(email), fullName, user.RestorePasswordHash(passwordHash), createdAt, pending), nil
+	return user.Restore(id, user.RestoreEmail(email), fullName, user.RestorePasswordHash(passwordHash), createdAt, pending), nil
 }
 
 const (

@@ -60,7 +60,7 @@ func (h *GetUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	usr, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
-		if errors.Is(err, user.ErrUserNotFound) {
+		if errors.Is(err, user.ErrNotFound) {
 			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
 			return
 		}

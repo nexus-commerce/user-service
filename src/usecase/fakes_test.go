@@ -33,7 +33,7 @@ func (f *fakeUsers) add(usr *user.User) {
 func (f *fakeUsers) ByID(_ context.Context, id uuid.UUID) (*user.User, error) {
 	usr, ok := f.byID[id]
 	if !ok {
-		return nil, user.ErrUserNotFound
+		return nil, user.ErrNotFound
 	}
 	return usr, nil
 }
@@ -44,7 +44,7 @@ func (f *fakeUsers) ByEmail(_ context.Context, email user.Email) (*user.User, er
 			return usr, nil
 		}
 	}
-	return nil, user.ErrUserNotFound
+	return nil, user.ErrNotFound
 }
 
 func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
@@ -67,7 +67,7 @@ func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.Emai
 			return f.UpdateByID(ctx, id, updateFn)
 		}
 	}
-	return nil, user.ErrUserNotFound
+	return nil, user.ErrNotFound
 }
 
 func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.User {
@@ -88,7 +88,7 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err != nil {
 		t.Fatalf("NewPassword() error: %v", err)
 	}
-	usr, err := user.NewUser(e, user.NewFullName(fn, ln), password, fakeHasher{})
+	usr, err := user.New(e, user.NewFullName(fn, ln), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}

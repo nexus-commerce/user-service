@@ -61,7 +61,7 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*user.User
 	}
 
 	usr, err := l.users.ByEmail(ctx, email)
-	if errors.Is(err, user.ErrUserNotFound) {
+	if errors.Is(err, user.ErrNotFound) {
 		return nil, l.rejectTimingSafe()
 	}
 	if err != nil {

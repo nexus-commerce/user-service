@@ -56,7 +56,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 	name := mustFullName(t, janeDoe)
 	password := mustPassword(t, "s3cretpass")
 
-	u, err := user.NewUser(email, name, password, fakeHasher{})
+	u, err := user.New(email, name, password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestNewUserRecordsRegistration(t *testing.T) {
 
 func TestEventsReturnsCopy(t *testing.T) {
 	password := mustPassword(t, "s3cretpass")
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
+	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func mustUser(t *testing.T) *user.User {
 	t.Helper()
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
+	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestRestoreUser(t *testing.T) {
 	name := mustFullName(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	u := user.RestoreUser(id, user.RestoreEmail(legacyEmail), name, hash, createdAt, nil)
+	u := user.Restore(id, user.RestoreEmail(legacyEmail), name, hash, createdAt, nil)
 	got := fieldsOf(u.FullName())
 	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
@@ -166,7 +166,7 @@ func TestRestoreUser(t *testing.T) {
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	password := mustPassword(t, "s3cretpass")
 	other := mustPassword(t, "otherpass")
-	u, err := user.NewUser(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
+	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("NewUser() error: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestRestoreUserWithPendingEmailChange(t *testing.T) {
 	tok := user.NewEmailChangeToken()
 	expiresAt := time.Now().Add(time.Hour)
 	pending := user.RestorePendingEmailChange(user.RestoreEmail("new@example.com"), tok.Hash(), expiresAt)
-	u := user.RestoreUser(uuid.New(), user.RestoreEmail(janeEmail), mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
+	u := user.Restore(uuid.New(), user.RestoreEmail(janeEmail), mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
 	if err := u.ConfirmEmailChange(tok); err != nil {
 		t.Errorf("ConfirmEmailChange() on restored user error: %v", err)
 	}

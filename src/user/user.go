@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ErrUserNotFound       = errors.New("user not found")
+	ErrNotFound           = errors.New("user not found")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrEmailTaken         = errors.New("user email already exists")
 	ErrEmailUnchanged     = NewValidationError("must differ from the current email")
@@ -25,7 +25,7 @@ type User struct {
 	events []Event
 }
 
-func NewUser(email Email, name FullName, password Password, hasher Hasher) (*User, error) {
+func New(email Email, name FullName, password Password, hasher Hasher) (*User, error) {
 	hash, err := hasher.Hash(password)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func NewUser(email Email, name FullName, password Password, hasher Hasher) (*Use
 	return u, nil
 }
 
-func RestoreUser(id uuid.UUID, email Email, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
+func Restore(id uuid.UUID, email Email, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
 	return &User{
 		id:           id,
 		email:        email,

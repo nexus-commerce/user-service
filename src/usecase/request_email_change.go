@@ -66,7 +66,7 @@ func (r *RequestEmailChange) emailTaken(ctx context.Context, email user.Email) (
 	switch {
 	case err == nil:
 		return true, nil
-	case errors.Is(err, user.ErrUserNotFound):
+	case errors.Is(err, user.ErrNotFound):
 		return false, nil
 	}
 	return false, err

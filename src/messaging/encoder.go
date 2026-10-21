@@ -64,7 +64,7 @@ func newEncoder(sealer Sealer) *encoder {
 		topic:   topicUsers,
 		typ:     typeUserEmailChangeRequested,
 		version: "1.0",
-	}, enc.convertUserEmailChangeRequested))
+	}, enc.convertEmailChangeRequested))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
 		typ:     typeUserEmailChanged,
@@ -159,7 +159,7 @@ type userEmailChangeRequested struct {
 	RequestedAt    time.Time `json:"requestedAt"`
 }
 
-func (enc *encoder) convertUserEmailChangeRequested(e user.EmailChangeRequested) (any, error) {
+func (enc *encoder) convertEmailChangeRequested(e user.EmailChangeRequested) (any, error) {
 	sealed, err := enc.sealer.Seal([]byte(e.Token.Plaintext()))
 	if err != nil {
 		return nil, fmt.Errorf("seal email change token: %w", err)

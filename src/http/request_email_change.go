@@ -73,7 +73,7 @@ func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, user.ErrInvalidCredentials):
 			writeError(rw, r, http.StatusForbidden, msgInvalidPassword)
 			return
-		case errors.Is(err, user.ErrUserNotFound):
+		case errors.Is(err, user.ErrNotFound):
 			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
 			return
 		case errors.Is(err, user.ErrEmailTaken):
