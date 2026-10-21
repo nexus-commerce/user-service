@@ -41,20 +41,33 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return user.ErrInvalidCredentials
 	}
 
-	owner, err := r.users.ByEmail(ctx, email)
-	switch {
-	case err == nil && owner.ID() != req.UserID:
-		return user.ErrEmailTaken
-	case err != nil && !errors.Is(err, user.ErrUserNotFound):
+	taken, err := r.emailTaken(ctx, email)
+	if err != nil {
 		return err
 	}
 
 	_, err = r.users.UpdateByID(ctx, req.UserID, func(usr *user.User) error {
-		err := usr.RequestEmailChange(email, password, r.hasher)
-		if errors.Is(err, user.ErrEmailUnchanged) {
-			return &FieldError{Field: FieldEmail, Err: err}
+		if err := usr.RequestEmailChange(email, password, r.hasher); err != nil {
+			if errors.Is(err, user.ErrEmailUnchanged) {
+				return &FieldError{Field: FieldEmail, Err: err}
+			}
+			return err
 		}
-		return err
+		if taken {
+			return user.ErrEmailTaken
+		}
+		return nil
 	})
 	return err
+}
+
+func (r *RequestEmailChange) emailTaken(ctx context.Context, email user.Email) (bool, error) {
+	_, err := r.users.ByEmail(ctx, email)
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, user.ErrUserNotFound):
+		return false, nil
+	}
+	return false, err
 }

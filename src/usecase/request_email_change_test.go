@@ -22,6 +22,7 @@ func TestRequestEmailChange(t *testing.T) {
 		{name: "wrong password", newEmail: "new@example.com", password: "wrongpass", wantErr: user.ErrInvalidCredentials},
 		{name: "password fails format", newEmail: "new@example.com", password: "short", wantErr: user.ErrInvalidCredentials},
 		{name: "taken", newEmail: "john@example.com", password: "s3cretpass", wantErr: user.ErrEmailTaken},
+		{name: "taken with wrong password", newEmail: "john@example.com", password: "wrongpass", wantErr: user.ErrInvalidCredentials},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
