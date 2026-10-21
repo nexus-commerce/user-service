@@ -52,18 +52,34 @@ func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	return usr, err
 }
 
-func (u *Users) Update(
+func (u *Users) UpdateByID(
 	ctx context.Context,
 	id uuid.UUID,
 	updateFn func(*user.User) error,
 ) (*user.User, error) {
-	selectQuery := selectUser + ` WHERE u.id = $1 FOR UPDATE OF u`
+	return u.update(ctx, selectUser+` WHERE u.id = $1 FOR UPDATE OF u`, id.String(), updateFn)
+}
+
+func (u *Users) UpdateByEmailChangeToken(
+	ctx context.Context,
+	hash user.EmailChangeTokenHash,
+	updateFn func(*user.User) error,
+) (*user.User, error) {
+	return u.update(ctx, selectUser+` WHERE p.token_hash = $1 FOR UPDATE OF u`, hash.Encoded(), updateFn)
+}
+
+func (u *Users) update(
+	ctx context.Context,
+	selectQuery string,
+	arg string,
+	updateFn func(*user.User) error,
+) (*user.User, error) {
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
 	var usr *user.User
 	err := u.db.runInTx(ctx, func(tx *sql.Tx) error {
 		var err error
-		usr, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id.String()))
+		usr, err = scanUser(tx.QueryRowContext(ctx, selectQuery, arg))
 		if err != nil {
 			if errors.Is(err, user.ErrUserNotFound) {
 				return err
@@ -122,24 +138,6 @@ func (u *Users) Add(ctx context.Context, usr *user.User) error {
 
 		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
 	})
-}
-
-func (u *Users) IDByEmailChangeToken(ctx context.Context, hash user.EmailChangeTokenHash) (uuid.UUID, error) {
-	query := `SELECT user_id FROM pending_email_changes WHERE token_hash = $1`
-
-	var rawID string
-	err := u.db.pool.QueryRowContext(ctx, query, hash.Encoded()).Scan(&rawID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return uuid.Nil(), user.ErrUserNotFound
-		}
-		return uuid.Nil(), fmt.Errorf("select user id by email change token: %w", err)
-	}
-	id, err := uuid.Parse(rawID)
-	if err != nil {
-		return uuid.Nil(), fmt.Errorf("parse user id: %w", err)
-	}
-	return id, nil
 }
 
 func savePendingEmailChange(ctx context.Context, tx *sql.Tx, usr *user.User) error {

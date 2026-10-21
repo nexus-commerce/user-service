@@ -10,7 +10,7 @@ import (
 
 type requestEmailChangeUsers interface {
 	ByEmail(ctx context.Context, email user.Email) (*user.User, error)
-	Update(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
 }
 
 type RequestEmailChange struct {
@@ -49,7 +49,7 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return err
 	}
 
-	_, err = r.users.Update(ctx, req.UserID, func(usr *user.User) error {
+	_, err = r.users.UpdateByID(ctx, req.UserID, func(usr *user.User) error {
 		err := usr.RequestEmailChange(email, password, r.hasher)
 		if errors.Is(err, user.ErrEmailUnchanged) {
 			return &FieldError{Field: FieldEmail, Err: err}

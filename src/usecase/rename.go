@@ -8,7 +8,7 @@ import (
 )
 
 type renameUsers interface {
-	Update(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
 }
 
 type Rename struct {
@@ -37,7 +37,7 @@ func (r *Rename) Execute(ctx context.Context, c NameChange) (UserView, error) {
 		return UserView{}, err
 	}
 
-	usr, err := r.users.Update(ctx, c.UserID, func(usr *user.User) error {
+	usr, err := r.users.UpdateByID(ctx, c.UserID, func(usr *user.User) error {
 		name := usr.FullName()
 		if first != nil {
 			name = name.WithFirstName(*first)

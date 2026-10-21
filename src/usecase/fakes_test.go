@@ -47,7 +47,7 @@ func (f *fakeUsers) ByEmail(_ context.Context, email user.Email) (*user.User, er
 	return nil, user.ErrUserNotFound
 }
 
-func (f *fakeUsers) Update(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
 	usr, err := f.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -61,13 +61,13 @@ func (f *fakeUsers) Update(ctx context.Context, id uuid.UUID, updateFn func(*use
 	return usr, nil
 }
 
-func (f *fakeUsers) IDByEmailChangeToken(_ context.Context, hash user.EmailChangeTokenHash) (uuid.UUID, error) {
+func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.EmailChangeTokenHash, updateFn func(*user.User) error) (*user.User, error) {
 	for id, usr := range f.byID {
 		if p, ok := usr.PendingEmailChange(); ok && p.TokenHash() == hash {
-			return id, nil
+			return f.UpdateByID(ctx, id, updateFn)
 		}
 	}
-	return uuid.Nil(), user.ErrUserNotFound
+	return nil, user.ErrUserNotFound
 }
 
 func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.User {
