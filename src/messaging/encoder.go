@@ -9,17 +9,7 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-const (
-	topicUsers = "users"
-
-	typeUserRegistered                         = "user.registered"
-	typeUserRegistrationRequested              = "user.registration_requested"
-	typeUserDuplicateRegistrationAttempted     = "user.duplicate_registration_attempted"
-	typeUserRenamed                            = "user.renamed"
-	typeUserEmailChangeRequested               = "user.email_change_requested"
-	typeUserEmailChangeToTakenAddressAttempted = "user.email_change_to_taken_address_attempted"
-	typeUserEmailChanged                       = "user.email_changed"
-)
+const topicUsers = "users"
 
 type Sealer interface {
 	Seal(plaintext []byte) ([]byte, error)
@@ -55,37 +45,37 @@ func newEncoder(sealer Sealer) *encoder {
 	enc := &encoder{routes: make(map[reflect.Type]route), sealer: sealer}
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserRegistered,
+		typ:     "user.registered",
 		version: "1.0",
 	}, convertRegistered))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserRegistrationRequested,
+		typ:     "user.registration_requested",
 		version: "1.0",
 	}, enc.convertRegistrationRequested))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserDuplicateRegistrationAttempted,
+		typ:     "user.duplicate_registration_attempted",
 		version: "1.0",
 	}, convertDuplicateRegistrationAttempted))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserRenamed,
+		typ:     "user.renamed",
 		version: "1.0",
 	}, convertRenamed))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserEmailChangeRequested,
+		typ:     "user.email_change_requested",
 		version: "1.0",
 	}, enc.convertEmailChangeRequested))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserEmailChangeToTakenAddressAttempted,
+		typ:     "user.email_change_to_taken_address_attempted",
 		version: "1.0",
 	}, convertEmailChangeToTakenAddressAttempted))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
-		typ:     typeUserEmailChanged,
+		typ:     "user.email_changed",
 		version: "1.0",
 	}, convertEmailChanged))
 	return enc

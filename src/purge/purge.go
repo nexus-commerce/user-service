@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-type purgeRegistrations interface {
+type expiredRegistrations interface {
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
-type purgeUsers interface {
+type expiredEmailChanges interface {
 	DeleteExpiredEmailChanges(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -20,12 +20,12 @@ type Options struct {
 }
 
 type Purger struct {
-	registrations purgeRegistrations
-	users         purgeUsers
+	registrations expiredRegistrations
+	users         expiredEmailChanges
 	opts          Options
 }
 
-func New(registrations purgeRegistrations, users purgeUsers, opts Options) *Purger {
+func New(registrations expiredRegistrations, users expiredEmailChanges, opts Options) *Purger {
 	return &Purger{registrations: registrations, users: users, opts: opts}
 }
 

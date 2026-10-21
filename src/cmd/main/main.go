@@ -101,7 +101,7 @@ func run() error {
 	}
 	register := usecase.NewRegister(users, registrations, hasher)
 	confirmRegistration := usecase.NewConfirmRegistration(registrations, tokens)
-	getUser := usecase.NewGetUser(users)
+	fetchUser := usecase.NewFetchUser(users)
 	rename := usecase.NewRename(users)
 	requestEmailChange := usecase.NewRequestEmailChange(users, hasher)
 	confirmEmailChange := usecase.NewConfirmEmailChange(users)
@@ -121,7 +121,7 @@ func run() error {
 		http.NewLogin(login),
 		http.NewRegister(register),
 		http.NewConfirmRegistration(confirmRegistration),
-		http.NewGetUser(getUser),
+		http.NewFetchUser(fetchUser),
 		http.NewRename(rename),
 		http.NewRequestEmailChange(requestEmailChange),
 		http.NewConfirmEmailChange(confirmEmailChange),

@@ -41,14 +41,14 @@ func NewFullName(firstName, lastName Name) FullName {
 	return FullName{firstName: firstName, lastName: lastName}
 }
 
-func (n FullName) FirstName() Name { return n.firstName }
+func (f FullName) FirstName() Name { return f.firstName }
 
-func (n FullName) LastName() Name { return n.lastName }
+func (f FullName) LastName() Name { return f.lastName }
 
-func (n FullName) WithFirstName(first Name) FullName {
-	return FullName{firstName: first, lastName: n.lastName}
+func (f FullName) WithFirstName(first Name) FullName {
+	return FullName{firstName: first, lastName: f.lastName}
 }
 
-func (n FullName) WithLastName(last Name) FullName {
-	return FullName{firstName: n.firstName, lastName: last}
+func (f FullName) WithLastName(last Name) FullName {
+	return FullName{firstName: f.firstName, lastName: last}
 }

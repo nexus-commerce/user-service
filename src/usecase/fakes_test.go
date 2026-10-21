@@ -156,11 +156,11 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err != nil {
 		t.Fatalf("NewEmail(%q) error: %v", email, err)
 	}
-	fn, err := user.NewName(first)
+	firstName, err := user.NewName(first)
 	if err != nil {
 		t.Fatalf("NewName(%q) error: %v", first, err)
 	}
-	ln, err := user.NewName(last)
+	lastName, err := user.NewName(last)
 	if err != nil {
 		t.Fatalf("NewName(%q) error: %v", last, err)
 	}
@@ -168,7 +168,7 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err != nil {
 		t.Fatalf("NewPassword() error: %v", err)
 	}
-	p, err := user.RequestRegistration(e, user.NewFullName(fn, ln), password, fakeHasher{})
+	p, err := user.RequestRegistration(e, user.NewFullName(firstName, lastName), password, fakeHasher{})
 	if err != nil {
 		t.Fatalf("RequestRegistration() error: %v", err)
 	}

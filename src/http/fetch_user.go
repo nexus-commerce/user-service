@@ -8,12 +8,12 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-type GetUser struct {
-	uc *usecase.GetUser
+type FetchUser struct {
+	uc *usecase.FetchUser
 }
 
-func NewGetUser(uc *usecase.GetUser) *GetUser {
-	return &GetUser{
+func NewFetchUser(uc *usecase.FetchUser) *FetchUser {
+	return &FetchUser{
 		uc: uc,
 	}
 }
@@ -51,7 +51,7 @@ func toUserEnvelope(v usecase.UserView) userEnvelope {
 // @Failure     404  {object}  errorResponse  "User not found"
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/me [get]
-func (h *GetUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (h *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := UserIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
@@ -71,7 +71,7 @@ func (h *GetUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, r, http.StatusOK, toUserEnvelope(usr))
 }
 
-func (h *GetUser) Route() Route {
+func (h *FetchUser) Route() Route {
 	return Route{
 		Pattern: "GET /users/me",
 		Handler: h,

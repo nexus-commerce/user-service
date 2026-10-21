@@ -7,16 +7,16 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-type getUserUsers interface {
+type fetchUserUsers interface {
 	ByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 }
 
-type GetUser struct {
-	users getUserUsers
+type FetchUser struct {
+	users fetchUserUsers
 }
 
-func NewGetUser(users getUserUsers) *GetUser {
-	return &GetUser{
+func NewFetchUser(users fetchUserUsers) *FetchUser {
+	return &FetchUser{
 		users: users,
 	}
 }
@@ -37,8 +37,8 @@ func toUserView(u *user.User) UserView {
 	}
 }
 
-func (gu *GetUser) Execute(ctx context.Context, userID uuid.UUID) (UserView, error) {
-	usr, err := gu.users.ByID(ctx, userID)
+func (fu *FetchUser) Execute(ctx context.Context, userID uuid.UUID) (UserView, error) {
+	usr, err := fu.users.ByID(ctx, userID)
 	if err != nil {
 		return UserView{}, err
 	}
