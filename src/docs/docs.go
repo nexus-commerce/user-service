@@ -75,7 +75,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Creates a new user account, publishes a user.registered event and returns a JWT token",
+                "description": "Starts a sign-up: sends a confirmation link to a new email or an \"account already exists\" notice to a registered one. The response does not reveal which.",
                 "consumes": [
                     "application/json"
                 ],
@@ -98,14 +98,63 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/http.registerResponse"
-                        }
+                    "202": {
+                        "description": "Accepted"
                     },
                     "400": {
                         "description": "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request body too large",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register/confirm": {
+            "post": {
+                "description": "Confirms a pending registration with the token from the confirmation link, creates the user account, publishes a user.registered event and returns a JWT token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Confirm registration",
+                "parameters": [
+                    {
+                        "description": "Confirmation token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.confirmRegistrationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.confirmRegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request, invalid, already used or expired confirmation link",
                         "schema": {
                             "$ref": "#/definitions/http.errorResponse"
                         }
@@ -377,7 +426,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it",
+                "description": "Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it. If the new email already belongs to another account, the response is the same and that address gets a notice instead of a link",
                 "consumes": [
                     "application/json"
                 ],
@@ -423,12 +472,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "User not found",
-                        "schema": {
-                            "$ref": "#/definitions/http.errorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "User with this email already exists",
                         "schema": {
                             "$ref": "#/definitions/http.errorResponse"
                         }
@@ -527,6 +570,22 @@ const docTemplate = `{
                 }
             }
         },
+        "http.confirmRegistrationRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.confirmRegistrationResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "http.errorResponse": {
             "type": "object",
             "properties": {
@@ -570,14 +629,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "passwordConfirmation": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.registerResponse": {
-            "type": "object",
-            "properties": {
-                "token": {
                     "type": "string"
                 }
             }

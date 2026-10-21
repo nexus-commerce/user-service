@@ -21,7 +21,6 @@ func TestRequestEmailChange(t *testing.T) {
 		{name: "same email", newEmail: "JANE@example.com", password: "s3cretpass", wantErr: user.ErrEmailUnchanged, wantField: usecase.FieldEmail},
 		{name: "wrong password", newEmail: "new@example.com", password: "wrongpass", wantErr: user.ErrInvalidCredentials},
 		{name: "password fails format", newEmail: "new@example.com", password: "short", wantErr: user.ErrInvalidCredentials},
-		{name: "taken", newEmail: "john@example.com", password: "s3cretpass", wantErr: user.ErrEmailTaken},
 		{name: "taken with wrong password", newEmail: "john@example.com", password: "wrongpass", wantErr: user.ErrInvalidCredentials},
 	}
 	for _, tt := range tests {
@@ -63,5 +62,34 @@ func TestRequestEmailChange(t *testing.T) {
 				t.Errorf("recorded %d EmailChangeRequested events, want 1", requested)
 			}
 		})
+	}
+}
+
+func TestRequestEmailChangeToTakenAddress(t *testing.T) {
+	usr, users := newJane(t)
+	john := newUser(t, users, "john@example.com", "John", "Roe")
+
+	err := usecase.NewRequestEmailChange(users, fakeHasher{}).Execute(t.Context(), usecase.EmailChangeRequest{
+		UserID:   usr.ID(),
+		NewEmail: "john@example.com",
+		Password: "s3cretpass",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v, want nil so a taken email is not revealed", err)
+	}
+	if _, ok := usr.PendingEmailChange(); ok {
+		t.Error("PendingEmailChange() exists, want none for a taken email")
+	}
+	var attempts []user.EmailChangeToTakenAddressAttempted
+	for _, e := range usr.Events() {
+		if a, ok := e.(user.EmailChangeToTakenAddressAttempted); ok {
+			attempts = append(attempts, a)
+		}
+		if _, ok := e.(user.EmailChangeRequested); ok {
+			t.Error("recorded EmailChangeRequested for a taken email")
+		}
+	}
+	if len(attempts) != 1 || attempts[0].NewEmail != john.Email() {
+		t.Errorf("EmailChangeToTakenAddressAttempted events = %+v, want one for %q", attempts, john.Email())
 	}
 }

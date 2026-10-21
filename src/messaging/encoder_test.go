@@ -180,7 +180,7 @@ func newUserEmailChangeRequested(t *testing.T) user.EmailChangeRequested {
 	return user.EmailChangeRequested{
 		EventMeta: meta,
 		NewEmail:  mustEmail(t, "new@example.com"),
-		Token:     user.NewEmailChangeToken(),
+		Token:     user.NewConfirmationToken(),
 		ExpiresAt: meta.OccurredAt.Add(24 * time.Hour),
 	}
 }
@@ -238,6 +238,124 @@ func TestEncodeReturnsSealError(t *testing.T) {
 	_, err := newEncoder(fakeSealer{err: sealErr}).encode(newUserEmailChangeRequested(t))
 	if !errors.Is(err, sealErr) {
 		t.Errorf("encode() error = %v, want %v", err, sealErr)
+	}
+}
+
+func newUserRegistrationRequested(t *testing.T) user.RegistrationRequested {
+	t.Helper()
+	meta := newMeta()
+	return user.RegistrationRequested{
+		EventMeta: meta,
+		Email:     mustEmail(t, "jane@example.com"),
+		FullName:  user.NewFullName(mustName(t, "Jane"), mustName(t, "Doe")),
+		Token:     user.NewConfirmationToken(),
+		ExpiresAt: meta.OccurredAt.Add(24 * time.Hour),
+	}
+}
+
+func TestEncodeUserRegistrationRequested(t *testing.T) {
+	e := newUserRegistrationRequested(t)
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(RegistrationRequested) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID         string    `json:"userId"`
+			Email          string    `json:"email"`
+			FirstName      string    `json:"firstName"`
+			LastName       string    `json:"lastName"`
+			EncryptedToken []byte    `json:"encryptedToken"`
+			KeyID          string    `json:"keyId"`
+			ExpiresAt      time.Time `json:"expiresAt"`
+			RequestedAt    time.Time `json:"requestedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	if got.Type != "user.registration_requested" || got.Version != "1.0" {
+		t.Errorf("type, version = %q, %q; want user.registration_requested, 1.0", got.Type, got.Version)
+	}
+	d := got.Data
+	if d.UserID != e.AggregateID.String() || d.Email != "jane@example.com" || d.FirstName != "Jane" ||
+		d.LastName != "Doe" || d.KeyID != "test-key" ||
+		!d.ExpiresAt.Equal(e.ExpiresAt) || !d.RequestedAt.Equal(e.OccurredAt) {
+		t.Errorf("data = %+v", d)
+	}
+	if want := "sealed:" + e.Token.Plaintext(); string(d.EncryptedToken) != want {
+		t.Errorf("encryptedToken = %q, want %q", d.EncryptedToken, want)
+	}
+}
+
+func TestEncodeUserRegistrationRequestedHidesPlaintextToken(t *testing.T) {
+	e := newUserRegistrationRequested(t)
+
+	msg, err := newEncoder(fakeSealer{out: []byte("opaque")}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(RegistrationRequested) error: %v", err)
+	}
+	if bytes.Contains(msg.Value, []byte(e.Token.Plaintext())) {
+		t.Errorf("encoded message %s contains plaintext token", msg.Value)
+	}
+}
+
+func TestEncodeUserDuplicateRegistrationAttempted(t *testing.T) {
+	e := user.DuplicateRegistrationAttempted{EventMeta: newMeta(), Email: mustEmail(t, "jane@example.com")}
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(DuplicateRegistrationAttempted) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID      string    `json:"userId"`
+			Email       string    `json:"email"`
+			AttemptedAt time.Time `json:"attemptedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	want := payload{Type: "user.duplicate_registration_attempted", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.Email = "jane@example.com"
+	want.Data.AttemptedAt = e.OccurredAt
+	if got != want {
+		t.Errorf("encode(DuplicateRegistrationAttempted) payload = %+v, want %+v", got, want)
+	}
+}
+
+func TestEncodeUserEmailChangeToTakenAddressAttempted(t *testing.T) {
+	e := user.EmailChangeToTakenAddressAttempted{EventMeta: newMeta(), NewEmail: mustEmail(t, "taken@example.com")}
+
+	msg, err := newEncoder(fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(EmailChangeToTakenAddressAttempted) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID      string    `json:"userId"`
+			NewEmail    string    `json:"newEmail"`
+			AttemptedAt time.Time `json:"attemptedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	want := payload{Type: "user.email_change_to_taken_address_attempted", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.NewEmail = "taken@example.com"
+	want.Data.AttemptedAt = e.OccurredAt
+	if got != want {
+		t.Errorf("encode(EmailChangeToTakenAddressAttempted) payload = %+v, want %+v", got, want)
 	}
 }
 

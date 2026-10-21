@@ -28,6 +28,23 @@ type Registered struct {
 
 func (Registered) isEvent() {}
 
+type RegistrationRequested struct {
+	EventMeta
+	Email     Email
+	FullName  FullName
+	Token     ConfirmationToken
+	ExpiresAt time.Time
+}
+
+func (RegistrationRequested) isEvent() {}
+
+type DuplicateRegistrationAttempted struct {
+	EventMeta
+	Email Email
+}
+
+func (DuplicateRegistrationAttempted) isEvent() {}
+
 type Renamed struct {
 	EventMeta
 	FullName FullName
@@ -38,11 +55,18 @@ func (Renamed) isEvent() {}
 type EmailChangeRequested struct {
 	EventMeta
 	NewEmail  Email
-	Token     EmailChangeToken
+	Token     ConfirmationToken
 	ExpiresAt time.Time
 }
 
 func (EmailChangeRequested) isEvent() {}
+
+type EmailChangeToTakenAddressAttempted struct {
+	EventMeta
+	NewEmail Email
+}
+
+func (EmailChangeToTakenAddressAttempted) isEvent() {}
 
 type EmailChanged struct {
 	EventMeta

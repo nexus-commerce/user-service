@@ -8,7 +8,7 @@ import (
 )
 
 type confirmEmailChangeUsers interface {
-	UpdateByEmailChangeToken(ctx context.Context, hash user.EmailChangeTokenHash, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error)
 }
 
 type ConfirmEmailChange struct {
@@ -22,7 +22,7 @@ func NewConfirmEmailChange(users confirmEmailChangeUsers) *ConfirmEmailChange {
 }
 
 func (c *ConfirmEmailChange) Execute(ctx context.Context, rawToken string) error {
-	token, err := user.ParseEmailChangeToken(rawToken)
+	token, err := user.ParseConfirmationToken(rawToken)
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (c *ConfirmEmailChange) Execute(ctx context.Context, rawToken string) error
 		return usr.ConfirmEmailChange(token)
 	})
 	if errors.Is(err, user.ErrNotFound) {
-		return user.ErrInvalidEmailChangeToken
+		return user.ErrInvalidConfirmationToken
 	}
 	return err
 }

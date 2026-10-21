@@ -47,16 +47,13 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 	}
 
 	_, err = r.users.UpdateByID(ctx, req.UserID, func(usr *user.User) error {
-		if err := usr.RequestEmailChange(email, password, r.hasher); err != nil {
-			if errors.Is(err, user.ErrEmailUnchanged) {
-				return &FieldError{Field: FieldEmail, Err: err}
-			}
-			return err
-		}
 		if taken {
-			return user.ErrEmailTaken
+			return usr.AttemptEmailChangeToTakenAddress(email, password, r.hasher)
 		}
-		return nil
+		return usr.RequestEmailChange(email, password, r.hasher)
 	})
+	if errors.Is(err, user.ErrEmailUnchanged) {
+		return &FieldError{Field: FieldEmail, Err: err}
+	}
 	return err
 }

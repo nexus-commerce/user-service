@@ -77,7 +77,9 @@ func run() error {
 		return fmt.Errorf("create token sealer: %w", err)
 	}
 
-	users := postgres.NewUsers(db, messaging.NewPublisher(sealer))
+	publisher := messaging.NewPublisher(sealer)
+	users := postgres.NewUsers(db, publisher)
+	registrations := postgres.NewRegistrations(db, publisher)
 	tokens := jwt.NewTokens(jwt.Options{
 		Secret: cfg.JWT.Secret,
 		Issuer: cfg.JWT.Issuer,
@@ -89,7 +91,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create login use case: %w", err)
 	}
-	register := usecase.NewRegister(users, tokens, hasher)
+	register := usecase.NewRegister(users, registrations, hasher)
+	confirmRegistration := usecase.NewConfirmRegistration(registrations, tokens)
 	getUser := usecase.NewGetUser(users)
 	rename := usecase.NewRename(users)
 	requestEmailChange := usecase.NewRequestEmailChange(users, hasher)
@@ -109,6 +112,7 @@ func run() error {
 		http.NewHealth(),
 		http.NewLogin(login),
 		http.NewRegister(register),
+		http.NewConfirmRegistration(confirmRegistration),
 		http.NewGetUser(getUser),
 		http.NewRename(rename),
 		http.NewRequestEmailChange(requestEmailChange),

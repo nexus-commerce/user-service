@@ -18,9 +18,20 @@ func (fakeHasher) Verify(h user.PasswordHash, p user.Password) (bool, error) {
 	return h.Encoded() == "hashed:"+p.Plaintext(), nil
 }
 
+type countingHasher struct {
+	fakeHasher
+	hashes int
+}
+
+func (c *countingHasher) Hash(p user.Password) (user.PasswordHash, error) {
+	c.hashes++
+	return c.fakeHasher.Hash(p)
+}
+
 type fakeUsers struct {
-	byID      map[uuid.UUID]*user.User
-	updateErr error
+	byID           map[uuid.UUID]*user.User
+	updateErr      error
+	vanishOnRecord bool
 }
 
 func (f *fakeUsers) add(usr *user.User) {
@@ -66,13 +77,77 @@ func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(
 	return usr, nil
 }
 
-func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.EmailChangeTokenHash, updateFn func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) RecordByEmail(ctx context.Context, email user.Email, recordFn func(*user.User)) error {
+	if f.vanishOnRecord {
+		return user.ErrNotFound
+	}
+	usr, err := f.ByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	recordFn(usr)
+	return nil
+}
+
+func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error) {
 	for id, usr := range f.byID {
 		if p, ok := usr.PendingEmailChange(); ok && p.TokenHash() == hash {
 			return f.UpdateByID(ctx, id, updateFn)
 		}
 	}
 	return nil, user.ErrNotFound
+}
+
+type fakeRegistrations struct {
+	byEmail    map[user.Email]*user.PendingRegistration
+	users      *fakeUsers
+	confirmErr error
+}
+
+func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration) error {
+	if f.byEmail == nil {
+		f.byEmail = make(map[user.Email]*user.PendingRegistration)
+	}
+	f.byEmail[p.Email()] = p
+	return nil
+}
+
+func (f *fakeRegistrations) ConvertToUser(_ context.Context, hash user.ConfirmationTokenHash, confirmFn func(*user.PendingRegistration) (*user.User, error)) (*user.User, error) {
+	for email, p := range f.byEmail {
+		if p.TokenHash() != hash {
+			continue
+		}
+		usr, err := confirmFn(p)
+		if err != nil {
+			return nil, err
+		}
+		if f.confirmErr != nil {
+			return nil, f.confirmErr
+		}
+		delete(f.byEmail, email)
+		f.users.add(usr)
+		return usr, nil
+	}
+	return nil, user.ErrNotFound
+}
+
+func tokenFor(t *testing.T, regs *fakeRegistrations, email string) user.ConfirmationToken {
+	t.Helper()
+	e, err := user.NewEmail(email)
+	if err != nil {
+		t.Fatalf("NewEmail(%q) error: %v", email, err)
+	}
+	p, ok := regs.byEmail[e]
+	if !ok {
+		t.Fatalf("no pending registration for %q", email)
+	}
+	for _, ev := range p.Events() {
+		if r, ok := ev.(user.RegistrationRequested); ok {
+			return r.Token
+		}
+	}
+	t.Fatalf("no RegistrationRequested event for %q", email)
+	return user.ConfirmationToken{}
 }
 
 func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.User {
@@ -93,9 +168,19 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err != nil {
 		t.Fatalf("NewPassword() error: %v", err)
 	}
-	usr, err := user.New(e, user.NewFullName(fn, ln), password, fakeHasher{})
+	p, err := user.RequestRegistration(e, user.NewFullName(fn, ln), password, fakeHasher{})
 	if err != nil {
-		t.Fatalf("NewUser() error: %v", err)
+		t.Fatalf("RequestRegistration() error: %v", err)
+	}
+	var token user.ConfirmationToken
+	for _, ev := range p.Events() {
+		if r, ok := ev.(user.RegistrationRequested); ok {
+			token = r.Token
+		}
+	}
+	usr, err := p.Confirm(token)
+	if err != nil {
+		t.Fatalf("Confirm() error: %v", err)
 	}
 	users.add(usr)
 	return usr

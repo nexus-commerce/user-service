@@ -44,20 +44,15 @@ func (r *registerRequest) toRegistration() usecase.Registration {
 	}
 }
 
-type registerResponse struct {
-	Token string `json:"token"`
-}
-
 // ServeHTTP godoc
 // @Summary     Register
-// @Description Creates a new user account, publishes a user.registered event and returns a JWT token
+// @Description Starts a sign-up: sends a confirmation link to a new email or an "account already exists" notice to a registered one. The response does not reveal which.
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
 // @Param       request  body      registerRequest   true  "Registration data"
-// @Success     200      {object}  registerResponse
+// @Success     202
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match"
-// @Failure     409      {object}  errorResponse  "User with this email already exists"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register [post]
@@ -68,21 +63,17 @@ func (h *Register) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.uc.Execute(r.Context(), reqBody.toRegistration())
+	err = h.uc.Execute(r.Context(), reqBody.toRegistration())
 	if err != nil {
-		switch {
-		case errors.Is(err, user.ErrValidation):
+		if errors.Is(err, user.ErrValidation) {
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registerFields))
-			return
-		case errors.Is(err, user.ErrEmailTaken):
-			writeError(rw, r, http.StatusConflict, msgEmailTaken)
 			return
 		}
 		writeInternalError(rw, r, err)
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, registerResponse{Token: token})
+	rw.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Register) Route() Route {

@@ -5,6 +5,16 @@ definitions:
       token:
         type: string
     type: object
+  http.confirmRegistrationRequest:
+    properties:
+      token:
+        type: string
+    type: object
+  http.confirmRegistrationResponse:
+    properties:
+      token:
+        type: string
+    type: object
   http.errorResponse:
     properties:
       error:
@@ -33,11 +43,6 @@ definitions:
       password:
         type: string
       passwordConfirmation:
-        type: string
-    type: object
-  http.registerResponse:
-    properties:
-      token:
         type: string
     type: object
   http.renameRequest:
@@ -118,8 +123,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new user account, publishes a user.registered event and
-        returns a JWT token
+      description: 'Starts a sign-up: sends a confirmation link to a new email or
+        an "account already exists" notice to a registered one. The response does
+        not reveal which.'
       parameters:
       - description: Registration data
         in: body
@@ -130,13 +136,48 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/http.registerResponse'
+        "202":
+          description: Accepted
         "400":
           description: Invalid request, empty or too long fields, too short password,
             malformed email or passwords do not match
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "413":
+          description: Request body too large
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.errorResponse'
+      summary: Register
+      tags:
+      - Auth
+  /auth/register/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Confirms a pending registration with the token from the confirmation
+        link, creates the user account, publishes a user.registered event and returns
+        a JWT token
+      parameters:
+      - description: Confirmation token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.confirmRegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.confirmRegistrationResponse'
+        "400":
+          description: Invalid request, invalid, already used or expired confirmation
+            link
           schema:
             $ref: '#/definitions/http.errorResponse'
         "409":
@@ -151,7 +192,7 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/http.errorResponse'
-      summary: Register
+      summary: Confirm registration
       tags:
       - Auth
   /docs:
@@ -312,7 +353,9 @@ paths:
       consumes:
       - application/json
       description: Starts an email change for the authenticated user; the new email
-        takes effect only after it is confirmed via the link sent to it
+        takes effect only after it is confirmed via the link sent to it. If the new
+        email already belongs to another account, the response is the same and that
+        address gets a notice instead of a link
       parameters:
       - description: New email and current password
         in: body
@@ -340,10 +383,6 @@ paths:
             $ref: '#/definitions/http.errorResponse'
         "404":
           description: User not found
-          schema:
-            $ref: '#/definitions/http.errorResponse'
-        "409":
-          description: User with this email already exists
           schema:
             $ref: '#/definitions/http.errorResponse'
         "413":

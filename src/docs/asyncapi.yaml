@@ -2,7 +2,7 @@ asyncapi: 3.0.0
 
 info:
   title: User Service Events
-  version: 0.2.0
+  version: 0.4.0
   description: |
     Events published by the User Service.
 
@@ -29,10 +29,16 @@ channels:
     messages:
       userRegistered:
         $ref: '#/components/messages/UserRegistered'
+      userRegistrationRequested:
+        $ref: '#/components/messages/UserRegistrationRequested'
+      userDuplicateRegistrationAttempted:
+        $ref: '#/components/messages/UserDuplicateRegistrationAttempted'
       userRenamed:
         $ref: '#/components/messages/UserRenamed'
       userEmailChangeRequested:
         $ref: '#/components/messages/UserEmailChangeRequested'
+      userEmailChangeToTakenAddressAttempted:
+        $ref: '#/components/messages/UserEmailChangeToTakenAddressAttempted'
       userEmailChanged:
         $ref: '#/components/messages/UserEmailChanged'
 
@@ -41,9 +47,23 @@ operations:
     action: send
     channel:
       $ref: '#/channels/users'
-    summary: Announces that a new user has signed up.
+    summary: Announces that a new user has confirmed their email and the account now exists.
     messages:
       - $ref: '#/channels/users/messages/userRegistered'
+  publishUserRegistrationRequested:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Asks for a confirmation link to be sent to the email of a new sign-up.
+    messages:
+      - $ref: '#/channels/users/messages/userRegistrationRequested'
+  publishUserDuplicateRegistrationAttempted:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Asks for an "account already exists" notice to be sent to the email of an existing user.
+    messages:
+      - $ref: '#/channels/users/messages/userDuplicateRegistrationAttempted'
   publishUserRenamed:
     action: send
     channel:
@@ -58,6 +78,13 @@ operations:
     summary: Asks for a confirmation link to be sent to the new email of a user.
     messages:
       - $ref: '#/channels/users/messages/userEmailChangeRequested'
+  publishUserEmailChangeToTakenAddressAttempted:
+    action: send
+    channel:
+      $ref: '#/channels/users'
+    summary: Asks for an "address already in use" notice to be sent to an email that a user tried to switch to.
+    messages:
+      - $ref: '#/channels/users/messages/userEmailChangeToTakenAddressAttempted'
   publishUserEmailChanged:
     action: send
     channel:
@@ -95,6 +122,63 @@ components:
               firstName: Jane
               lastName: Doe
               createdAt: '2026-10-14T19:30:00Z'
+
+    UserRegistrationRequested:
+      name: UserRegistrationRequested
+      title: Registration requested
+      summary: Someone signed up; the account is created only after the link sent to that email is opened.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserRegistrationRequestedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID the user will get once the email is confirmed; same key as the later user.registered event.
+      examples:
+        - name: userRegistrationRequested
+          summary: Someone signs up.
+          payload:
+            eventId: 2c4e6a8b-0d1f-4a3c-8e5b-7d9f1b3c5e7a
+            eventType: user.registration_requested
+            timestamp: '2026-10-14T19:25:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              email: jane.doe@example.com
+              firstName: Jane
+              lastName: Doe
+              encryptedToken: q3J0bXlFbmNyeXB0ZWRUb2tlbkV4YW1wbGVCeXRlcw==
+              keyId: '2026-10'
+              expiresAt: '2026-10-15T19:25:00Z'
+              requestedAt: '2026-10-14T19:25:00Z'
+
+    UserDuplicateRegistrationAttempted:
+      name: UserDuplicateRegistrationAttempted
+      title: Duplicate registration attempted
+      summary: Someone tried to sign up with the email of an existing user; the owner of that email should be told the account already exists.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserDuplicateRegistrationAttemptedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the existing user.
+      examples:
+        - name: userDuplicateRegistrationAttempted
+          summary: Someone signs up with a taken email.
+          payload:
+            eventId: 8f6d4b2a-0e9c-4a7b-9d5f-3b1e9c7a5d3f
+            eventType: user.duplicate_registration_attempted
+            timestamp: '2026-10-20T12:00:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              email: jane.doe@example.com
+              attemptedAt: '2026-10-20T12:00:00Z'
 
     UserRenamed:
       name: UserRenamed
@@ -151,6 +235,34 @@ components:
               keyId: '2026-10'
               expiresAt: '2026-10-21T11:00:00Z'
               requestedAt: '2026-10-20T11:00:00Z'
+
+    UserEmailChangeToTakenAddressAttempted:
+      name: UserEmailChangeToTakenAddressAttempted
+      title: Email change to taken address attempted
+      summary: >-
+        A user asked to switch to an email that already belongs to another account; no change was started.
+        The owner of that email should be told it is already in use, without revealing who asked.
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/UserEmailChangeToTakenAddressAttemptedEnvelope'
+      bindings:
+        kafka:
+          key:
+            type: string
+            format: uuid
+            description: ID of the user who asked for the change, not of the owner of the email.
+      examples:
+        - name: userEmailChangeToTakenAddressAttempted
+          summary: A user asks to switch to an email of another account.
+          payload:
+            eventId: 4b3a2f1e-0d9c-4b8a-a7f6-5e4d3c2b1a0f
+            eventType: user.email_change_to_taken_address_attempted
+            timestamp: '2026-10-20T11:30:00Z'
+            version: '1.0'
+            data:
+              userId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              newEmail: john.roe@example.com
+              attemptedAt: '2026-10-20T11:30:00Z'
 
     UserEmailChanged:
       name: UserEmailChanged
@@ -218,6 +330,99 @@ components:
         lastName:
           type: string
         createdAt:
+          type: string
+          format: date-time
+
+    UserRegistrationRequestedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.registration_requested
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserRegistrationRequestedData'
+
+    UserRegistrationRequestedData:
+      type: object
+      required: [userId, email, firstName, lastName, encryptedToken, keyId, expiresAt, requestedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID the user will get once the email is confirmed.
+        email:
+          type: string
+          format: email
+          description: Normalized to lowercase. The confirmation link must be sent here.
+        firstName:
+          type: string
+        lastName:
+          type: string
+        encryptedToken:
+          type: string
+          contentEncoding: base64
+          description: >-
+            Base64 NaCl anonymous sealed box of the confirmation token, sealed with the
+            notification-service public key identified by `keyId`.
+        keyId:
+          type: string
+          description: ID of the notification-service key pair used to seal `encryptedToken`.
+        expiresAt:
+          type: string
+          format: date-time
+          description: The confirmation link stops working after this time.
+        requestedAt:
+          type: string
+          format: date-time
+
+    UserDuplicateRegistrationAttemptedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.duplicate_registration_attempted
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserDuplicateRegistrationAttemptedData'
+
+    UserDuplicateRegistrationAttemptedData:
+      type: object
+      required: [userId, email, attemptedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID of the existing user.
+        email:
+          type: string
+          format: email
+          description: Normalized to lowercase. The notice must be sent here.
+        attemptedAt:
           type: string
           format: date-time
 
@@ -305,6 +510,44 @@ components:
           format: date-time
           description: The confirmation link stops working after this time.
         requestedAt:
+          type: string
+          format: date-time
+
+    UserEmailChangeToTakenAddressAttemptedEnvelope:
+      type: object
+      required: [eventId, eventType, timestamp, version, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique ID of the event; use it to deduplicate.
+        eventType:
+          type: string
+          const: user.email_change_to_taken_address_attempted
+        timestamp:
+          type: string
+          format: date-time
+          description: Time the event was created, in UTC.
+        version:
+          type: string
+          const: '1.0'
+          description: Version of the data schema.
+        data:
+          $ref: '#/components/schemas/UserEmailChangeToTakenAddressAttemptedData'
+
+    UserEmailChangeToTakenAddressAttemptedData:
+      type: object
+      required: [userId, newEmail, attemptedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID of the user who asked for the change. Must not be disclosed in the notice.
+        newEmail:
+          type: string
+          format: email
+          description: Normalized to lowercase. The notice must be sent here.
+        attemptedAt:
           type: string
           format: date-time
 

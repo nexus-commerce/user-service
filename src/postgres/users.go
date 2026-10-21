@@ -70,9 +70,27 @@ func (u *Users) UpdateByID(
 	return u.update(ctx, selectUser+` WHERE u.id = $1 FOR UPDATE OF u`, id.String(), updateFn)
 }
 
+func (u *Users) RecordByEmail(ctx context.Context, email user.Email, recordFn func(*user.User)) error {
+	query := selectUser + ` WHERE u.email = $1`
+
+	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
+		usr, err := scanUser(tx.QueryRowContext(ctx, query, email.String()))
+		if err != nil {
+			if errors.Is(err, user.ErrNotFound) {
+				return err
+			}
+			return fmt.Errorf("select user by email: %w", err)
+		}
+
+		recordFn(usr)
+
+		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
+	})
+}
+
 func (u *Users) UpdateByEmailChangeToken(
 	ctx context.Context,
-	hash user.EmailChangeTokenHash,
+	hash user.ConfirmationTokenHash,
 	updateFn func(*user.User) error,
 ) (*user.User, error) {
 	return u.update(ctx, selectUser+` WHERE p.token_hash = $1 FOR UPDATE OF u`, hash.Encoded(), updateFn)
@@ -127,27 +145,24 @@ func (u *Users) update(
 	return usr, nil
 }
 
-func (u *Users) Add(ctx context.Context, usr *user.User) error {
+func insertUser(ctx context.Context, tx *sql.Tx, usr *user.User) error {
 	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)`
 
-	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, query,
-			usr.ID().String(),
-			usr.FullName().FirstName().String(),
-			usr.FullName().LastName().String(),
-			usr.Email().String(),
-			usr.PasswordHash().Encoded(),
-			usr.CreatedAt(),
-		)
-		if err != nil {
-			if isEmailUniqueViolation(err) {
-				return user.ErrEmailTaken
-			}
-			return fmt.Errorf("insert user: %w", err)
+	_, err := tx.ExecContext(ctx, query,
+		usr.ID().String(),
+		usr.FullName().FirstName().String(),
+		usr.FullName().LastName().String(),
+		usr.Email().String(),
+		usr.PasswordHash().Encoded(),
+		usr.CreatedAt(),
+	)
+	if err != nil {
+		if isEmailUniqueViolation(err) {
+			return user.ErrEmailTaken
 		}
-
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
-	})
+		return fmt.Errorf("insert user: %w", err)
+	}
+	return nil
 }
 
 func savePendingEmailChange(ctx context.Context, tx *sql.Tx, usr *user.User) error {
@@ -209,7 +224,7 @@ func scanUser(row *sql.Row) (*user.User, error) {
 	if pendingEmail.Valid {
 		p := user.RestorePendingEmailChange(
 			user.RestoreEmail(pendingEmail.String),
-			user.RestoreEmailChangeTokenHash(pendingTokenHash.String),
+			user.RestoreConfirmationTokenHash(pendingTokenHash.String),
 			pendingExpiresAt.Time,
 		)
 		pending = &p

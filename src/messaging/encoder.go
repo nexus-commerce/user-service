@@ -12,10 +12,13 @@ import (
 const (
 	topicUsers = "users"
 
-	typeUserRegistered           = "user.registered"
-	typeUserRenamed              = "user.renamed"
-	typeUserEmailChangeRequested = "user.email_change_requested"
-	typeUserEmailChanged         = "user.email_changed"
+	typeUserRegistered                         = "user.registered"
+	typeUserRegistrationRequested              = "user.registration_requested"
+	typeUserDuplicateRegistrationAttempted     = "user.duplicate_registration_attempted"
+	typeUserRenamed                            = "user.renamed"
+	typeUserEmailChangeRequested               = "user.email_change_requested"
+	typeUserEmailChangeToTakenAddressAttempted = "user.email_change_to_taken_address_attempted"
+	typeUserEmailChanged                       = "user.email_changed"
 )
 
 type Sealer interface {
@@ -57,6 +60,16 @@ func newEncoder(sealer Sealer) *encoder {
 	}, convertRegistered))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
+		typ:     typeUserRegistrationRequested,
+		version: "1.0",
+	}, enc.convertRegistrationRequested))
+	enc.register(newRoute(destination{
+		topic:   topicUsers,
+		typ:     typeUserDuplicateRegistrationAttempted,
+		version: "1.0",
+	}, convertDuplicateRegistrationAttempted))
+	enc.register(newRoute(destination{
+		topic:   topicUsers,
 		typ:     typeUserRenamed,
 		version: "1.0",
 	}, convertRenamed))
@@ -65,6 +78,11 @@ func newEncoder(sealer Sealer) *encoder {
 		typ:     typeUserEmailChangeRequested,
 		version: "1.0",
 	}, enc.convertEmailChangeRequested))
+	enc.register(newRoute(destination{
+		topic:   topicUsers,
+		typ:     typeUserEmailChangeToTakenAddressAttempted,
+		version: "1.0",
+	}, convertEmailChangeToTakenAddressAttempted))
 	enc.register(newRoute(destination{
 		topic:   topicUsers,
 		typ:     typeUserEmailChanged,
@@ -134,6 +152,48 @@ func convertRegistered(e user.Registered) (any, error) {
 	}, nil
 }
 
+type userRegistrationRequested struct {
+	UserID         string    `json:"userId"`
+	Email          string    `json:"email"`
+	FirstName      string    `json:"firstName"`
+	LastName       string    `json:"lastName"`
+	EncryptedToken []byte    `json:"encryptedToken"`
+	KeyID          string    `json:"keyId"`
+	ExpiresAt      time.Time `json:"expiresAt"`
+	RequestedAt    time.Time `json:"requestedAt"`
+}
+
+func (enc *encoder) convertRegistrationRequested(e user.RegistrationRequested) (any, error) {
+	sealed, err := enc.sealer.Seal([]byte(e.Token.Plaintext()))
+	if err != nil {
+		return nil, fmt.Errorf("seal registration token: %w", err)
+	}
+	return userRegistrationRequested{
+		UserID:         e.AggregateID.String(),
+		Email:          e.Email.String(),
+		FirstName:      e.FullName.FirstName().String(),
+		LastName:       e.FullName.LastName().String(),
+		EncryptedToken: sealed,
+		KeyID:          enc.sealer.KeyID(),
+		ExpiresAt:      e.ExpiresAt,
+		RequestedAt:    e.OccurredAt,
+	}, nil
+}
+
+type userDuplicateRegistrationAttempted struct {
+	UserID      string    `json:"userId"`
+	Email       string    `json:"email"`
+	AttemptedAt time.Time `json:"attemptedAt"`
+}
+
+func convertDuplicateRegistrationAttempted(e user.DuplicateRegistrationAttempted) (any, error) {
+	return userDuplicateRegistrationAttempted{
+		UserID:      e.AggregateID.String(),
+		Email:       e.Email.String(),
+		AttemptedAt: e.OccurredAt,
+	}, nil
+}
+
 type userRenamed struct {
 	UserID    string    `json:"userId"`
 	FirstName string    `json:"firstName"`
@@ -171,6 +231,20 @@ func (enc *encoder) convertEmailChangeRequested(e user.EmailChangeRequested) (an
 		KeyID:          enc.sealer.KeyID(),
 		ExpiresAt:      e.ExpiresAt,
 		RequestedAt:    e.OccurredAt,
+	}, nil
+}
+
+type userEmailChangeToTakenAddressAttempted struct {
+	UserID      string    `json:"userId"`
+	NewEmail    string    `json:"newEmail"`
+	AttemptedAt time.Time `json:"attemptedAt"`
+}
+
+func convertEmailChangeToTakenAddressAttempted(e user.EmailChangeToTakenAddressAttempted) (any, error) {
+	return userEmailChangeToTakenAddressAttempted{
+		UserID:      e.AggregateID.String(),
+		NewEmail:    e.NewEmail.String(),
+		AttemptedAt: e.OccurredAt,
 	}, nil
 }
 

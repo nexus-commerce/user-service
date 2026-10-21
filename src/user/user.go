@@ -25,26 +25,6 @@ type User struct {
 	events []Event
 }
 
-func New(email Email, name FullName, password Password, hasher Hasher) (*User, error) {
-	hash, err := hasher.Hash(password)
-	if err != nil {
-		return nil, err
-	}
-	u := &User{
-		id:           uuid.New(),
-		email:        email,
-		fullName:     name,
-		passwordHash: hash,
-		createdAt:    time.Now().UTC(),
-	}
-	u.events = append(u.events, Registered{
-		EventMeta: u.newEventMeta(u.createdAt),
-		Email:     u.email,
-		FullName:  u.fullName,
-	})
-	return u, nil
-}
-
 func Restore(id uuid.UUID, email Email, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
 	return &User{
 		id:           id,
@@ -84,15 +64,19 @@ func (u *User) Rename(name FullName) {
 	})
 }
 
+func (u *User) RecordDuplicateRegistration() {
+	u.events = append(u.events, DuplicateRegistrationAttempted{
+		EventMeta: u.newEventMeta(time.Now().UTC()),
+		Email:     u.email,
+	})
+}
+
 func (u *User) RequestEmailChange(newEmail Email, password Password, hasher Hasher) error {
-	if err := u.Authenticate(password, hasher); err != nil {
+	if err := u.authorizeEmailChange(newEmail, password, hasher); err != nil {
 		return err
 	}
-	if newEmail == u.email {
-		return ErrEmailUnchanged
-	}
 	now := time.Now().UTC()
-	token := NewEmailChangeToken()
+	token := NewConfirmationToken()
 	u.pending = &PendingEmailChange{
 		email:     newEmail,
 		tokenHash: token.Hash(),
@@ -107,13 +91,34 @@ func (u *User) RequestEmailChange(newEmail Email, password Password, hasher Hash
 	return nil
 }
 
-func (u *User) ConfirmEmailChange(token EmailChangeToken) error {
+func (u *User) AttemptEmailChangeToTakenAddress(newEmail Email, password Password, hasher Hasher) error {
+	if err := u.authorizeEmailChange(newEmail, password, hasher); err != nil {
+		return err
+	}
+	u.events = append(u.events, EmailChangeToTakenAddressAttempted{
+		EventMeta: u.newEventMeta(time.Now().UTC()),
+		NewEmail:  newEmail,
+	})
+	return nil
+}
+
+func (u *User) authorizeEmailChange(newEmail Email, password Password, hasher Hasher) error {
+	if err := u.Authenticate(password, hasher); err != nil {
+		return err
+	}
+	if newEmail == u.email {
+		return ErrEmailUnchanged
+	}
+	return nil
+}
+
+func (u *User) ConfirmEmailChange(token ConfirmationToken) error {
 	if u.pending == nil || token.Hash() != u.pending.tokenHash {
-		return ErrInvalidEmailChangeToken
+		return ErrInvalidConfirmationToken
 	}
 	now := time.Now().UTC()
 	if now.After(u.pending.expiresAt) {
-		return ErrEmailChangeTokenExpired
+		return ErrConfirmationTokenExpired
 	}
 	old := u.email
 	u.email = u.pending.email

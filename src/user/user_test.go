@@ -51,53 +51,8 @@ func fieldsOf(n user.FullName) nameFields {
 	}
 }
 
-func TestNewUserRecordsRegistration(t *testing.T) {
-	email := mustEmail(t, janeEmail)
-	name := mustFullName(t, janeDoe)
-	password := mustPassword(t, "s3cretpass")
-
-	u, err := user.New(email, name, password, fakeHasher{})
-	if err != nil {
-		t.Fatalf("NewUser() error: %v", err)
-	}
-	if err := u.Authenticate(password, fakeHasher{}); err != nil {
-		t.Errorf("Authenticate = %v, want nil", err)
-	}
-
-	events := u.Events()
-	if len(events) != 1 {
-		t.Fatalf("Events() returned %d events, want 1", len(events))
-	}
-	reg, ok := events[0].(user.Registered)
-	if !ok {
-		t.Fatalf("Events()[0] is %T, want Registered", events[0])
-	}
-	if reg.ID == uuid.Nil() {
-		t.Errorf("Events()[0].ID = nil, want non-nil")
-	}
-	want := user.Registered{
-		ID:          reg.ID,
-		AggregateID: u.ID(),
-		OccurredAt:  u.CreatedAt(),
-		Email:       email,
-		FullName:    name,
-	}
-	if reg != want {
-		t.Errorf("Events()[0] = %+v, want %+v", reg, want)
-	}
-
-	again := u.Events()
-	if len(again) != 1 || again[0].(user.Registered).ID != reg.ID {
-		t.Error("Events must return the same recorded events with stable IDs")
-	}
-}
-
 func TestEventsReturnsCopy(t *testing.T) {
-	password := mustPassword(t, "s3cretpass")
-	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
-	if err != nil {
-		t.Fatalf("NewUser() error: %v", err)
-	}
+	u := mustUser(t)
 
 	events := u.Events()
 	events[0] = nil
@@ -109,9 +64,10 @@ func TestEventsReturnsCopy(t *testing.T) {
 
 func mustUser(t *testing.T) *user.User {
 	t.Helper()
-	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), mustPassword(t, "s3cretpass"), fakeHasher{})
+	p, tok := mustPending(t)
+	u, err := p.Confirm(tok)
 	if err != nil {
-		t.Fatalf("NewUser() error: %v", err)
+		t.Fatalf("Confirm() error: %v", err)
 	}
 	return u
 }
@@ -136,7 +92,7 @@ func TestRestoreName(t *testing.T) {
 	}
 }
 
-func TestRestoreUser(t *testing.T) {
+func TestRestore(t *testing.T) {
 	password := mustPassword(t, "s3cretpass")
 	hash, err := fakeHasher{}.Hash(password)
 	if err != nil {
@@ -152,24 +108,20 @@ func TestRestoreUser(t *testing.T) {
 	got := fieldsOf(u.FullName())
 	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
-		t.Errorf("RestoreUser() = {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}, want {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}",
+		t.Errorf("Restore() = {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}, want {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}",
 			u.ID(), u.Email(), got, u.PasswordHash().Encoded(), u.CreatedAt(), id, legacyEmail, fields, hash.Encoded(), createdAt)
 	}
 	if err := u.Authenticate(password, fakeHasher{}); err != nil {
 		t.Errorf("Authenticate = %v, want nil", err)
 	}
 	if events := u.Events(); len(events) != 0 {
-		t.Errorf("Events() after RestoreUser returned %d events, want 0", len(events))
+		t.Errorf("Events() after Restore returned %d events, want 0", len(events))
 	}
 }
 
 func TestAuthenticateRejectsWrongPassword(t *testing.T) {
-	password := mustPassword(t, "s3cretpass")
 	other := mustPassword(t, "otherpass")
-	u, err := user.New(mustEmail(t, janeEmail), mustFullName(t, janeDoe), password, fakeHasher{})
-	if err != nil {
-		t.Fatalf("NewUser() error: %v", err)
-	}
+	u := mustUser(t)
 
 	if err := u.Authenticate(other, fakeHasher{}); !errors.Is(err, user.ErrInvalidCredentials) {
 		t.Errorf("Authenticate(wrong) = %v, want %v", err, user.ErrInvalidCredentials)
@@ -269,8 +221,61 @@ func TestRequestEmailChange(t *testing.T) {
 	})
 }
 
+func TestAttemptEmailChangeToTakenAddress(t *testing.T) {
+	attempt := func(t *testing.T, u *user.User, email, password string) error {
+		t.Helper()
+		return u.AttemptEmailChangeToTakenAddress(mustEmail(t, email), mustPassword(t, password), fakeHasher{})
+	}
+	t.Run("records event without pending change", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			u := mustUser(t)
+			if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
+				t.Fatalf("AttemptEmailChangeToTakenAddress() error: %v", err)
+			}
+			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
+				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+			}
+			events := eventsOf[user.EmailChangeToTakenAddressAttempted](u)
+			if len(events) != 1 {
+				t.Fatalf("recorded %d EmailChangeToTakenAddressAttempted, want 1", len(events))
+			}
+			if e := events[0]; e.AggregateID != u.ID() || e.NewEmail.String() != "taken@example.com" || !e.OccurredAt.Equal(time.Now()) {
+				t.Errorf("EmailChangeToTakenAddressAttempted = %+v", e)
+			}
+		})
+	})
+	t.Run("keeps existing pending change", func(t *testing.T) {
+		u := mustUser(t)
+		if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
+			t.Fatalf("RequestEmailChange() error: %v", err)
+		}
+		if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
+			t.Fatalf("AttemptEmailChangeToTakenAddress() error: %v", err)
+		}
+		if p, ok := u.PendingEmailChange(); !ok || p.Email().String() != "new@example.com" {
+			t.Errorf("pending = %+v, %v; want new@example.com", p, ok)
+		}
+	})
+	t.Run("wrong password", func(t *testing.T) {
+		u := mustUser(t)
+		if err := attempt(t, u, "taken@example.com", "wrongpass"); !errors.Is(err, user.ErrInvalidCredentials) {
+			t.Errorf("error = %v, want %v", err, user.ErrInvalidCredentials)
+		}
+		if n := len(eventsOf[user.EmailChangeToTakenAddressAttempted](u)); n != 0 {
+			t.Errorf("recorded %d EmailChangeToTakenAddressAttempted, want 0", n)
+		}
+	})
+	t.Run("own email", func(t *testing.T) {
+		u := mustUser(t)
+		err := attempt(t, u, "Jane@Example.com", "s3cretpass")
+		if !errors.Is(err, user.ErrEmailUnchanged) {
+			t.Errorf("error = %v, want %v", err, user.ErrEmailUnchanged)
+		}
+	})
+}
+
 func TestConfirmEmailChange(t *testing.T) {
-	requested := func(t *testing.T) (*user.User, user.EmailChangeToken) {
+	requested := func(t *testing.T) (*user.User, user.ConfirmationToken) {
 		u := mustUser(t)
 		if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
 			t.Fatalf("RequestEmailChange() error: %v", err)
@@ -298,8 +303,8 @@ func TestConfirmEmailChange(t *testing.T) {
 			u, tok := requested(t)
 			time.Sleep(24*time.Hour + time.Nanosecond)
 			err := u.ConfirmEmailChange(tok)
-			if !errors.Is(err, user.ErrEmailChangeTokenExpired) || u.Email().String() != "jane@example.com" {
-				t.Errorf("error = %v, email = %q; want %v, unchanged", err, u.Email(), user.ErrEmailChangeTokenExpired)
+			if !errors.Is(err, user.ErrConfirmationTokenExpired) || u.Email().String() != "jane@example.com" {
+				t.Errorf("error = %v, email = %q; want %v, unchanged", err, u.Email(), user.ErrConfirmationTokenExpired)
 			}
 		})
 	})
@@ -308,24 +313,45 @@ func TestConfirmEmailChange(t *testing.T) {
 		if err := requestChange(t, u, "other@example.com", "s3cretpass"); err != nil {
 			t.Fatalf("second RequestEmailChange() error: %v", err)
 		}
-		if err := u.ConfirmEmailChange(old); !errors.Is(err, user.ErrInvalidEmailChangeToken) {
-			t.Errorf("confirm with superseded token = %v, want %v", err, user.ErrInvalidEmailChangeToken)
+		if err := u.ConfirmEmailChange(old); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("confirm with superseded token = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 	t.Run("no pending change", func(t *testing.T) {
 		u := mustUser(t)
-		if err := u.ConfirmEmailChange(user.NewEmailChangeToken()); !errors.Is(err, user.ErrInvalidEmailChangeToken) {
-			t.Errorf("error = %v, want %v", err, user.ErrInvalidEmailChangeToken)
+		if err := u.ConfirmEmailChange(user.NewConfirmationToken()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 }
 
-func TestRestoreUserWithPendingEmailChange(t *testing.T) {
-	tok := user.NewEmailChangeToken()
+func TestRestoreWithPendingEmailChange(t *testing.T) {
+	tok := user.NewConfirmationToken()
 	expiresAt := time.Now().Add(time.Hour)
 	pending := user.RestorePendingEmailChange(user.RestoreEmail("new@example.com"), tok.Hash(), expiresAt)
 	u := user.Restore(uuid.New(), user.RestoreEmail(janeEmail), mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
 	if err := u.ConfirmEmailChange(tok); err != nil {
 		t.Errorf("ConfirmEmailChange() on restored user error: %v", err)
+	}
+}
+
+func TestRecordDuplicateRegistration(t *testing.T) {
+	u := mustUser(t)
+	email, name, hash := u.Email(), u.FullName(), u.PasswordHash()
+	before := len(u.Events())
+	u.RecordDuplicateRegistration()
+	events := u.Events()
+	if len(events) != before+1 {
+		t.Fatalf("recorded %d events, want %d", len(events), before+1)
+	}
+	e, ok := events[len(events)-1].(user.DuplicateRegistrationAttempted)
+	if !ok {
+		t.Fatalf("last event = %T, want user.DuplicateRegistrationAttempted", events[len(events)-1])
+	}
+	if e.AggregateID != u.ID() || e.Email != u.Email() {
+		t.Errorf("DuplicateRegistrationAttempted = %+v", e)
+	}
+	if u.Email() != email || u.FullName() != name || u.PasswordHash() != hash {
+		t.Errorf("user state changed after RecordDuplicateRegistration")
 	}
 }

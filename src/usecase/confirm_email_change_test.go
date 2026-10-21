@@ -11,7 +11,7 @@ import (
 	"github.com/nexus-commerce/user-service/src/user"
 )
 
-func requestedJane(t *testing.T) (*user.User, *fakeUsers, user.EmailChangeToken) {
+func requestedJane(t *testing.T) (*user.User, *fakeUsers, user.ConfirmationToken) {
 	t.Helper()
 	usr, users := newJane(t)
 	email, err := user.NewEmail("new@example.com")
@@ -31,7 +31,7 @@ func requestedJane(t *testing.T) (*user.User, *fakeUsers, user.EmailChangeToken)
 		}
 	}
 	t.Fatal("no EmailChangeRequested event")
-	return nil, nil, user.EmailChangeToken{}
+	return nil, nil, user.ConfirmationToken{}
 }
 
 func TestConfirmEmailChange(t *testing.T) {
@@ -56,10 +56,10 @@ func TestConfirmEmailChange(t *testing.T) {
 
 func TestConfirmEmailChangeRejectsBadToken(t *testing.T) {
 	_, users, _ := requestedJane(t)
-	for _, token := range []string{"", "abc", strings.Repeat("!", 43), user.NewEmailChangeToken().Plaintext()} {
+	for _, token := range []string{"", "abc", strings.Repeat("!", 43), user.NewConfirmationToken().Plaintext()} {
 		err := usecase.NewConfirmEmailChange(users).Execute(t.Context(), token)
-		if !errors.Is(err, user.ErrInvalidEmailChangeToken) {
-			t.Errorf("Execute(%q) error = %v, want %v", token, err, user.ErrInvalidEmailChangeToken)
+		if !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("Execute(%q) error = %v, want %v", token, err, user.ErrInvalidConfirmationToken)
 		}
 	}
 }
@@ -80,8 +80,8 @@ func TestConfirmEmailChangeExpired(t *testing.T) {
 		time.Sleep(25 * time.Hour)
 
 		err := usecase.NewConfirmEmailChange(users).Execute(t.Context(), tok.Plaintext())
-		if !errors.Is(err, user.ErrEmailChangeTokenExpired) {
-			t.Errorf("Execute() error = %v, want %v", err, user.ErrEmailChangeTokenExpired)
+		if !errors.Is(err, user.ErrConfirmationTokenExpired) {
+			t.Errorf("Execute() error = %v, want %v", err, user.ErrConfirmationTokenExpired)
 		}
 		if got := usr.Email().String(); got != "jane@example.com" {
 			t.Errorf("Email() = %q, want unchanged", got)

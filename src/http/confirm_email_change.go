@@ -45,10 +45,10 @@ func (h *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 	err = h.uc.Execute(r.Context(), reqBody.Token)
 	if err != nil {
 		switch {
-		case errors.Is(err, user.ErrInvalidEmailChangeToken):
+		case errors.Is(err, user.ErrInvalidConfirmationToken):
 			writeError(rw, r, http.StatusBadRequest, msgInvalidConfirmationLink)
 			return
-		case errors.Is(err, user.ErrEmailChangeTokenExpired):
+		case errors.Is(err, user.ErrConfirmationTokenExpired):
 			writeError(rw, r, http.StatusBadRequest, msgExpiredConfirmationLink)
 			return
 		case errors.Is(err, user.ErrEmailTaken):
