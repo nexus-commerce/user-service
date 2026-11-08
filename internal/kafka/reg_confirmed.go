@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
+	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
 type registrationCompleter interface {
@@ -22,10 +23,10 @@ func NewRegistrationConfirmed(uc registrationCompleter) *RegistrationConfirmed {
 	return &RegistrationConfirmed{uc: uc}
 }
 
-func (h *RegistrationConfirmed) EventType() string { return messaging.TypeRegistrationConfirmed }
+func (h *RegistrationConfirmed) EventType() string { return userevent.TypeRegistrationConfirmed }
 
 func (h *RegistrationConfirmed) Handle(ctx context.Context, msg messaging.Message) error {
-	userID, err := messaging.DecodeRegistrationConfirmed(msg.Value)
+	userID, err := userevent.DecodeRegistrationConfirmed(msg.Value)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrPermanent, err)
 	}

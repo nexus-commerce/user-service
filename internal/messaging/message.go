@@ -13,3 +13,7 @@ type Message struct {
 }
 
 type BatchFunc func(ctx context.Context, msgs []Message) error
+
+type Producer interface {
+	Produce(ctx context.Context, msgs ...Message) error
+}

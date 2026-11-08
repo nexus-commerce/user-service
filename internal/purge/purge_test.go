@@ -15,7 +15,7 @@ type fakeRegistrations struct {
 	err    error
 }
 
-func (f *fakeRegistrations) DeleteAbandoned(_ context.Context, before time.Time) (int64, error) {
+func (f *fakeRegistrations) DeleteAbandonedRegistrations(_ context.Context, before time.Time) (int64, error) {
 	f.purged = append(f.purged, before)
 	return 0, f.err
 }

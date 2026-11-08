@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
+	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
 type fakeCompleter struct {
@@ -22,7 +23,7 @@ func (f *fakeCompleter) Execute(_ context.Context, id uuid.UUID) error {
 
 func registrationConfirmedMessage(id uuid.UUID) messaging.Message {
 	return messaging.Message{
-		Type:  messaging.TypeRegistrationConfirmed,
+		Type:  userevent.TypeRegistrationConfirmed,
 		Value: []byte(`{"eventType":"user.registration_confirmed","data":{"userId":"` + id.String() + `"}}`),
 	}
 }
@@ -66,8 +67,8 @@ func TestRegistrationConfirmedHandle(t *testing.T) {
 func TestRegistrationConfirmedMalformedIsPermanent(t *testing.T) {
 	uc := &fakeCompleter{}
 	err := NewRegistrationConfirmed(uc).Handle(t.Context(), messaging.Message{Value: []byte("{")})
-	if !errors.Is(err, ErrPermanent) || !errors.Is(err, messaging.ErrMalformedMessage) {
-		t.Errorf("Handle() error = %v, want %v wrapping %v", err, ErrPermanent, messaging.ErrMalformedMessage)
+	if !errors.Is(err, ErrPermanent) || !errors.Is(err, userevent.ErrMalformedMessage) {
+		t.Errorf("Handle() error = %v, want %v wrapping %v", err, ErrPermanent, userevent.ErrMalformedMessage)
 	}
 	if uc.got != (uuid.UUID{}) {
 		t.Error("use case called for malformed message")

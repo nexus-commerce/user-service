@@ -1,4 +1,4 @@
-package messaging
+package userevent
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
@@ -141,7 +142,7 @@ func newMeta() user.EventMeta {
 	}
 }
 
-func assertHeader(t *testing.T, msg Message, meta user.EventMeta) {
+func assertHeader(t *testing.T, msg messaging.Message, meta user.EventMeta) {
 	t.Helper()
 	type header struct{ ID, Topic, Key string }
 	got := header{msg.ID, msg.Topic, msg.Key}
@@ -151,7 +152,7 @@ func assertHeader(t *testing.T, msg Message, meta user.EventMeta) {
 	}
 }
 
-func decode[T any](t *testing.T, msg Message) T {
+func decode[T any](t *testing.T, msg messaging.Message) T {
 	t.Helper()
 	var v T
 	if err := json.Unmarshal(msg.Value, &v); err != nil {

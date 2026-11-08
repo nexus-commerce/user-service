@@ -18,10 +18,10 @@ import (
 	"github.com/nexus-commerce/user-service/internal/docs"
 	"github.com/nexus-commerce/user-service/internal/http"
 	"github.com/nexus-commerce/user-service/internal/jwt"
-	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/nacl"
 	"github.com/nexus-commerce/user-service/internal/postgres"
 	"github.com/nexus-commerce/user-service/internal/usecase"
+	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
 const dbConnectTimeout = 10 * time.Second
@@ -85,7 +85,7 @@ func run() error {
 		return fmt.Errorf("create token sealer: %w", err)
 	}
 
-	publisher, err := messaging.NewPublisher(sealer)
+	publisher, err := userevent.NewPublisher(sealer)
 	if err != nil {
 		return fmt.Errorf("create event publisher: %w", err)
 	}

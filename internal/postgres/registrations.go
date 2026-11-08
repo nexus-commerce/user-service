@@ -186,16 +186,6 @@ func (r *Registrations) Remove(ctx context.Context, p *user.PendingRegistration)
 	})
 }
 
-func (r *Registrations) DeleteAbandoned(ctx context.Context, before time.Time) (int64, error) {
-	query := `DELETE FROM pending_registrations WHERE expires_at < $1 AND confirmed_at IS NULL`
-
-	res, err := r.db.pool.ExecContext(ctx, query, before)
-	if err != nil {
-		return 0, fmt.Errorf("delete abandoned registrations: %w", err)
-	}
-	return res.RowsAffected()
-}
-
 func scanPendingRegistration(row *sql.Row) (*user.PendingRegistration, error) {
 	var (
 		email, rawUserID, firstName, lastName, passwordHash, tokenHash string

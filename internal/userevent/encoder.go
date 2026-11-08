@@ -1,4 +1,4 @@
-package messaging
+package userevent
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
@@ -123,15 +124,15 @@ type envelope struct {
 	Data      any       `json:"data"`
 }
 
-func (enc *encoder) encode(e user.Event) (Message, error) {
+func (enc *encoder) encode(e user.Event) (messaging.Message, error) {
 	r, ok := enc.routes[reflect.TypeOf(e)]
 	if !ok {
-		return Message{}, fmt.Errorf("no route for event %T", e)
+		return messaging.Message{}, fmt.Errorf("no route for event %T", e)
 	}
 	meta := e.Meta()
 	data, err := r.convert(e)
 	if err != nil {
-		return Message{}, fmt.Errorf("convert %s event: %w", r.typ, err)
+		return messaging.Message{}, fmt.Errorf("convert %s event: %w", r.typ, err)
 	}
 	value, err := json.Marshal(envelope{
 		ID:        meta.ID.String(),
@@ -141,9 +142,9 @@ func (enc *encoder) encode(e user.Event) (Message, error) {
 		Data:      data,
 	})
 	if err != nil {
-		return Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)
+		return messaging.Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)
 	}
-	return Message{
+	return messaging.Message{
 		ID:    meta.ID.String(),
 		Type:  r.typ,
 		Topic: r.topic,

@@ -37,7 +37,7 @@ dependencies point inward only.
 |---|---|---|
 | Domain | `internal/user` | Aggregates, value objects, domain events. No infrastructure imports. |
 | Application | `internal/usecase` | One type per use case; each declares the narrow repository interface it needs. |
-| Adapters | `http`, `postgres`, `kafka`, `messaging`, `bcrypt`, `jwt`, `nacl` | Translate at the boundary: HTTP DTOs, Postgres rows and Kafka envelopes never reach the domain. |
+| Adapters | `http`, `postgres`, `kafka`, `messaging`, `userevent`, `bcrypt`, `jwt`, `nacl` | Translate at the boundary: HTTP DTOs, Postgres rows and Kafka envelopes never reach the domain. |
 
 Events are written to an **outbox** table in the same transaction as the aggregate,
 then relayed to Kafka.

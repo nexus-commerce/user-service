@@ -1,4 +1,4 @@
-package messaging
+package userevent
 
 import (
 	"encoding/json/jsontext"

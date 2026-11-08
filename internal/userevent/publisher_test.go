@@ -1,18 +1,19 @@
-package messaging
+package userevent
 
 import (
 	"context"
 	"slices"
 	"testing"
 
+	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
 type fakeProducer struct {
-	calls [][]Message
+	calls [][]messaging.Message
 }
 
-func (p *fakeProducer) Produce(_ context.Context, msgs ...Message) error {
+func (p *fakeProducer) Produce(_ context.Context, msgs ...messaging.Message) error {
 	p.calls = append(p.calls, msgs)
 	return nil
 }

@@ -16,10 +16,10 @@ import (
 	"github.com/nexus-commerce/user-service/internal/config"
 	"github.com/nexus-commerce/user-service/internal/kafka"
 	"github.com/nexus-commerce/user-service/internal/lifecycle"
-	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/nacl"
 	"github.com/nexus-commerce/user-service/internal/postgres"
 	"github.com/nexus-commerce/user-service/internal/usecase"
+	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
 const dbConnectTimeout = 10 * time.Second
@@ -66,7 +66,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create token sealer: %w", err)
 	}
-	publisher, err := messaging.NewPublisher(sealer)
+	publisher, err := userevent.NewPublisher(sealer)
 	if err != nil {
 		return fmt.Errorf("create event publisher: %w", err)
 	}
@@ -79,7 +79,7 @@ func run() error {
 	consumer, err := kafka.NewConsumer(kafka.ConsumerOptions{
 		Addr:    cfg.Kafka.Addr(),
 		GroupID: cfg.Consumer.GroupID,
-		Topic:   messaging.TopicUsersInternal,
+		Topic:   userevent.TopicUsersInternal,
 	}, kafka.NewRegistrationConfirmed(completeRegistration))
 	if err != nil {
 		return fmt.Errorf("create kafka consumer: %w", err)

@@ -16,6 +16,7 @@ import (
 	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
+	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
 // Each test gets its own search_path, including its own migration history.
@@ -72,7 +73,7 @@ type testRepos struct {
 func newTestRepos(t *testing.T) testRepos {
 	t.Helper()
 	db := testDB(t)
-	publisher, err := messaging.NewPublisher(testSealer{})
+	publisher, err := userevent.NewPublisher(testSealer{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +153,7 @@ func TestConfirmThenCompleteRegistration(t *testing.T) {
 		t.Fatalf("ConfirmRegistration error: %v", err)
 	}
 	r.assertState(t, pending.UserID(), 0, 1, map[string]int{
-		messaging.TypeRegistrationConfirmed: 1,
+		userevent.TypeRegistrationConfirmed: 1,
 		"user.registered":                   0,
 	})
 
@@ -162,7 +163,7 @@ func TestConfirmThenCompleteRegistration(t *testing.T) {
 		}
 	}
 	r.assertState(t, pending.UserID(), 1, 0, map[string]int{
-		messaging.TypeRegistrationConfirmed: 1,
+		userevent.TypeRegistrationConfirmed: 1,
 		"user.registered":                   1,
 	})
 	if err := r.confirm().Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
@@ -182,7 +183,7 @@ func TestCompleteRegistrationRejectsTakenEmail(t *testing.T) {
 		t.Fatalf("CompleteRegistration error = %v, want %v", err, user.ErrEmailTaken)
 	}
 	r.assertState(t, pending.UserID(), 0, 0, map[string]int{
-		messaging.TypeRegistrationConfirmed: 1,
+		userevent.TypeRegistrationConfirmed: 1,
 		"user.registration_rejected":        1,
 		"user.registered":                   0,
 	})
@@ -237,7 +238,7 @@ func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
 	if p.Confirmed() {
 		t.Error("registration confirmed after rolled back update")
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{messaging.TypeRegistrationConfirmed: 0})
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 0})
 }
 
 func TestConcurrentConfirmation(t *testing.T) {
@@ -270,7 +271,7 @@ func TestConcurrentConfirmation(t *testing.T) {
 	if successes != 1 || invalid != 1 {
 		t.Fatalf("successes = %d, invalid tokens = %d", successes, invalid)
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{messaging.TypeRegistrationConfirmed: 1})
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 1})
 }
 
 func TestSaveKeepsConfirmedRegistration(t *testing.T) {
@@ -419,9 +420,9 @@ func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := r.registrations.DeleteAbandoned(t.Context(), time.Now().Add(2*time.Hour))
+	n, err := NewRetention(r.db).DeleteAbandonedRegistrations(t.Context(), time.Now().Add(2*time.Hour))
 	if err != nil || n != 1 {
-		t.Fatalf("DeleteAbandoned() = %d, %v; want 1, nil", n, err)
+		t.Fatalf("DeleteAbandonedRegistrations() = %d, %v; want 1, nil", n, err)
 	}
 	r.assertState(t, unconfirmed.UserID(), 0, 0, nil)
 	r.assertState(t, confirmed.UserID(), 0, 1, nil)
@@ -444,8 +445,8 @@ func TestOutboxCarriesEventType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Type != messaging.TypeRegistrationConfirmed || got[0].Key != pending.UserID().String() {
-		t.Fatalf("ProcessBatch() messages = %+v, want one %s for %v", got, messaging.TypeRegistrationConfirmed, pending.UserID())
+	if len(got) != 1 || got[0].Type != userevent.TypeRegistrationConfirmed || got[0].Key != pending.UserID().String() {
+		t.Fatalf("ProcessBatch() messages = %+v, want one %s for %v", got, userevent.TypeRegistrationConfirmed, pending.UserID())
 	}
 }
 

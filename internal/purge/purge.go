@@ -7,7 +7,7 @@ import (
 )
 
 type abandonedRegistrations interface {
-	DeleteAbandoned(ctx context.Context, before time.Time) (int64, error)
+	DeleteAbandonedRegistrations(ctx context.Context, before time.Time) (int64, error)
 }
 
 type expiredEmailChanges interface {
@@ -49,7 +49,7 @@ func (p *Purger) Run(ctx context.Context) error {
 
 func (p *Purger) purge(ctx context.Context) {
 	before := time.Now().Add(-p.opts.Grace)
-	p.delete(ctx, "abandoned registrations", before, p.registrations.DeleteAbandoned)
+	p.delete(ctx, "abandoned registrations", before, p.registrations.DeleteAbandonedRegistrations)
 	p.delete(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
 }
 
