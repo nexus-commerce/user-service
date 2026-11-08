@@ -2,6 +2,7 @@
 .git
 .env
 .air.toml
+.air.relay.toml
 tmp
 *.md
 .github

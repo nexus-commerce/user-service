@@ -1,0 +1,78 @@
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"github.com/nexus-commerce/user-service/internal/messaging"
+)
+
+type Outbox struct {
+	db *Database
+}
+
+func NewOutbox(db *Database) *Outbox {
+	return &Outbox{db: db}
+}
+
+func (o *Outbox) ProcessBatch(ctx context.Context, limit int, fn messaging.BatchFunc) (int, error) {
+	query := `DELETE FROM outbox WHERE id = ANY($1)`
+
+	var count int
+	err := o.db.runInTx(ctx, func(tx *sql.Tx) error {
+		ids, msgs, err := selectOutboxMessages(ctx, tx, limit)
+		if err != nil {
+			return err
+		}
+		if len(msgs) == 0 {
+			return nil
+		}
+
+		if err = fn(ctx, msgs); err != nil {
+			return err
+		}
+
+		if _, err = tx.ExecContext(ctx, query, ids); err != nil {
+			return fmt.Errorf("delete outbox messages: %w", err)
+		}
+		count = len(msgs)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func selectOutboxMessages(ctx context.Context, tx *sql.Tx, limit int) ([]int64, []messaging.Message, error) {
+	query := `SELECT id, event_id, topic, key, value, COALESCE(headers->>$2, '') FROM outbox ORDER BY id LIMIT $1 FOR UPDATE`
+
+	rows, err := tx.QueryContext(ctx, query, limit, messaging.HeaderEventType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("select outbox messages: %w", err)
+	}
+	defer rows.Close()
+
+	var (
+		ids  []int64
+		msgs []messaging.Message
+	)
+	for rows.Next() {
+		var (
+			id  int64
+			m   messaging.Message
+			key []byte
+		)
+		if err = rows.Scan(&id, &m.ID, &m.Topic, &key, &m.Value, &m.Type); err != nil {
+			return nil, nil, fmt.Errorf("scan outbox message: %w", err)
+		}
+		m.Key = string(key)
+		ids = append(ids, id)
+		msgs = append(msgs, m)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterate outbox messages: %w", err)
+	}
+	return ids, msgs, nil
+}
