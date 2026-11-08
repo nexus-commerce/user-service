@@ -174,37 +174,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/docs": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Serves the interactive API reference UI",
-                "produces": [
-                    "text/html"
-                ],
-                "tags": [
-                    "System"
-                ],
-                "summary": "API Documentation",
-                "responses": {
-                    "200": {
-                        "description": "HTML page",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid credentials",
-                        "schema": {
-                            "$ref": "#/definitions/http.errorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/docs/asyncapi": {
             "get": {
                 "security": [
@@ -267,14 +236,45 @@ const docTemplate = `{
                 }
             }
         },
-        "/docs/swagger.json": {
+        "/docs/openapi": {
             "get": {
                 "security": [
                     {
                         "BasicAuth": []
                     }
                 ],
-                "description": "Serves the Swagger specification used by the API reference UI",
+                "description": "Serves the interactive API reference UI",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "API Documentation",
+                "responses": {
+                    "200": {
+                        "description": "HTML page",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/http.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/docs/openapi.json": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Serves the OpenAPI specification used by the API reference UI",
                 "produces": [
                     "application/json"
                 ],
@@ -284,7 +284,7 @@ const docTemplate = `{
                 "summary": "API Specification",
                 "responses": {
                     "200": {
-                        "description": "Swagger 2.0 specification",
+                        "description": "OpenAPI 2.0 specification",
                         "schema": {
                             "type": "object"
                         }
