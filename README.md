@@ -10,32 +10,24 @@ This service deliberately merges two bounded contexts that would ideally be sepa
 - **Identity** — credentials, login, confirmation tokens, email ownership.
 - **Customer** — the person's profile (name, and whatever the shop needs later).
 
-They are kept together as a single `user` context for simplicity. The seam is already
-visible in the model (`Authenticate` / `Reauthenticate` / confirmation flows vs. `Rename`),
-so splitting into `identity-service` and `customer-service` later means moving that seam,
-not untangling it.
+For simplicity, both live in a single `user` context. The model already keeps them
+apart: authentication and confirmation flows on one side, `Rename` on the other.
+Extracting `identity-service` and `customer-service` later means moving code along that
+line, not untangling it.
 
 ## Architecture
 
-The service follows **Domain-Driven Design** for the model and **Clean Architecture** for
-the layering. Dependencies point inward only:
+**Domain-Driven Design** for the model, **Clean Architecture** for the layering:
+dependencies point inward only.
 
-```
-http, kafka, postgres, messaging, bcrypt, jwt, nacl   adapters
-                     │
-                  usecase                              application
-                     │
-                   user                                domain
-```
+| Layer | Packages | Rule |
+|---|---|---|
+| Domain | `internal/user` | Aggregates, value objects, domain events. No infrastructure imports. |
+| Application | `internal/usecase` | One type per use case; each declares the narrow repository interface it needs. |
+| Adapters | `http`, `postgres`, `kafka`, `messaging`, `bcrypt`, `jwt`, `nacl` | Translate at the boundary: HTTP DTOs, Postgres rows and Kafka envelopes never reach the domain. |
 
-- `internal/user` — aggregates, value objects, domain events, the `Hasher` port. No
-  infrastructure imports.
-- `internal/usecase` — one type per use case; each declares the narrow repository
-  interface it needs.
-- Adapters translate at the boundary: HTTP DTOs, Postgres rows, and versioned Kafka
-  envelopes never reach the domain.
-- Events are written to an **outbox** table in the same transaction as the aggregate,
-  then relayed to Kafka.
+Events are written to an **outbox** table in the same transaction as the aggregate,
+then relayed to Kafka.
 
 ### Aggregates
 
@@ -79,11 +71,11 @@ Go 1.27.2 · PostgreSQL 15 · Kafka · Docker
 ## Running
 
 ```sh
-./redeploy.sh           # api (port 80), purge, Postgres (port 5433)
-./redeploy.sh --kafka   # plus Kafka (port 9092), outbox-relay, registration-consumer
+./dev/redeploy.sh           # api (port 80), purge, Postgres (port 5433)
+./dev/redeploy.sh --kafka   # plus Kafka (port 9092), outbox-relay, registration-consumer
 ```
 
-The committed `.env` holds working development values. Optional settings and their
+The `.env` file contains working development values. Optional settings and their
 defaults are in [internal/config/config.go](internal/config/config.go).
 
 Without Kafka, events accumulate in the outbox and confirmed registrations are not
@@ -93,10 +85,9 @@ wipes the database volume.
 ## Tests
 
 ```sh
-./test.sh                          # all tests, including PostgreSQL integration tests
-./test.sh -v ./internal/postgres   # arguments are passed to go test
+./dev/test.sh   # all tests, including PostgreSQL integration tests
 ```
 
 Tests run inside the dev container against the compose Postgres, using credentials
-from `.env`. Each integration test creates a unique schema, applies the migrations,
+from `.env`. Arguments are passed to `go test`. Each integration test creates a unique schema, applies the migrations,
 and drops only that schema on cleanup. Kafka is not required.
