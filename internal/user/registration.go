@@ -32,23 +32,13 @@ func RequestRegistration(email Email, name FullName, password Password, hasher H
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC()
-	token := NewConfirmationToken()
 	p := &PendingRegistration{
 		userID:       uuid.New(),
 		email:        email,
 		fullName:     name,
 		passwordHash: hash,
-		tokenHash:    token.Hash(),
-		expiresAt:    now.Add(registrationTTL),
 	}
-	p.events = append(p.events, RegistrationRequested{
-		EventMeta: p.newEventMeta(now),
-		Email:     p.email,
-		FullName:  p.fullName,
-		Token:     token,
-		ExpiresAt: p.expiresAt,
-	})
+	p.issueConfirmationToken(time.Now().UTC())
 	return p, nil
 }
 
@@ -116,11 +106,27 @@ func (p *PendingRegistration) Confirm(token ConfirmationToken) error {
 	return nil
 }
 
-func (p *PendingRegistration) EnsureSupersedable() error {
+func (p *PendingRegistration) Supersede(name FullName, hash PasswordHash) error {
 	if p.Confirmed() {
 		return ErrRegistrationAlreadyConfirmed
 	}
+	p.fullName = name
+	p.passwordHash = hash
+	p.issueConfirmationToken(time.Now().UTC())
 	return nil
+}
+
+func (p *PendingRegistration) issueConfirmationToken(now time.Time) {
+	token := NewConfirmationToken()
+	p.tokenHash = token.Hash()
+	p.expiresAt = now.Add(registrationTTL)
+	p.events = append(p.events, RegistrationRequested{
+		EventMeta: p.newEventMeta(now),
+		Email:     p.email,
+		FullName:  p.fullName,
+		Token:     token,
+		ExpiresAt: p.expiresAt,
+	})
 }
 
 func (p *PendingRegistration) Reject() error {

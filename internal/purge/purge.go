@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-type expiredRegistrations interface {
-	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
+type abandonedRegistrations interface {
+	DeleteAbandoned(ctx context.Context, before time.Time) (int64, error)
 }
 
 type expiredEmailChanges interface {
@@ -20,12 +20,12 @@ type Options struct {
 }
 
 type Purger struct {
-	registrations expiredRegistrations
+	registrations abandonedRegistrations
 	users         expiredEmailChanges
 	opts          Options
 }
 
-func New(registrations expiredRegistrations, users expiredEmailChanges, opts Options) *Purger {
+func New(registrations abandonedRegistrations, users expiredEmailChanges, opts Options) *Purger {
 	return &Purger{registrations: registrations, users: users, opts: opts}
 }
 
@@ -49,17 +49,17 @@ func (p *Purger) Run(ctx context.Context) error {
 
 func (p *Purger) purge(ctx context.Context) {
 	before := time.Now().Add(-p.opts.Grace)
-	p.delete(ctx, "registrations", before, p.registrations.DeleteExpired)
-	p.delete(ctx, "email changes", before, p.users.DeleteExpiredEmailChanges)
+	p.delete(ctx, "abandoned registrations", before, p.registrations.DeleteAbandoned)
+	p.delete(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
 }
 
 func (p *Purger) delete(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
 	n, err := fn(ctx, before)
 	if err != nil {
-		log.Printf("purge expired %s: %v", what, err)
+		log.Printf("purge %s: %v", what, err)
 		return
 	}
 	if n > 0 {
-		log.Printf("Purged %d expired %s", n, what)
+		log.Printf("Purged %d %s", n, what)
 	}
 }

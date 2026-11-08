@@ -124,17 +124,19 @@ func copyPending(p *user.PendingRegistration) *user.PendingRegistration {
 	return user.RestorePendingRegistration(p.UserID(), p.Email(), p.FullName(), p.PasswordHash(), p.TokenHash(), p.ExpiresAt(), confirmedAt)
 }
 
-func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration, ensureSupersedable func(*user.PendingRegistration) error) error {
+func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration, supersede func(*user.PendingRegistration) error) error {
 	if f.byEmail == nil {
 		f.byEmail = make(map[user.Email]*user.PendingRegistration)
 	}
+	saved := p
 	if existing, ok := f.byEmail[p.Email()]; ok {
-		if err := ensureSupersedable(copyPending(existing)); err != nil {
+		saved = copyPending(existing)
+		if err := supersede(saved); err != nil {
 			return err
 		}
 	}
-	f.byEmail[p.Email()] = p
-	f.published = append(f.published, p.Events()...)
+	f.byEmail[saved.Email()] = saved
+	f.published = append(f.published, saved.Events()...)
 	return nil
 }
 

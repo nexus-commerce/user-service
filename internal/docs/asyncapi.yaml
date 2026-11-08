@@ -145,7 +145,7 @@ components:
           key:
             type: string
             format: uuid
-            description: ID the user will get once the email is confirmed; same key as the later user.registered event.
+            description: ID the user will get once the email is confirmed; same key as the later user.registered event and as any repeated request for the same email.
       examples:
         - name: userRegistrationRequested
           summary: Someone signs up.
@@ -404,7 +404,9 @@ components:
         userId:
           type: string
           format: uuid
-          description: ID the user will get once the email is confirmed.
+          description: >-
+            ID the user will get once the email is confirmed. A repeated request for the
+            same email keeps this ID and supersedes the earlier one, whose link stops working.
         email:
           type: string
           format: email

@@ -13,7 +13,7 @@ type requestRegistrationUsers interface {
 }
 
 type requestRegistrationRegistrations interface {
-	Save(ctx context.Context, p *user.PendingRegistration, ensureSupersedable func(existing *user.PendingRegistration) error) error
+	Save(ctx context.Context, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error
 }
 
 type RequestRegistration struct {
@@ -69,7 +69,9 @@ func (r *RequestRegistration) Execute(ctx context.Context, req RegistrationReque
 		return err
 	}
 	if !taken {
-		err = r.registrations.Save(ctx, pending, (*user.PendingRegistration).EnsureSupersedable)
+		err = r.registrations.Save(ctx, pending, func(existing *user.PendingRegistration) error {
+			return existing.Supersede(pending.FullName(), pending.PasswordHash())
+		})
 		if errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 			return nil
 		}

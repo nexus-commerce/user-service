@@ -95,10 +95,16 @@ func (r testRepos) seedRegistration(t *testing.T, email string) (*user.PendingRe
 		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")),
 		user.RestorePasswordHash("test-hash"), token.Hash(), time.Now().UTC().Add(time.Hour), nil,
 	)
-	if err := r.registrations.Save(t.Context(), pending, (*user.PendingRegistration).EnsureSupersedable); err != nil {
+	if err := r.registrations.Save(t.Context(), pending, supersedeWith(pending)); err != nil {
 		t.Fatal(err)
 	}
 	return pending, token
+}
+
+func supersedeWith(p *user.PendingRegistration) func(*user.PendingRegistration) error {
+	return func(existing *user.PendingRegistration) error {
+		return existing.Supersede(p.FullName(), p.PasswordHash())
+	}
 }
 
 func (r testRepos) seedUser(t *testing.T, email string) uuid.UUID {
@@ -253,7 +259,7 @@ func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.registrations.Save(t.Context(), again, (*user.PendingRegistration).EnsureSupersedable); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
+	if err := r.registrations.Save(t.Context(), again, supersedeWith(again)); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 		t.Fatalf("Save() error = %v, want %v", err, user.ErrRegistrationAlreadyConfirmed)
 	}
 	p, err := r.registrations.ByUserID(t.Context(), pending.UserID())
@@ -263,6 +269,7 @@ func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	if !p.Confirmed() || p.TokenHash() != token.Hash() {
 		t.Error("confirmed registration was overwritten")
 	}
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{"user.registration_requested": 0})
 	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
 }
 
@@ -276,23 +283,38 @@ func newTestRegistration(t *testing.T, email string) *user.PendingRegistration {
 	return p
 }
 
-func TestSaveReplacesUnconfirmedRegistration(t *testing.T) {
+func TestSaveSupersedesUnconfirmedRegistration(t *testing.T) {
 	r := newTestRepos(t)
-	first, _ := r.seedRegistration(t, "jane@example.com")
+	first, oldToken := r.seedRegistration(t, "jane@example.com")
 
-	again := newTestRegistration(t, "jane@example.com")
-	if err := r.registrations.Save(t.Context(), again, (*user.PendingRegistration).EnsureSupersedable); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-	p, err := r.registrations.ByUserID(t.Context(), again.UserID())
+	again, err := user.RequestRegistration(user.RestoreEmail("jane@example.com"),
+		user.NewFullName(user.RestoreName("Janet"), user.RestoreName("Roe")), mustTestPassword(t), testHasher{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Confirmed() || p.TokenHash() != again.TokenHash() {
-		t.Error("unconfirmed registration was not replaced")
+	var superseded *user.PendingRegistration
+	err = r.registrations.Save(t.Context(), again, func(existing *user.PendingRegistration) error {
+		superseded = existing
+		return supersedeWith(again)(existing)
+	})
+	if err != nil {
+		t.Fatalf("Save() error: %v", err)
 	}
-	r.assertState(t, first.UserID(), 0, 0, nil)
-	r.assertState(t, again.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
+	if superseded == nil {
+		t.Fatal("Save() did not supersede the existing registration")
+	}
+	p, err := r.registrations.ByUserID(t.Context(), first.UserID())
+	if err != nil {
+		t.Fatalf("ByUserID(first) error: %v", err)
+	}
+	if p.FullName() != again.FullName() || p.PasswordHash() != again.PasswordHash() || p.TokenHash() != superseded.TokenHash() || !p.ExpiresAt().After(first.ExpiresAt()) {
+		t.Error("unconfirmed registration was not superseded")
+	}
+	r.assertState(t, first.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
+	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+	if err := r.confirm().Execute(t.Context(), oldToken.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+		t.Errorf("confirm with superseded token error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+	}
 }
 
 func TestConcurrentSaveOfNewEmail(t *testing.T) {
@@ -308,7 +330,7 @@ func TestConcurrentSaveOfNewEmail(t *testing.T) {
 	for _, p := range regs {
 		go func() {
 			<-start
-			results <- r.registrations.Save(ctx, p, (*user.PendingRegistration).EnsureSupersedable)
+			results <- r.registrations.Save(ctx, p, supersedeWith(p))
 		}()
 	}
 	close(start)
@@ -359,7 +381,7 @@ func TestUsersAddEmailTaken(t *testing.T) {
 	r.assertState(t, usr.ID(), 0, 1, map[string]int{"user.registered": 0})
 }
 
-func TestDeleteExpiredKeepsConfirmedRegistrations(t *testing.T) {
+func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 	r := newTestRepos(t)
 	unconfirmed, _ := r.seedRegistration(t, "old@example.com")
 	confirmed, token := r.seedRegistration(t, "jane@example.com")
@@ -369,9 +391,9 @@ func TestDeleteExpiredKeepsConfirmedRegistrations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := r.registrations.DeleteExpired(t.Context(), time.Now().Add(2*time.Hour))
+	n, err := r.registrations.DeleteAbandoned(t.Context(), time.Now().Add(2*time.Hour))
 	if err != nil || n != 1 {
-		t.Fatalf("DeleteExpired() = %d, %v; want 1, nil", n, err)
+		t.Fatalf("DeleteAbandoned() = %d, %v; want 1, nil", n, err)
 	}
 	r.assertState(t, unconfirmed.UserID(), 0, 0, nil)
 	r.assertState(t, confirmed.UserID(), 0, 1, nil)

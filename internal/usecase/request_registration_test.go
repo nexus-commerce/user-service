@@ -121,22 +121,31 @@ func TestRequestRegistrationDuplicateUserVanished(t *testing.T) {
 	}
 }
 
-func TestRequestRegistrationAgainReplacesPending(t *testing.T) {
+func TestRequestRegistrationAgainSupersedesPending(t *testing.T) {
 	users := &fakeUsers{}
 	regs := &fakeRegistrations{}
 	requestRegistration := usecase.NewRequestRegistration(users, regs, fakeHasher{})
 
-	if err := requestRegistration.Execute(t.Context(), validRegistrationRequest("new@example.com")); err != nil {
+	if err := requestRegistration.Execute(t.Context(), validRegistrationRequest("jane@example.com")); err != nil {
 		t.Fatalf("first Execute() error: %v", err)
 	}
-	first := tokenFor(t, regs, "new@example.com")
-	if err := requestRegistration.Execute(t.Context(), validRegistrationRequest("new@example.com")); err != nil {
+	id := pendingJane(t, regs).UserID()
+	first := tokenFor(t, regs, "jane@example.com")
+	again := validRegistrationRequest("jane@example.com")
+	again.FirstName = "Janet"
+	again.Password, again.PasswordConfirmation = "n3wpassword", "n3wpassword"
+	if err := requestRegistration.Execute(t.Context(), again); err != nil {
 		t.Fatalf("second Execute() error: %v", err)
 	}
-	second := tokenFor(t, regs, "new@example.com")
 	if len(regs.byEmail) != 1 {
 		t.Fatalf("saved %d pending registrations, want 1", len(regs.byEmail))
 	}
+	p := pendingJane(t, regs)
+	if p.UserID() != id || p.FullName().FirstName().String() != "Janet" || p.PasswordHash().Encoded() != "hashed:n3wpassword" {
+		t.Errorf("registration = {id: %v, first name: %s, hash: %q}, want {id: %v, first name: Janet, hash: %q}",
+			p.UserID(), p.FullName().FirstName(), p.PasswordHash().Encoded(), id, "hashed:n3wpassword")
+	}
+	second := tokenFor(t, regs, "jane@example.com")
 
 	confirm := usecase.NewConfirmRegistration(regs)
 	if err := confirm.Execute(t.Context(), first.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {

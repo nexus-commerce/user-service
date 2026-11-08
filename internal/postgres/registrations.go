@@ -30,12 +30,12 @@ func NewRegistrations(db *Database, events eventPublisher) *Registrations {
 func (r *Registrations) Save(
 	ctx context.Context,
 	p *user.PendingRegistration,
-	ensureSupersedable func(existing *user.PendingRegistration) error,
+	supersede func(existing *user.PendingRegistration) error,
 ) error {
 	var err error
 	for range saveAttempts {
 		err = r.db.runInTx(ctx, func(tx *sql.Tx) error {
-			return r.save(ctx, tx, p, ensureSupersedable)
+			return r.save(ctx, tx, p, supersede)
 		})
 		if !errors.Is(err, errConcurrentRegistration) {
 			return err
@@ -48,10 +48,11 @@ func (r *Registrations) save(
 	ctx context.Context,
 	tx *sql.Tx,
 	p *user.PendingRegistration,
-	ensureSupersedable func(existing *user.PendingRegistration) error,
+	supersede func(existing *user.PendingRegistration) error,
 ) error {
 	selectQuery := selectPendingRegistration + ` WHERE email = $1 FOR UPDATE`
 
+	saved := p
 	existing, err := scanPendingRegistration(tx.QueryRowContext(ctx, selectQuery, p.Email().String()))
 	switch {
 	case errors.Is(err, user.ErrRegistrationNotFound):
@@ -59,16 +60,17 @@ func (r *Registrations) save(
 	case err != nil:
 		return fmt.Errorf("select pending registration by email: %w", err)
 	default:
-		if err = ensureSupersedable(existing); err != nil {
+		if err = supersede(existing); err != nil {
 			return err
 		}
-		err = replacePendingRegistration(ctx, tx, p)
+		saved = existing
+		err = updatePendingRegistration(ctx, tx, existing)
 	}
 	if err != nil {
 		return err
 	}
 
-	return r.events.Publish(ctx, outboxProducer{tx: tx}, p.Events())
+	return r.events.Publish(ctx, outboxProducer{tx: tx}, saved.Events())
 }
 
 func insertPendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration) error {
@@ -98,22 +100,24 @@ func insertPendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingR
 	return nil
 }
 
-func replacePendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration) error {
-	query := `UPDATE pending_registrations SET user_id = $2, first_name = $3, last_name = $4,
-			password_hash = $5, token_hash = $6, expires_at = $7, confirmed_at = NULL
-		WHERE email = $1`
+func updatePendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration) error {
+	query := `UPDATE pending_registrations SET first_name = $2, last_name = $3,
+			password_hash = $4, token_hash = $5, expires_at = $6, confirmed_at = $7
+		WHERE user_id = $1`
 
+	var confirmedAt sql.NullTime
+	confirmedAt.Time, confirmedAt.Valid = p.ConfirmedAt()
 	_, err := tx.ExecContext(ctx, query,
-		p.Email().String(),
 		p.UserID().String(),
 		p.FullName().FirstName().String(),
 		p.FullName().LastName().String(),
 		p.PasswordHash().Encoded(),
 		p.TokenHash().Encoded(),
 		p.ExpiresAt(),
+		confirmedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("replace pending registration: %w", err)
+		return fmt.Errorf("update pending registration: %w", err)
 	}
 	return nil
 }
@@ -134,7 +138,6 @@ func (r *Registrations) UpdateByToken(
 	updateFn func(*user.PendingRegistration) error,
 ) (*user.PendingRegistration, error) {
 	selectQuery := selectPendingRegistration + ` WHERE token_hash = $1 FOR UPDATE`
-	updateQuery := `UPDATE pending_registrations SET confirmed_at = $1 WHERE user_id = $2`
 
 	var p *user.PendingRegistration
 	err := r.db.runInTx(ctx, func(tx *sql.Tx) error {
@@ -151,10 +154,8 @@ func (r *Registrations) UpdateByToken(
 			return err
 		}
 
-		var confirmedAt sql.NullTime
-		confirmedAt.Time, confirmedAt.Valid = p.ConfirmedAt()
-		if _, err = tx.ExecContext(ctx, updateQuery, confirmedAt, p.UserID().String()); err != nil {
-			return fmt.Errorf("update pending registration: %w", err)
+		if err = updatePendingRegistration(ctx, tx, p); err != nil {
+			return err
 		}
 
 		return r.events.Publish(ctx, outboxProducer{tx: tx}, p.Events())
@@ -202,12 +203,12 @@ func deletePendingRegistration(ctx context.Context, tx *sql.Tx, id uuid.UUID) er
 	return nil
 }
 
-func (r *Registrations) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
+func (r *Registrations) DeleteAbandoned(ctx context.Context, before time.Time) (int64, error) {
 	query := `DELETE FROM pending_registrations WHERE expires_at < $1 AND confirmed_at IS NULL`
 
 	res, err := r.db.pool.ExecContext(ctx, query, before)
 	if err != nil {
-		return 0, fmt.Errorf("delete expired registrations: %w", err)
+		return 0, fmt.Errorf("delete abandoned registrations: %w", err)
 	}
 	return res.RowsAffected()
 }
