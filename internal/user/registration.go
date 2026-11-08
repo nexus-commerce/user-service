@@ -21,8 +21,7 @@ type PendingRegistration struct {
 	email        Email
 	fullName     FullName
 	passwordHash PasswordHash
-	tokenHash    ConfirmationTokenHash
-	expiresAt    time.Time
+	confirmation Confirmation
 	confirmedAt  *time.Time
 
 	events []Event
@@ -57,8 +56,7 @@ func RestorePendingRegistration(
 		email:        email,
 		fullName:     name,
 		passwordHash: passwordHash,
-		tokenHash:    tokenHash,
-		expiresAt:    expiresAt,
+		confirmation: Confirmation{tokenHash: tokenHash, expiresAt: expiresAt},
 		confirmedAt:  confirmedAt,
 	}
 }
@@ -71,9 +69,9 @@ func (p *PendingRegistration) FullName() FullName { return p.fullName }
 
 func (p *PendingRegistration) PasswordHash() PasswordHash { return p.passwordHash }
 
-func (p *PendingRegistration) TokenHash() ConfirmationTokenHash { return p.tokenHash }
+func (p *PendingRegistration) TokenHash() ConfirmationTokenHash { return p.confirmation.tokenHash }
 
-func (p *PendingRegistration) ExpiresAt() time.Time { return p.expiresAt }
+func (p *PendingRegistration) ExpiresAt() time.Time { return p.confirmation.expiresAt }
 
 func (p *PendingRegistration) ConfirmedAt() (time.Time, bool) {
 	if p.confirmedAt == nil {
@@ -93,12 +91,12 @@ func (p *PendingRegistration) Events() []Event {
 }
 
 func (p *PendingRegistration) Confirm(token ConfirmationToken) error {
-	if token.Hash() != p.tokenHash || p.Confirmed() {
+	if p.Confirmed() {
 		return ErrInvalidConfirmationToken
 	}
 	now := time.Now().UTC()
-	if now.After(p.expiresAt) {
-		return ErrConfirmationTokenExpired
+	if err := p.confirmation.verify(token, now); err != nil {
+		return err
 	}
 	p.confirmedAt = &now
 	p.events = append(p.events, RegistrationConfirmed{
@@ -121,15 +119,14 @@ func (p *PendingRegistration) Supersede(newer *PendingRegistration) error {
 }
 
 func (p *PendingRegistration) issueConfirmationToken(now time.Time) {
-	token := NewConfirmationToken()
-	p.tokenHash = token.Hash()
-	p.expiresAt = now.Add(registrationTTL)
+	confirmation, token := issueConfirmation(now, registrationTTL)
+	p.confirmation = confirmation
 	p.events = append(p.events, RegistrationRequested{
 		EventMeta: p.newEventMeta(now),
 		Email:     p.email,
 		FullName:  p.fullName,
 		Token:     token,
-		ExpiresAt: p.expiresAt,
+		ExpiresAt: confirmation.expiresAt,
 	})
 }
 

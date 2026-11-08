@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"time"
 )
 
 const (
@@ -57,3 +58,27 @@ func RestoreConfirmationTokenHash(s string) ConfirmationTokenHash {
 }
 
 func (h ConfirmationTokenHash) Encoded() string { return h.value }
+
+type Confirmation struct {
+	tokenHash ConfirmationTokenHash
+	expiresAt time.Time
+}
+
+func issueConfirmation(now time.Time, ttl time.Duration) (Confirmation, ConfirmationToken) {
+	token := NewConfirmationToken()
+	return Confirmation{tokenHash: token.Hash(), expiresAt: now.Add(ttl)}, token
+}
+
+func (c Confirmation) matches(token ConfirmationToken) bool {
+	return token.Hash() == c.tokenHash
+}
+
+func (c Confirmation) verify(token ConfirmationToken, now time.Time) error {
+	if !c.matches(token) {
+		return ErrInvalidConfirmationToken
+	}
+	if now.After(c.expiresAt) {
+		return ErrConfirmationTokenExpired
+	}
+	return nil
+}

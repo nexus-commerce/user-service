@@ -93,29 +93,25 @@ func (u *User) RequestEmailChange(newEmail Email, taken bool, proof Reauthentica
 		})
 		return nil
 	}
-	token := NewConfirmationToken()
-	u.pending = &PendingEmailChange{
-		email:     newEmail,
-		tokenHash: token.Hash(),
-		expiresAt: now.Add(emailChangeTTL),
-	}
+	confirmation, token := issueConfirmation(now, emailChangeTTL)
+	u.pending = &PendingEmailChange{email: newEmail, confirmation: confirmation}
 	u.events = append(u.events, EmailChangeRequested{
 		EventMeta: u.newEventMeta(now),
 		FullName:  u.fullName,
 		NewEmail:  newEmail,
 		Token:     token,
-		ExpiresAt: u.pending.expiresAt,
+		ExpiresAt: confirmation.expiresAt,
 	})
 	return nil
 }
 
 func (u *User) ConfirmEmailChange(token ConfirmationToken) error {
-	if u.pending == nil || token.Hash() != u.pending.tokenHash {
+	if u.pending == nil {
 		return ErrInvalidConfirmationToken
 	}
 	now := time.Now().UTC()
-	if now.After(u.pending.expiresAt) {
-		return ErrConfirmationTokenExpired
+	if err := u.pending.confirmation.verify(token, now); err != nil {
+		return err
 	}
 	old := u.email
 	u.email = u.pending.email
@@ -130,7 +126,7 @@ func (u *User) ConfirmEmailChange(token ConfirmationToken) error {
 }
 
 func (u *User) RejectEmailChange(token ConfirmationToken) error {
-	if u.pending == nil || token.Hash() != u.pending.tokenHash {
+	if u.pending == nil || !u.pending.confirmation.matches(token) {
 		return ErrInvalidConfirmationToken
 	}
 	rejected := u.pending.email
