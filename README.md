@@ -1,18 +1,102 @@
 # user-service
 
-Run checks with Go 1.27.2 or newer:
+User accounts for the nexus-commerce platform: registration with email confirmation,
+login (JWT), renaming, and email change with confirmation.
 
-```powershell
-go test ./...
-go vet ./...
+## Scope and a known compromise
+
+This service deliberately merges two bounded contexts that would ideally be separate:
+
+- **Identity** — credentials, login, confirmation tokens, email ownership.
+- **Customer** — the person's profile (name, and whatever the shop needs later).
+
+They are kept together as a single `user` context for simplicity. The seam is already
+visible in the model (`Authenticate` / `Reauthenticate` / confirmation flows vs. `Rename`),
+so splitting into `identity-service` and `customer-service` later means moving that seam,
+not untangling it.
+
+## Architecture
+
+The service follows **Domain-Driven Design** for the model and **Clean Architecture** for
+the layering. Dependencies point inward only:
+
+```
+http, kafka, postgres, messaging, bcrypt, jwt, nacl   adapters
+                     │
+                  usecase                              application
+                     │
+                   user                                domain
 ```
 
-PostgreSQL integration tests are skipped unless `TEST_POSTGRES_DSN` is set.
-Use a test database with permission to create schemas. Each test creates a unique
-schema, applies the existing migrations, and drops only that schema on cleanup.
-Kafka is not required.
+- `internal/user` — aggregates, value objects, domain events, the `Hasher` port. No
+  infrastructure imports.
+- `internal/usecase` — one type per use case; each declares the narrow repository
+  interface it needs.
+- Adapters translate at the boundary: HTTP DTOs, Postgres rows, and versioned Kafka
+  envelopes never reach the domain.
+- Events are written to an **outbox** table in the same transaction as the aggregate,
+  then relayed to Kafka.
 
-```powershell
-$env:TEST_POSTGRES_DSN = 'postgres://test_user:test_password@localhost:5433/test_database?sslmode=disable'
-go test ./internal/postgres -count=1 -v
+### Aggregates
+
+| Aggregate | Responsibility |
+|---|---|
+| `PendingRegistration` | A registration awaiting email confirmation (token hash, 24h expiry). Acts as the factory for `User`: `Complete()` only succeeds once confirmed. A newer request supersedes an unconfirmed one for the same email. If the email is taken by the time it completes, it is rejected (`RegistrationRejected`). |
+| `User` | A registered account. Owns authentication, renaming and email change. Holds at most one `PendingEmailChange`; requesting a change requires a `Reauthentication` proof obtained by re-entering the password. |
+
+Confirmation tokens travel in events sealed with NaCl anonymous box using
+notification-service's public key, so only that service can read them. Duplicate and
+taken-address attempts are reported as events rather than API errors to avoid account
+enumeration.
+
+## API contracts
+
+Served by `api` behind basic auth (`DOCS_USERNAME` / `DOCS_PASSWORD`):
+
+- OpenAPI (HTTP): `/api/docs/openapi`
+- AsyncAPI (events): `/api/docs/asyncapi`
+
+## Entry points
+
+One image, several binaries (`cmd/`):
+
+| Command | Role |
+|---|---|
+| `api` | HTTP API on `/api` (default image `CMD`); runs DB migrations on start |
+| `relay` | Polls the outbox and publishes to Kafka |
+| `consumer` | Consumes `users.internal` and completes registrations |
+| `purge` | Periodically deletes expired pending registrations and email changes |
+| `decrypt-token` | Dev tool: decrypts a sealed token from an event (needs `NOTIFICATION_PRIVATE_KEY`) |
+
+## Tech stack
+
+Go 1.27.2 · PostgreSQL 15 · Kafka · Docker
+
+## Requirements
+
+- Docker
+
+## Running
+
+```sh
+./redeploy.sh           # api (port 80), purge, Postgres (port 5433)
+./redeploy.sh --kafka   # plus Kafka (port 9092), outbox-relay, registration-consumer
 ```
+
+The committed `.env` holds working development values. Optional settings and their
+defaults are in [internal/config/config.go](internal/config/config.go).
+
+Without Kafka, events accumulate in the outbox and confirmed registrations are not
+completed until the `kafka` profile runs. The script recreates the containers and
+wipes the database volume.
+
+## Tests
+
+```sh
+./test.sh                          # all tests, including PostgreSQL integration tests
+./test.sh -v ./internal/postgres   # arguments are passed to go test
+```
+
+Tests run inside the dev container against the compose Postgres, using credentials
+from `.env`. Each integration test creates a unique schema, applies the migrations,
+and drops only that schema on cleanup. Kafka is not required.
