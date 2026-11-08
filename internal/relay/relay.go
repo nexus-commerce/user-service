@@ -1,0 +1,71 @@
+package relay
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/nexus-commerce/user-service/internal/messaging"
+)
+
+type Outbox interface {
+	ProcessBatch(ctx context.Context, limit int, fn messaging.BatchFunc) (int, error)
+}
+
+type Producer interface {
+	Produce(ctx context.Context, msgs ...messaging.Message) error
+}
+
+type Options struct {
+	Interval  time.Duration
+	BatchSize int
+}
+
+type Relay struct {
+	outbox   Outbox
+	producer Producer
+	opts     Options
+}
+
+func New(outbox Outbox, producer Producer, opts Options) *Relay {
+	return &Relay{outbox: outbox, producer: producer, opts: opts}
+}
+
+func (r *Relay) Run(ctx context.Context) error {
+	log.Println("Starting outbox relay")
+
+	ticker := time.NewTicker(r.opts.Interval)
+	defer ticker.Stop()
+
+	for {
+		r.flush(ctx)
+
+		select {
+		case <-ctx.Done():
+			log.Println("Stopping outbox relay")
+			return nil
+		case <-ticker.C:
+		}
+	}
+}
+
+func (r *Relay) flush(ctx context.Context) {
+	for ctx.Err() == nil {
+		n, err := r.processBatch(ctx)
+		if err != nil {
+			log.Printf("relay outbox messages: %v", err)
+			return
+		}
+		if n < r.opts.BatchSize {
+			return
+		}
+	}
+}
+
+func (r *Relay) processBatch(ctx context.Context) (int, error) {
+	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, r.produce)
+}
+
+func (r *Relay) produce(ctx context.Context, msgs []messaging.Message) error {
+	return r.producer.Produce(ctx, msgs...)
+}

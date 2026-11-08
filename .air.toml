@@ -7,11 +7,11 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main ./src/cmd/main/main.go"
+  bin = "./tmp/api"
+  cmd = "go build -o ./tmp/api ./cmd/api"
   delay = 1000
-  entrypoint = ["./tmp/main"]
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "src/docs"]
+  entrypoint = ["./tmp/api"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "internal/docs"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
@@ -26,7 +26,7 @@ tmp_dir = "tmp"
   poll = true
   poll_interval = 1000
   post_cmd = []
-  pre_cmd = ["swag init -g main.go -d ./src/cmd/main,./src/http,./src/usecase,./src/user -o ./src/docs"]
+  pre_cmd = ["swag init -g main.go -d ./cmd/api,./internal/http,./internal/usecase,./internal/user -o ./internal/docs"]
   rerun = false
   rerun_delay = 500
   send_interrupt = false

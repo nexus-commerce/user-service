@@ -5,10 +5,10 @@ tmp_dir = "tmp"
 
 [build]
   bin = "./tmp/relay"
-  cmd = "go build -o ./tmp/relay ./src/cmd/relay"
+  cmd = "go build -o ./tmp/relay ./cmd/relay"
   delay = 1000
   entrypoint = ["./tmp/relay"]
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "src/docs"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "internal/docs"]
   exclude_regex = ["_test.go"]
   include_ext = ["go", "env"]
   log = "build-errors-relay.log"

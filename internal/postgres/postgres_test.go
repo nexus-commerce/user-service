@@ -1,0 +1,582 @@
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"os"
+	"strings"
+	"testing"
+	"time"
+	"uuid"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/nexus-commerce/user-service/internal/messaging"
+	"github.com/nexus-commerce/user-service/internal/usecase"
+	"github.com/nexus-commerce/user-service/internal/user"
+)
+
+// Each test gets its own search_path, including its own migration history.
+func testDB(t *testing.T) *Database {
+	t.Helper()
+	dsn := os.Getenv("TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("set TEST_POSTGRES_DSN to run PostgreSQL integration tests")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	admin, err := New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = admin.Close() })
+	schema := "postgres_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
+	quoted := pgx.Identifier{schema}.Sanitize()
+	if _, err := admin.pool.ExecContext(ctx, "CREATE SCHEMA "+quoted); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := admin.pool.ExecContext(ctx, "DROP SCHEMA "+quoted+" CASCADE"); err != nil {
+			t.Errorf("clean up test schema: %v", err)
+		}
+	})
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.RuntimeParams["search_path"] = schema
+	db := &Database{pool: stdlib.OpenDB(*config)}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+type testSealer struct{}
+
+func (testSealer) Seal(p []byte) ([]byte, error) { return p, nil }
+
+func (testSealer) KeyID() string { return "test" }
+
+type testRepos struct {
+	db            *Database
+	users         *Users
+	registrations *Registrations
+}
+
+func newTestRepos(t *testing.T) testRepos {
+	t.Helper()
+	db := testDB(t)
+	publisher, err := messaging.NewPublisher(testSealer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testRepos{db: db, users: NewUsers(db, publisher), registrations: NewRegistrations(db, publisher)}
+}
+
+func (r testRepos) confirm() *usecase.ConfirmRegistration {
+	return usecase.NewConfirmRegistration(r.registrations)
+}
+
+func (r testRepos) complete() *usecase.CompleteRegistration {
+	return usecase.NewCompleteRegistration(r.registrations, r.users)
+}
+
+func (r testRepos) seedRegistration(t *testing.T, email string) (*user.PendingRegistration, user.ConfirmationToken) {
+	t.Helper()
+	token := user.NewConfirmationToken()
+	pending := user.RestorePendingRegistration(
+		uuid.New(), user.RestoreEmail(email),
+		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")),
+		user.RestorePasswordHash("test-hash"), token.Hash(), time.Now().UTC().Add(time.Hour), nil,
+	)
+	if err := r.registrations.Save(t.Context(), pending, (*user.PendingRegistration).EnsureSupersedable); err != nil {
+		t.Fatal(err)
+	}
+	return pending, token
+}
+
+func (r testRepos) seedUser(t *testing.T, email string) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	_, err := r.db.pool.ExecContext(t.Context(), `INSERT INTO users (id, first_name, last_name, email, password_hash)
+		VALUES ($1, 'Other', 'User', $2, 'hash')`, id.String(), email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func (r testRepos) count(t *testing.T, query string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := r.db.pool.QueryRowContext(t.Context(), query, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func (r testRepos) assertState(t *testing.T, id uuid.UUID, wantUsers, wantPending int, wantEvents map[string]int) {
+	t.Helper()
+	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1`, id.String()); got != wantUsers {
+		t.Errorf("users = %d, want %d", got, wantUsers)
+	}
+	if got := r.count(t, `SELECT count(*) FROM pending_registrations WHERE user_id = $1`, id.String()); got != wantPending {
+		t.Errorf("pending registrations = %d, want %d", got, wantPending)
+	}
+	for typ, want := range wantEvents {
+		got := r.count(t, `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = $3`,
+			id.String(), messaging.HeaderEventType, typ)
+		if got != want {
+			t.Errorf("outbox %s events = %d, want %d", typ, got, want)
+		}
+	}
+}
+
+func TestConfirmThenCompleteRegistration(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+
+	if err := r.confirm().Execute(t.Context(), token.Plaintext()); err != nil {
+		t.Fatalf("ConfirmRegistration error: %v", err)
+	}
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{
+		messaging.TypeRegistrationConfirmed: 1,
+		"user.registered":                   0,
+	})
+
+	for i := range 2 {
+		if err := r.complete().Execute(t.Context(), pending.UserID()); err != nil {
+			t.Fatalf("CompleteRegistration #%d error: %v", i+1, err)
+		}
+	}
+	r.assertState(t, pending.UserID(), 1, 0, map[string]int{
+		messaging.TypeRegistrationConfirmed: 1,
+		"user.registered":                   1,
+	})
+	if err := r.confirm().Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+		t.Fatalf("repeated confirmation: %v", err)
+	}
+}
+
+func TestCompleteRegistrationRejectsTakenEmail(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	r.seedUser(t, "jane@example.com")
+
+	if err := r.confirm().Execute(t.Context(), token.Plaintext()); err != nil {
+		t.Fatalf("ConfirmRegistration error: %v", err)
+	}
+	if err := r.complete().Execute(t.Context(), pending.UserID()); !errors.Is(err, user.ErrEmailTaken) {
+		t.Fatalf("CompleteRegistration error = %v, want %v", err, user.ErrEmailTaken)
+	}
+	r.assertState(t, pending.UserID(), 0, 0, map[string]int{
+		messaging.TypeRegistrationConfirmed: 1,
+		"user.registration_rejected":        1,
+		"user.registered":                   0,
+	})
+}
+
+func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	want := errors.New("update failed")
+
+	_, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
+		if err := p.Confirm(token); err != nil {
+			return err
+		}
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("UpdateByToken() error = %v, want %v", err, want)
+	}
+	p, err := r.registrations.ByUserID(t.Context(), pending.UserID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Confirmed() {
+		t.Error("registration confirmed after rolled back update")
+	}
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{messaging.TypeRegistrationConfirmed: 0})
+}
+
+func TestConcurrentConfirmation(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	confirm := r.confirm()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- confirm.Execute(ctx, token.Plaintext())
+		}()
+	}
+	close(start)
+	var successes, invalid int
+	for range 2 {
+		err := <-results
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, user.ErrInvalidConfirmationToken):
+			invalid++
+		default:
+			t.Fatalf("unexpected confirmation error: %v", err)
+		}
+	}
+	if successes != 1 || invalid != 1 {
+		t.Fatalf("successes = %d, invalid tokens = %d", successes, invalid)
+	}
+	r.assertState(t, pending.UserID(), 0, 1, map[string]int{messaging.TypeRegistrationConfirmed: 1})
+}
+
+func TestSaveKeepsConfirmedRegistration(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
+		return p.Confirm(token)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := user.RequestRegistration(user.RestoreEmail("jane@example.com"),
+		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")), mustTestPassword(t), testHasher{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.registrations.Save(t.Context(), again, (*user.PendingRegistration).EnsureSupersedable); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
+		t.Fatalf("Save() error = %v, want %v", err, user.ErrRegistrationAlreadyConfirmed)
+	}
+	p, err := r.registrations.ByUserID(t.Context(), pending.UserID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Confirmed() || p.TokenHash() != token.Hash() {
+		t.Error("confirmed registration was overwritten")
+	}
+	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+}
+
+func newTestRegistration(t *testing.T, email string) *user.PendingRegistration {
+	t.Helper()
+	p, err := user.RequestRegistration(user.RestoreEmail(email),
+		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")), mustTestPassword(t), testHasher{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestSaveReplacesUnconfirmedRegistration(t *testing.T) {
+	r := newTestRepos(t)
+	first, _ := r.seedRegistration(t, "jane@example.com")
+
+	again := newTestRegistration(t, "jane@example.com")
+	if err := r.registrations.Save(t.Context(), again, (*user.PendingRegistration).EnsureSupersedable); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+	p, err := r.registrations.ByUserID(t.Context(), again.UserID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Confirmed() || p.TokenHash() != again.TokenHash() {
+		t.Error("unconfirmed registration was not replaced")
+	}
+	r.assertState(t, first.UserID(), 0, 0, nil)
+	r.assertState(t, again.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
+}
+
+func TestConcurrentSaveOfNewEmail(t *testing.T) {
+	r := newTestRepos(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	regs := []*user.PendingRegistration{
+		newTestRegistration(t, "jane@example.com"),
+		newTestRegistration(t, "jane@example.com"),
+	}
+	start := make(chan struct{})
+	results := make(chan error, len(regs))
+	for _, p := range regs {
+		go func() {
+			<-start
+			results <- r.registrations.Save(ctx, p, (*user.PendingRegistration).EnsureSupersedable)
+		}()
+	}
+	close(start)
+	for range regs {
+		if err := <-results; err != nil {
+			t.Fatalf("Save() error: %v", err)
+		}
+	}
+	if got := r.count(t, `SELECT count(*) FROM pending_registrations WHERE email = $1`, "jane@example.com"); got != 1 {
+		t.Errorf("pending registrations = %d, want 1", got)
+	}
+}
+
+func TestUsersAddIsIdempotent(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	if err := pending.Confirm(token); err != nil {
+		t.Fatal(err)
+	}
+	usr, err := pending.Complete()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 2 {
+		if err := r.users.Add(t.Context(), usr); err != nil {
+			t.Fatalf("Add() #%d error: %v", i+1, err)
+		}
+	}
+	r.assertState(t, usr.ID(), 1, 1, map[string]int{"user.registered": 1})
+}
+
+func TestUsersAddEmailTaken(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	r.seedUser(t, "jane@example.com")
+	if err := pending.Confirm(token); err != nil {
+		t.Fatal(err)
+	}
+	usr, err := pending.Complete()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.users.Add(t.Context(), usr); !errors.Is(err, user.ErrEmailTaken) {
+		t.Fatalf("Add() error = %v, want %v", err, user.ErrEmailTaken)
+	}
+	r.assertState(t, usr.ID(), 0, 1, map[string]int{"user.registered": 0})
+}
+
+func TestDeleteExpiredKeepsConfirmedRegistrations(t *testing.T) {
+	r := newTestRepos(t)
+	unconfirmed, _ := r.seedRegistration(t, "old@example.com")
+	confirmed, token := r.seedRegistration(t, "jane@example.com")
+	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
+		return p.Confirm(token)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := r.registrations.DeleteExpired(t.Context(), time.Now().Add(2*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("DeleteExpired() = %d, %v; want 1, nil", n, err)
+	}
+	r.assertState(t, unconfirmed.UserID(), 0, 0, nil)
+	r.assertState(t, confirmed.UserID(), 0, 1, nil)
+}
+
+func TestOutboxCarriesEventType(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
+		return p.Confirm(token)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var got []messaging.Message
+	_, err := NewOutbox(r.db).ProcessBatch(t.Context(), 10, func(_ context.Context, msgs []messaging.Message) error {
+		got = msgs
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Type != messaging.TypeRegistrationConfirmed || got[0].Key != pending.UserID().String() {
+		t.Fatalf("ProcessBatch() messages = %+v, want one %s for %v", got, messaging.TypeRegistrationConfirmed, pending.UserID())
+	}
+}
+
+type testHasher struct{}
+
+func (testHasher) Hash(p user.Password) (user.PasswordHash, error) {
+	return user.NewPasswordHash("hashed:" + p.Plaintext())
+}
+
+func (testHasher) Verify(h user.PasswordHash, p user.Password) (bool, error) {
+	return h.Encoded() == "hashed:"+p.Plaintext(), nil
+}
+
+func mustTestPassword(t *testing.T) user.Password {
+	t.Helper()
+	p, err := user.NewPassword("s3cretpass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func (r testRepos) seedPendingEmailChange(t *testing.T, id uuid.UUID, email string, token user.ConfirmationToken) {
+	t.Helper()
+	_, err := r.db.pool.ExecContext(t.Context(), `INSERT INTO pending_email_changes (user_id, email, token_hash, expires_at)
+		VALUES ($1, $2, $3, $4)`, id.String(), email, token.Hash().Encoded(), time.Now().UTC().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (r testRepos) runBlockedBy(t *testing.T, change func(*sql.Tx) error, op func(context.Context) error) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	tx, err := r.db.pool.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var pid int
+	if err := tx.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+		t.Fatal(err)
+	}
+	if err := change(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- op(ctx) }()
+	for blocked := false; !blocked; {
+		query := `SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`
+		if err := r.db.pool.QueryRowContext(ctx, query, pid).Scan(&blocked); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case err := <-done:
+			t.Fatalf("operation finished before blocking on the lock: %v", err)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return <-done
+}
+
+func consumeEmailChange(id uuid.UUID, newEmail string) func(*sql.Tx) error {
+	return func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`UPDATE users SET email = $1 WHERE id = $2`, newEmail, id.String()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`DELETE FROM pending_email_changes WHERE user_id = $1`, id.String())
+		return err
+	}
+}
+
+func (r testRepos) rename(id uuid.UUID) func(context.Context) error {
+	return func(ctx context.Context) error {
+		_, err := r.users.UpdateByID(ctx, id, func(u *user.User) error {
+			u.Rename(user.NewFullName(user.RestoreName("Renamed"), user.RestoreName("User")))
+			return nil
+		})
+		return err
+	}
+}
+
+func (r testRepos) emailChangedEvents(t *testing.T, id uuid.UUID) int {
+	t.Helper()
+	return r.count(t, `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = 'user.email_changed'`,
+		id.String(), messaging.HeaderEventType)
+}
+
+func TestRenameWaitingOnConfirmedEmailChangeDoesNotRestoreIt(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "old@example.com")
+	r.seedPendingEmailChange(t, id, "new@example.com", user.NewConfirmationToken())
+
+	if err := r.runBlockedBy(t, consumeEmailChange(id, "new@example.com"), r.rename(id)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1`, id.String()); got != 0 {
+		t.Errorf("pending email changes = %d, want 0", got)
+	}
+	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND first_name = 'Renamed' AND email = 'new@example.com'`, id.String()); got != 1 {
+		t.Errorf("users with the new name and the new email = %d, want 1", got)
+	}
+}
+
+func TestRenameWaitingOnRequestedEmailChangeKeepsIt(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "old@example.com")
+	token := user.NewConfirmationToken()
+
+	request := func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`UPDATE users SET first_name = first_name WHERE id = $1`, id.String()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`INSERT INTO pending_email_changes (user_id, email, token_hash, expires_at)
+			VALUES ($1, 'new@example.com', $2, $3)`, id.String(), token.Hash().Encoded(), time.Now().UTC().Add(time.Hour))
+		return err
+	}
+	if err := r.runBlockedBy(t, request, r.rename(id)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1 AND token_hash = $2`, id.String(), token.Hash().Encoded()); got != 1 {
+		t.Errorf("pending email changes with the mailed token = %d, want 1", got)
+	}
+}
+
+func TestConfirmWaitingOnConfirmedEmailChangeRejectsUsedToken(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "old@example.com")
+	token := user.NewConfirmationToken()
+	r.seedPendingEmailChange(t, id, "new@example.com", token)
+	confirm := usecase.NewConfirmEmailChange(r.users)
+
+	err := r.runBlockedBy(t, consumeEmailChange(id, "new@example.com"), func(ctx context.Context) error {
+		return confirm.Execute(ctx, token.Plaintext())
+	})
+
+	if !errors.Is(err, user.ErrInvalidConfirmationToken) {
+		t.Errorf("err = %v, want %v", err, user.ErrInvalidConfirmationToken)
+	}
+	if got := r.emailChangedEvents(t, id); got != 0 {
+		t.Errorf("email changed events = %d, want 0", got)
+	}
+}
+
+func TestConfirmEmailChangeAppliesPendingEmail(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "old@example.com")
+	token := user.NewConfirmationToken()
+	r.seedPendingEmailChange(t, id, "new@example.com", token)
+
+	if err := usecase.NewConfirmEmailChange(r.users).Execute(t.Context(), token.Plaintext()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND email = 'new@example.com'`, id.String()); got != 1 {
+		t.Errorf("users with the new email = %d, want 1", got)
+	}
+	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1`, id.String()); got != 0 {
+		t.Errorf("pending email changes = %d, want 0", got)
+	}
+	if got := r.emailChangedEvents(t, id); got != 1 {
+		t.Errorf("email changed events = %d, want 1", got)
+	}
+}
+
+func TestUpdateUnknownUserReturnsNotFound(t *testing.T) {
+	r := newTestRepos(t)
+	noop := func(*user.User) error { return nil }
+
+	if _, err := r.users.UpdateByID(t.Context(), uuid.New(), noop); !errors.Is(err, user.ErrNotFound) {
+		t.Errorf("UpdateByID err = %v, want %v", err, user.ErrNotFound)
+	}
+	hash := user.NewConfirmationToken().Hash()
+	if _, err := r.users.UpdateByEmailChangeToken(t.Context(), hash, noop); !errors.Is(err, user.ErrNotFound) {
+		t.Errorf("UpdateByEmailChangeToken err = %v, want %v", err, user.ErrNotFound)
+	}
+}

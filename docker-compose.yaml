@@ -8,6 +8,7 @@ services:
     hostname: user-service
     networks:
       - user-service-network
+      - ecommerce-network
     ports:
       - "80:80"
     volumes:
@@ -29,8 +30,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
 
   outbox-relay:
     build:
@@ -41,6 +40,7 @@ services:
     hostname: outbox-relay
     networks:
       - user-service-network
+      - ecommerce-network
     volumes:
       - .:/app
     env_file:
@@ -57,8 +57,33 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
+
+  registration-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: user-service-dev
+    container_name: registration-consumer
+    hostname: registration-consumer
+    networks:
+      - user-service-network
+      - ecommerce-network
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      KAFKA_HOST: kafka
+      KAFKA_PORT: 29092
+    command: [ "air", "-c", ".air.consumer.toml" ]
+    restart: on-failure
+    depends_on:
+      user-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   purge:
     build:
@@ -69,6 +94,7 @@ services:
     hostname: purge
     networks:
       - user-service-network
+      - ecommerce-network
     volumes:
       - .:/app
     env_file:
@@ -109,70 +135,11 @@ services:
       retries: 10
       start_period: 120s
 
-  kafka:
-    image: confluentinc/cp-kafka:8.1.0
-    container_name: kafka
-    hostname: kafka
-    networks:
-      - user-service-network
-    ports:
-      - "9092:9092"
-    restart: always
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://kafka:9093,PLAINTEXT_HOST://0.0.0.0:9092'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      KAFKA_NUM_PARTITIONS: 3
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
-  kafka-init:
-    image: confluentinc/cp-kafka:8.1.0
-    container_name: kafka-init
-    networks:
-      - user-service-network
-    command: >
-      kafka-topics --create --if-not-exists
-      --bootstrap-server kafka:29092
-      --topic users
-      --partitions 3
-      --replication-factor 1
-    depends_on:
-      kafka:
-        condition: service_healthy
-
-  redpanda-console:
-    image: redpandadata/console:v2.8.0
-    container_name: redpanda-console
-    networks:
-      - user-service-network
-    ports:
-      - "8080:8080"
-    restart: always
-    environment:
-      KAFKA_BROKERS: kafka:29092
-    depends_on:
-      kafka:
-        condition: service_healthy
-
 networks:
   user-service-network:
     driver: bridge
+  ecommerce-network:
+    external: true
 
 volumes:
   postgres-data:
