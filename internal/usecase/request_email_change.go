@@ -58,7 +58,7 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 
 	_, err = r.users.UpdateByID(ctx, req.UserID, func(locked *user.User) error {
 		if taken {
-			return locked.AttemptEmailChangeToTakenAddress(email, proof)
+			return locked.RecordEmailChangeToTakenAddress(email, proof)
 		}
 		return locked.RequestEmailChange(email, proof)
 	})

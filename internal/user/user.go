@@ -98,7 +98,7 @@ func (u *User) RequestEmailChange(newEmail Email, proof Reauthentication) error 
 	return nil
 }
 
-func (u *User) AttemptEmailChangeToTakenAddress(newEmail Email, proof Reauthentication) error {
+func (u *User) RecordEmailChangeToTakenAddress(newEmail Email, proof Reauthentication) error {
 	if err := u.authorizeEmailChange(newEmail, proof); err != nil {
 		return err
 	}

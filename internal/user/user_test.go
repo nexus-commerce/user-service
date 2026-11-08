@@ -228,20 +228,20 @@ func TestRequestEmailChange(t *testing.T) {
 	})
 }
 
-func TestAttemptEmailChangeToTakenAddress(t *testing.T) {
+func TestRecordEmailChangeToTakenAddress(t *testing.T) {
 	attempt := func(t *testing.T, u *user.User, email, password string) error {
 		t.Helper()
 		proof, err := u.Reauthenticate(mustPassword(t, password), fakeHasher{})
 		if err != nil {
 			return err
 		}
-		return u.AttemptEmailChangeToTakenAddress(mustEmail(t, email), proof)
+		return u.RecordEmailChangeToTakenAddress(mustEmail(t, email), proof)
 	}
 	t.Run("records event without pending change", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			u := mustUser(t)
 			if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-				t.Fatalf("AttemptEmailChangeToTakenAddress() error: %v", err)
+				t.Fatalf("RecordEmailChangeToTakenAddress() error: %v", err)
 			}
 			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
 				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
@@ -261,7 +261,7 @@ func TestAttemptEmailChangeToTakenAddress(t *testing.T) {
 			t.Fatalf("RequestEmailChange() error: %v", err)
 		}
 		if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-			t.Fatalf("AttemptEmailChangeToTakenAddress() error: %v", err)
+			t.Fatalf("RecordEmailChangeToTakenAddress() error: %v", err)
 		}
 		if p, ok := u.PendingEmailChange(); !ok || p.Email().String() != "new@example.com" {
 			t.Errorf("pending = %+v, %v; want new@example.com", p, ok)
@@ -288,7 +288,7 @@ func TestAttemptEmailChangeToTakenAddress(t *testing.T) {
 func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 	changes := map[string]func(*user.User, user.Email, user.Reauthentication) error{
 		"request": (*user.User).RequestEmailChange,
-		"attempt": (*user.User).AttemptEmailChangeToTakenAddress,
+		"attempt": (*user.User).RecordEmailChangeToTakenAddress,
 	}
 	proofs := map[string]func(*testing.T, *user.User) user.Reauthentication{
 		"missing": func(*testing.T, *user.User) user.Reauthentication {

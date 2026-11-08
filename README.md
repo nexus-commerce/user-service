@@ -7,13 +7,26 @@ login (JWT), renaming, and email change with confirmation.
 
 This service deliberately merges two bounded contexts that would ideally be separate:
 
-- **Identity** — credentials, login, confirmation tokens, email ownership.
-- **Customer** — the person's profile (name, and whatever the shop needs later).
+- **Identity** (generic subdomain) — credentials, login, confirmation tokens, email ownership.
+- **Customer** (supporting subdomain) — the person's profile (name, and whatever the shop needs later).
 
-For simplicity, both live in a single `user` context. The model already keeps them
-apart: authentication and confirmation flows on one side, `Rename` on the other.
-Extracting `identity-service` and `customer-service` later means moving code along that
-line, not untangling it.
+Neither is the platform's core domain, so neither warrants its own bounded context;
+a single `user` context is a deliberate trade-off, not a shortcut.
+
+In a production system, Identity would be delegated to an off-the-shelf provider
+(Keycloak, Auth0, Zitadel). Here it is built in-house on purpose: this is a learning
+project, and modelling registration, confirmation and email change is part of the goal.
+
+The model mostly keeps them apart: authentication and confirmation flows on one side,
+`Rename` on the other. The seam is not perfectly clean: registration collects the name
+together with credentials, and identity events carry
+`FullName` for notifications. Extracting `identity-service` and `customer-service` later
+therefore also means deciding:
+
+- who creates the customer profile (likely `customer-service` reacting to `Registered`);
+- where `notification-service` gets the name from (its own projection of customer
+  events, or a display name kept by identity);
+- whether registration stays a single form that writes to both contexts.
 
 ## Architecture
 
