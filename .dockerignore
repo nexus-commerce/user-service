@@ -1,8 +1,7 @@
 .idea
 .git
 .env
-.air.toml
-.air.relay.toml
+dev
 tmp
 *.md
 .github

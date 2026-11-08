@@ -17,6 +17,6 @@ esac
 
 cd "$(dirname "$0")"
 
-docker compose --profile kafka down -v
-docker compose "${profile[@]}" up -d
-docker compose logs -f user-service
+docker compose --env-file ../.env --profile kafka down -v
+docker compose --env-file ../.env "${profile[@]}" up -d
+docker compose --env-file ../.env logs -f user-service

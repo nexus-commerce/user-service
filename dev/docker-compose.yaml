@@ -1,8 +1,10 @@
+name: user-service
+
 services:
   user-service:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: dev/Dockerfile.dev
     image: user-service-dev
     hostname: user-service
     networks:
@@ -10,9 +12,9 @@ services:
     ports:
       - "80:80"
     volumes:
-      - .:/app
+      - ..:/app
     env_file:
-      - .env
+      - ../.env
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -31,22 +33,22 @@ services:
 
   outbox-relay:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: dev/Dockerfile.dev
     image: user-service-dev
     hostname: outbox-relay
     networks:
       - user-service-network
     volumes:
-      - .:/app
+      - ..:/app
     env_file:
-      - .env
+      - ../.env
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       KAFKA_HOST: kafka
       KAFKA_PORT: 29092
-    command: [ "air", "-c", ".air.relay.toml" ]
+    command: [ "air", "-c", "dev/air/relay.toml" ]
     profiles: [ kafka ]
     restart: on-failure
     depends_on:
@@ -59,22 +61,22 @@ services:
 
   registration-consumer:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: dev/Dockerfile.dev
     image: user-service-dev
     hostname: registration-consumer
     networks:
       - user-service-network
     volumes:
-      - .:/app
+      - ..:/app
     env_file:
-      - .env
+      - ../.env
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       KAFKA_HOST: kafka
       KAFKA_PORT: 29092
-    command: [ "air", "-c", ".air.consumer.toml" ]
+    command: [ "air", "-c", "dev/air/consumer.toml" ]
     profiles: [ kafka ]
     restart: on-failure
     depends_on:
@@ -87,22 +89,22 @@ services:
 
   purge:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: dev/Dockerfile.dev
     image: user-service-dev
     hostname: purge
     networks:
       - user-service-network
     volumes:
-      - .:/app
+      - ..:/app
     env_file:
-      - .env
+      - ../.env
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       KAFKA_HOST: kafka
       KAFKA_PORT: 29092
-    command: [ "air", "-c", ".air.purge.toml" ]
+    command: [ "air", "-c", "dev/air/purge.toml" ]
     restart: on-failure
     depends_on:
       user-service:
