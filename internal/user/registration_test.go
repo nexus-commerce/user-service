@@ -134,18 +134,24 @@ func TestConfirmRejectsExpiredToken(t *testing.T) {
 
 var janetRoe = nameFields{FirstName: "Janet", LastName: "Roe"}
 
+func newerRequest(t *testing.T, email string) *user.PendingRegistration {
+	t.Helper()
+	p, err := user.RequestRegistration(mustEmail(t, email), mustFullName(t, janetRoe), mustPassword(t, "n3wpassword"), fakeHasher{})
+	if err != nil {
+		t.Fatalf("RequestRegistration() error: %v", err)
+	}
+	return p
+}
+
 func TestSupersedeRenewsRegistration(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p, _ := mustPending(t)
 		id, email := p.UserID(), p.Email()
-		name := mustFullName(t, janetRoe)
-		hash, err := fakeHasher{}.Hash(mustPassword(t, "n3wpassword"))
-		if err != nil {
-			t.Fatalf("Hash() error: %v", err)
-		}
 		time.Sleep(23 * time.Hour)
+		newer := newerRequest(t, janeEmail)
+		name, hash := newer.FullName(), newer.PasswordHash()
 
-		if err := p.Supersede(name, hash); err != nil {
+		if err := p.Supersede(newer); err != nil {
 			t.Fatalf("Supersede() error: %v", err)
 		}
 		if p.UserID() != id || p.Email() != email || p.FullName() != name || p.PasswordHash() != hash {
@@ -172,7 +178,7 @@ func TestSupersedeIssuesFreshToken(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p, old := mustPending(t)
 		time.Sleep(25 * time.Hour)
-		if err := p.Supersede(p.FullName(), p.PasswordHash()); err != nil {
+		if err := p.Supersede(newerRequest(t, janeEmail)); err != nil {
 			t.Fatalf("Supersede() error: %v", err)
 		}
 		fresh := lastRequested(t, p).Token
@@ -191,11 +197,21 @@ func TestSupersedeRejectsConfirmedRegistration(t *testing.T) {
 	if err := p.Confirm(tok); err != nil {
 		t.Fatalf("Confirm() error: %v", err)
 	}
-	if err := p.Supersede(mustFullName(t, janetRoe), mustHash(t)); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
+	if err := p.Supersede(newerRequest(t, janeEmail)); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 		t.Errorf("Supersede() error = %v, want %v", err, user.ErrRegistrationAlreadyConfirmed)
 	}
 	if p.FullName() != mustFullName(t, janeDoe) || p.TokenHash() != tok.Hash() || len(p.Events()) != 2 {
 		t.Error("Supersede() changed a confirmed registration")
+	}
+}
+
+func TestSupersedeRejectsOtherEmail(t *testing.T) {
+	p, tok := mustPending(t)
+	if err := p.Supersede(newerRequest(t, "other@example.com")); !errors.Is(err, user.ErrRegistrationEmailMismatch) {
+		t.Errorf("Supersede() error = %v, want %v", err, user.ErrRegistrationEmailMismatch)
+	}
+	if p.FullName() != mustFullName(t, janeDoe) || p.TokenHash() != tok.Hash() || len(p.Events()) != 1 {
+		t.Error("Supersede() changed a registration for another email")
 	}
 }
 

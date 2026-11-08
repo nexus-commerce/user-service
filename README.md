@@ -47,7 +47,7 @@ then relayed to Kafka.
 | Aggregate | Responsibility |
 |---|---|
 | `PendingRegistration` | A registration awaiting email confirmation (token hash, 24h expiry). Acts as the factory for `User`: `Complete()` only succeeds once confirmed. A newer request for the same email supersedes an unconfirmed one (`Supersede()`): the registration keeps its ID and gets a fresh token and expiry. If the email is taken by the time it completes, it is rejected (`RegistrationRejected`). |
-| `User` | A registered account. Owns authentication, renaming and email change. Holds at most one `PendingEmailChange`; requesting a change requires a `Reauthentication` proof obtained by re-entering the password. |
+| `User` | A registered account. Owns authentication, renaming and email change. Holds at most one `PendingEmailChange`; requesting a change requires a `Reauthentication` proof obtained by re-entering the password. If the new email is taken by the time the change is confirmed, the change is rejected (`EmailChangeRejected`). |
 
 Confirmation tokens travel in events sealed with NaCl anonymous box using
 notification-service's public key, so only that service can read them. Duplicate and

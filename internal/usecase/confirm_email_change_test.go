@@ -1,6 +1,7 @@
 package usecase_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -69,10 +70,60 @@ func TestConfirmEmailChangeRejectsBadToken(t *testing.T) {
 }
 
 func TestConfirmEmailChangeEmailTakenMeanwhile(t *testing.T) {
-	_, users, tok := requestedJane(t)
-	users.updateErr = user.ErrEmailTaken
+	usr, users, tok := requestedJane(t)
+	newUser(t, users, "new@example.com", "John", "Roe")
+	confirm := usecase.NewConfirmEmailChange(users)
 
-	err := usecase.NewConfirmEmailChange(users).Execute(t.Context(), tok.Plaintext())
+	if err := confirm.Execute(t.Context(), tok.Plaintext()); !errors.Is(err, user.ErrEmailTaken) {
+		t.Fatalf("Execute() error = %v, want %v", err, user.ErrEmailTaken)
+	}
+	if _, ok := usr.PendingEmailChange(); ok || usr.Email().String() != "jane@example.com" {
+		t.Errorf("email = %q, pending = %v; want unchanged, no pending", usr.Email(), ok)
+	}
+	rejected := publishedOf[user.EmailChangeRejected](usr.Events())
+	if len(rejected) != 1 || rejected[0].NewEmail != mustEmail(t, "new@example.com") {
+		t.Errorf("EmailChangeRejected events = %+v, want one for new@example.com", rejected)
+	}
+	if n := len(publishedOf[user.EmailChanged](usr.Events())); n != 0 {
+		t.Errorf("recorded %d EmailChanged events, want 0", n)
+	}
+	if err := confirm.Execute(t.Context(), tok.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+		t.Errorf("repeated Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+	}
+}
+
+func TestConfirmEmailChangeRejectFailure(t *testing.T) {
+	usr, users, tok := requestedJane(t)
+	newUser(t, users, "new@example.com", "John", "Roe")
+	want := errors.New("reject failed")
+	users.updateErr = want
+
+	if err := usecase.NewConfirmEmailChange(users).Execute(t.Context(), tok.Plaintext()); !errors.Is(err, want) {
+		t.Fatalf("Execute() error = %v, want %v", err, want)
+	}
+	if _, ok := usr.PendingEmailChange(); !ok {
+		t.Error("pending email change lost after failed rejection")
+	}
+}
+
+type vanishingEmailChange struct {
+	*fakeUsers
+	calls int
+}
+
+func (u *vanishingEmailChange) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error) {
+	u.calls++
+	if u.calls > 1 {
+		return nil, user.ErrNotFound
+	}
+	return u.fakeUsers.UpdateByEmailChangeToken(ctx, hash, updateFn)
+}
+
+func TestConfirmEmailChangeVanishedBeforeReject(t *testing.T) {
+	_, users, tok := requestedJane(t)
+	newUser(t, users, "new@example.com", "John", "Roe")
+
+	err := usecase.NewConfirmEmailChange(&vanishingEmailChange{fakeUsers: users}).Execute(t.Context(), tok.Plaintext())
 	if !errors.Is(err, user.ErrEmailTaken) {
 		t.Errorf("Execute() error = %v, want %v", err, user.ErrEmailTaken)
 	}

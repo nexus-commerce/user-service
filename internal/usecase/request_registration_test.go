@@ -110,7 +110,7 @@ func TestRequestRegistrationHashesOnceInBothBranches(t *testing.T) {
 
 func TestRequestRegistrationDuplicateUserVanished(t *testing.T) {
 	_, users := newJane(t)
-	users.vanishOnRecord = true
+	users.vanishOnUpdateByEmail = true
 	regs := &fakeRegistrations{}
 
 	if err := usecase.NewRequestRegistration(users, regs, fakeHasher{}).Execute(t.Context(), validRegistrationRequest("jane@example.com")); err != nil {

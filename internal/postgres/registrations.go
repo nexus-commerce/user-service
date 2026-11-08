@@ -15,7 +15,7 @@ const saveAttempts = 3
 
 var errConcurrentRegistration = errors.New("concurrent registration for the same email")
 
-const selectPendingRegistration =`SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
+const selectPendingRegistration = `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
 	FROM pending_registrations`
 
 type Registrations struct {
@@ -166,7 +166,7 @@ func (r *Registrations) UpdateByToken(
 	return p, nil
 }
 
-func (r *Registrations) Reject(ctx context.Context, id uuid.UUID, rejectFn func(*user.PendingRegistration) error) error {
+func (r *Registrations) DeleteByUserID(ctx context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error {
 	selectQuery := selectPendingRegistration + ` WHERE user_id = $1 FOR UPDATE`
 
 	return r.db.runInTx(ctx, func(tx *sql.Tx) error {
@@ -175,10 +175,10 @@ func (r *Registrations) Reject(ctx context.Context, id uuid.UUID, rejectFn func(
 			if errors.Is(err, user.ErrRegistrationNotFound) {
 				return err
 			}
-			return fmt.Errorf("select pending registration for reject: %w", err)
+			return fmt.Errorf("select pending registration for delete: %w", err)
 		}
 
-		if err = rejectFn(p); err != nil {
+		if err = deleteFn(p); err != nil {
 			return err
 		}
 

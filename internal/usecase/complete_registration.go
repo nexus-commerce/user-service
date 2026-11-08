@@ -10,7 +10,7 @@ import (
 
 type completeRegistrationRegistrations interface {
 	ByUserID(ctx context.Context, id uuid.UUID) (*user.PendingRegistration, error)
-	Reject(ctx context.Context, id uuid.UUID, rejectFn func(*user.PendingRegistration) error) error
+	DeleteByUserID(ctx context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -54,7 +54,7 @@ func (c *CompleteRegistration) Execute(ctx context.Context, userID uuid.UUID) er
 }
 
 func (c *CompleteRegistration) reject(ctx context.Context, userID uuid.UUID) error {
-	err := c.registrations.Reject(ctx, userID, (*user.PendingRegistration).Reject)
+	err := c.registrations.DeleteByUserID(ctx, userID, (*user.PendingRegistration).Reject)
 	if err != nil && !errors.Is(err, user.ErrRegistrationNotFound) {
 		return err
 	}

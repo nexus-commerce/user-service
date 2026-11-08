@@ -93,6 +93,11 @@ func newEncoder(sealer Sealer) (*encoder, error) {
 			typ:     "user.email_changed",
 			version: "1.0",
 		}, convertEmailChanged),
+		newRoute(destination{
+			topic:   TopicUsers,
+			typ:     "user.email_change_rejected",
+			version: "1.0",
+		}, convertEmailChangeRejected),
 	}
 	for _, r := range routes {
 		if err := enc.register(r); err != nil {
@@ -312,5 +317,19 @@ func convertEmailChanged(e user.EmailChanged) (any, error) {
 		OldEmail:  e.OldEmail.String(),
 		NewEmail:  e.NewEmail.String(),
 		ChangedAt: e.OccurredAt,
+	}, nil
+}
+
+type userEmailChangeRejected struct {
+	UserID     string    `json:"userId"`
+	NewEmail   string    `json:"newEmail"`
+	RejectedAt time.Time `json:"rejectedAt"`
+}
+
+func convertEmailChangeRejected(e user.EmailChangeRejected) (any, error) {
+	return userEmailChangeRejected{
+		UserID:     e.AggregateID.String(),
+		NewEmail:   e.NewEmail.String(),
+		RejectedAt: e.OccurredAt,
 	}, nil
 }

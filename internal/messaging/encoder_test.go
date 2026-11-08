@@ -487,3 +487,31 @@ func TestEncodeUserRegistrationRejected(t *testing.T) {
 		t.Errorf("encode(RegistrationRejected) payload = %+v, want %+v", got, want)
 	}
 }
+
+func TestEncodeUserEmailChangeRejected(t *testing.T) {
+	e := user.EmailChangeRejected{EventMeta: newMeta(), NewEmail: mustEmail(t, "new@example.com")}
+
+	msg, err := mustEncoder(t, fakeSealer{}).encode(e)
+	if err != nil {
+		t.Fatalf("encode(EmailChangeRejected) error: %v", err)
+	}
+	assertHeader(t, msg, e.EventMeta)
+
+	type payload struct {
+		Type    string `json:"eventType"`
+		Version string `json:"version"`
+		Data    struct {
+			UserID     string    `json:"userId"`
+			NewEmail   string    `json:"newEmail"`
+			RejectedAt time.Time `json:"rejectedAt"`
+		} `json:"data"`
+	}
+	got := decode[payload](t, msg)
+	want := payload{Type: "user.email_change_rejected", Version: "1.0"}
+	want.Data.UserID = e.AggregateID.String()
+	want.Data.NewEmail = "new@example.com"
+	want.Data.RejectedAt = e.OccurredAt
+	if got != want {
+		t.Errorf("encode(EmailChangeRejected) payload = %+v, want %+v", got, want)
+	}
+}

@@ -31,7 +31,7 @@ type confirmEmailChangeRequest struct {
 // @Param       request  body  confirmEmailChangeRequest  true  "Confirmation token"
 // @Success     204
 // @Failure     400  {object}  errorResponse  "Invalid request, invalid, already used or expired confirmation link"
-// @Failure     409  {object}  errorResponse  "User with this email already exists"
+// @Failure     409  {object}  errorResponse  "User with this email already exists; the email change is cancelled"
 // @Failure     413  {object}  errorResponse  "Request body too large"
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/email/confirm [post]

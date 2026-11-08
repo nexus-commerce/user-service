@@ -139,6 +139,19 @@ func (u *User) ConfirmEmailChange(token ConfirmationToken) error {
 	return nil
 }
 
+func (u *User) RejectEmailChange(token ConfirmationToken) error {
+	if u.pending == nil || token.Hash() != u.pending.tokenHash {
+		return ErrInvalidConfirmationToken
+	}
+	rejected := u.pending.email
+	u.pending = nil
+	u.events = append(u.events, EmailChangeRejected{
+		EventMeta: u.newEventMeta(time.Now().UTC()),
+		NewEmail:  rejected,
+	})
+	return nil
+}
+
 func (u *User) Authenticate(password Password, hasher Hasher) error {
 	ok, err := hasher.Verify(u.passwordHash, password)
 	if err != nil {

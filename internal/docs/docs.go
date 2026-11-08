@@ -350,7 +350,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "User with this email already exists",
+                        "description": "User with this email already exists; the email change is cancelled",
                         "schema": {
                             "$ref": "#/definitions/http.errorResponse"
                         }

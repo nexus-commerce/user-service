@@ -9,7 +9,7 @@ import (
 
 type requestRegistrationUsers interface {
 	EmailTaken(ctx context.Context, email user.Email) (bool, error)
-	RecordByEmail(ctx context.Context, email user.Email, recordFn func(*user.User)) error
+	UpdateByEmail(ctx context.Context, email user.Email, updateFn func(*user.User) error) (*user.User, error)
 }
 
 type requestRegistrationRegistrations interface {
@@ -70,7 +70,7 @@ func (r *RequestRegistration) Execute(ctx context.Context, req RegistrationReque
 	}
 	if !taken {
 		err = r.registrations.Save(ctx, pending, func(existing *user.PendingRegistration) error {
-			return existing.Supersede(pending.FullName(), pending.PasswordHash())
+			return existing.Supersede(pending)
 		})
 		if errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 			return nil
@@ -78,7 +78,10 @@ func (r *RequestRegistration) Execute(ctx context.Context, req RegistrationReque
 		return err
 	}
 
-	err = r.users.RecordByEmail(ctx, email, (*user.User).RecordDuplicateRegistration)
+	_, err = r.users.UpdateByEmail(ctx, email, func(usr *user.User) error {
+		usr.RecordDuplicateRegistration()
+		return nil
+	})
 	if errors.Is(err, user.ErrNotFound) {
 		return nil
 	}

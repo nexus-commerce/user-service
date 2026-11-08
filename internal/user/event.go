@@ -95,3 +95,10 @@ type EmailChanged struct {
 }
 
 func (EmailChanged) isEvent() {}
+
+type EmailChangeRejected struct {
+	EventMeta
+	NewEmail Email
+}
+
+func (EmailChangeRejected) isEvent() {}

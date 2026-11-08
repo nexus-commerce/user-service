@@ -116,7 +116,7 @@ func TestCompleteRegistrationRejectFailure(t *testing.T) {
 	users, regs, id := confirmedJane(t)
 	newUser(t, users, "jane@example.com", "Other", "Jane")
 	want := errors.New("reject failed")
-	regs.rejectErr = want
+	regs.deleteByUserIDErr = want
 
 	if err := usecase.NewCompleteRegistration(regs, users).Execute(t.Context(), id); !errors.Is(err, want) {
 		t.Fatalf("Execute() error = %v, want %v", err, want)

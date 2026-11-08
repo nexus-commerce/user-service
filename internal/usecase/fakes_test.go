@@ -36,11 +36,11 @@ func (c *countingHasher) Hash(p user.Password) (user.PasswordHash, error) {
 }
 
 type fakeUsers struct {
-	byID           map[uuid.UUID]*user.User
-	addErr         error
-	addCalls       int
-	updateErr      error
-	vanishOnRecord bool
+	byID                  map[uuid.UUID]*user.User
+	addErr                error
+	addCalls              int
+	updateErr             error
+	vanishOnUpdateByEmail bool
 }
 
 func (f *fakeUsers) add(usr *user.User) {
@@ -77,25 +77,35 @@ func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(
 	if err != nil {
 		return nil, err
 	}
-	if err = updateFn(usr); err != nil {
+	before := *usr
+	if err = f.apply(usr, updateFn); err != nil {
+		*usr = before
 		return nil, err
-	}
-	if f.updateErr != nil {
-		return nil, f.updateErr
 	}
 	return usr, nil
 }
 
-func (f *fakeUsers) RecordByEmail(ctx context.Context, email user.Email, recordFn func(*user.User)) error {
-	if f.vanishOnRecord {
-		return user.ErrNotFound
+func (f *fakeUsers) apply(usr *user.User, updateFn func(*user.User) error) error {
+	if err := updateFn(usr); err != nil {
+		return err
+	}
+	for _, other := range f.byID {
+		if other.ID() != usr.ID() && other.Email() == usr.Email() {
+			return user.ErrEmailTaken
+		}
+	}
+	return f.updateErr
+}
+
+func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, updateFn func(*user.User) error) (*user.User, error) {
+	if f.vanishOnUpdateByEmail {
+		return nil, user.ErrNotFound
 	}
 	usr, err := f.ByEmail(ctx, email)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	recordFn(usr)
-	return nil
+	return f.UpdateByID(ctx, usr.ID(), updateFn)
 }
 
 func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error) {
@@ -108,12 +118,12 @@ func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.Conf
 }
 
 type fakeRegistrations struct {
-	byEmail   map[user.Email]*user.PendingRegistration
-	readErr   error
-	updateErr error
-	rejectErr error
-	deleteErr error
-	published []user.Event
+	byEmail           map[user.Email]*user.PendingRegistration
+	readErr           error
+	updateErr         error
+	deleteByUserIDErr error
+	deleteErr         error
+	published         []user.Event
 }
 
 func copyPending(p *user.PendingRegistration) *user.PendingRegistration {
@@ -172,16 +182,16 @@ func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.Confirmat
 	return p, nil
 }
 
-func (f *fakeRegistrations) Reject(_ context.Context, id uuid.UUID, rejectFn func(*user.PendingRegistration) error) error {
+func (f *fakeRegistrations) DeleteByUserID(_ context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error {
 	p, err := f.find(func(p *user.PendingRegistration) bool { return p.UserID() == id })
 	if err != nil {
 		return err
 	}
-	if err = rejectFn(p); err != nil {
+	if err = deleteFn(p); err != nil {
 		return err
 	}
-	if f.rejectErr != nil {
-		return f.rejectErr
+	if f.deleteByUserIDErr != nil {
+		return f.deleteByUserIDErr
 	}
 	delete(f.byEmail, p.Email())
 	f.published = append(f.published, p.Events()...)

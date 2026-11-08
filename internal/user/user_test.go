@@ -330,17 +330,19 @@ func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 	}
 }
 
-func TestConfirmEmailChange(t *testing.T) {
-	requested := func(t *testing.T) (*user.User, user.ConfirmationToken) {
-		u := mustUser(t)
-		if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
-			t.Fatalf("RequestEmailChange() error: %v", err)
-		}
-		return u, eventsOf[user.EmailChangeRequested](u)[0].Token
+func requestedChange(t *testing.T) (*user.User, user.ConfirmationToken) {
+	t.Helper()
+	u := mustUser(t)
+	if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
+		t.Fatalf("RequestEmailChange() error: %v", err)
 	}
+	return u, eventsOf[user.EmailChangeRequested](u)[0].Token
+}
+
+func TestConfirmEmailChange(t *testing.T) {
 	t.Run("valid at expiry instant", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			u, tok := requested(t)
+			u, tok := requestedChange(t)
 			time.Sleep(24 * time.Hour)
 			if err := u.ConfirmEmailChange(tok); err != nil {
 				t.Fatalf("ConfirmEmailChange() error: %v", err)
@@ -356,7 +358,7 @@ func TestConfirmEmailChange(t *testing.T) {
 	})
 	t.Run("expired", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			u, tok := requested(t)
+			u, tok := requestedChange(t)
 			time.Sleep(24*time.Hour + time.Nanosecond)
 			err := u.ConfirmEmailChange(tok)
 			if !errors.Is(err, user.ErrConfirmationTokenExpired) || u.Email().String() != "jane@example.com" {
@@ -365,7 +367,7 @@ func TestConfirmEmailChange(t *testing.T) {
 		})
 	})
 	t.Run("superseded token", func(t *testing.T) {
-		u, old := requested(t)
+		u, old := requestedChange(t)
 		if err := requestChange(t, u, "other@example.com", "s3cretpass"); err != nil {
 			t.Fatalf("second RequestEmailChange() error: %v", err)
 		}
@@ -376,6 +378,46 @@ func TestConfirmEmailChange(t *testing.T) {
 	t.Run("no pending change", func(t *testing.T) {
 		u := mustUser(t)
 		if err := u.ConfirmEmailChange(user.NewConfirmationToken()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+		}
+	})
+}
+
+func TestRejectEmailChange(t *testing.T) {
+	t.Run("discards pending change and records event", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			u, tok := requestedChange(t)
+			if err := u.RejectEmailChange(tok); err != nil {
+				t.Fatalf("RejectEmailChange() error: %v", err)
+			}
+			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
+				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+			}
+			events := eventsOf[user.EmailChangeRejected](u)
+			if len(events) != 1 {
+				t.Fatalf("recorded %d EmailChangeRejected, want 1", len(events))
+			}
+			if e := events[0]; e.AggregateID != u.ID() || e.NewEmail.String() != "new@example.com" || !e.OccurredAt.Equal(time.Now()) {
+				t.Errorf("EmailChangeRejected = %+v", e)
+			}
+		})
+	})
+	t.Run("superseded token", func(t *testing.T) {
+		u, old := requestedChange(t)
+		if err := requestChange(t, u, "other@example.com", "s3cretpass"); err != nil {
+			t.Fatalf("second RequestEmailChange() error: %v", err)
+		}
+		if err := u.RejectEmailChange(old); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("reject with superseded token = %v, want %v", err, user.ErrInvalidConfirmationToken)
+		}
+		p, ok := u.PendingEmailChange()
+		if !ok || p.Email().String() != "other@example.com" || len(eventsOf[user.EmailChangeRejected](u)) != 0 {
+			t.Errorf("pending = %+v, %v; want other@example.com kept and no EmailChangeRejected", p, ok)
+		}
+	})
+	t.Run("no pending change", func(t *testing.T) {
+		u := mustUser(t)
+		if err := u.RejectEmailChange(user.NewConfirmationToken()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 			t.Errorf("error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})

@@ -103,7 +103,7 @@ func (r testRepos) seedRegistration(t *testing.T, email string) (*user.PendingRe
 
 func supersedeWith(p *user.PendingRegistration) func(*user.PendingRegistration) error {
 	return func(existing *user.PendingRegistration) error {
-		return existing.Supersede(p.FullName(), p.PasswordHash())
+		return existing.Supersede(p)
 	}
 }
 
@@ -590,6 +590,30 @@ func TestConfirmEmailChangeAppliesPendingEmail(t *testing.T) {
 	}
 }
 
+func TestConfirmEmailChangeRejectsTakenEmail(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "old@example.com")
+	token := user.NewConfirmationToken()
+	r.seedPendingEmailChange(t, id, "new@example.com", token)
+	r.seedUser(t, "new@example.com")
+	confirm := usecase.NewConfirmEmailChange(r.users)
+
+	if err := confirm.Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrEmailTaken) {
+		t.Fatalf("Execute() error = %v, want %v", err, user.ErrEmailTaken)
+	}
+
+	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND email = 'old@example.com'`, id.String()); got != 1 {
+		t.Errorf("users with the old email = %d, want 1", got)
+	}
+	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1`, id.String()); got != 0 {
+		t.Errorf("pending email changes = %d, want 0", got)
+	}
+	r.assertState(t, id, 1, 0, map[string]int{"user.email_change_rejected": 1, "user.email_changed": 0})
+	if err := confirm.Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+		t.Errorf("repeated Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+	}
+}
+
 func TestUpdateUnknownUserReturnsNotFound(t *testing.T) {
 	r := newTestRepos(t)
 	noop := func(*user.User) error { return nil }
@@ -601,4 +625,26 @@ func TestUpdateUnknownUserReturnsNotFound(t *testing.T) {
 	if _, err := r.users.UpdateByEmailChangeToken(t.Context(), hash, noop); !errors.Is(err, user.ErrNotFound) {
 		t.Errorf("UpdateByEmailChangeToken err = %v, want %v", err, user.ErrNotFound)
 	}
+	if _, err := r.users.UpdateByEmail(t.Context(), user.RestoreEmail("nobody@example.com"), noop); !errors.Is(err, user.ErrNotFound) {
+		t.Errorf("UpdateByEmail err = %v, want %v", err, user.ErrNotFound)
+	}
+}
+
+func TestUpdateByEmailSavesChangesAndEvents(t *testing.T) {
+	r := newTestRepos(t)
+	id := r.seedUser(t, "jane@example.com")
+
+	_, err := r.users.UpdateByEmail(t.Context(), user.RestoreEmail("jane@example.com"), func(u *user.User) error {
+		u.RecordDuplicateRegistration()
+		u.Rename(user.NewFullName(user.RestoreName("Renamed"), user.RestoreName("User")))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND first_name = 'Renamed'`, id.String()); got != 1 {
+		t.Errorf("renamed users = %d, want 1", got)
+	}
+	r.assertState(t, id, 1, 0, map[string]int{"user.duplicate_registration_attempted": 1, "user.renamed": 1})
 }

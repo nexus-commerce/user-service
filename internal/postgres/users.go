@@ -70,22 +70,12 @@ func (u *Users) UpdateByID(
 	return u.update(ctx, `SELECT id FROM users WHERE id = $1 FOR UPDATE`, id.String(), updateFn)
 }
 
-func (u *Users) RecordByEmail(ctx context.Context, email user.Email, recordFn func(*user.User)) error {
-	query := selectUser + ` WHERE u.email = $1`
-
-	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
-		usr, err := scanUser(tx.QueryRowContext(ctx, query, email.String()))
-		if err != nil {
-			if errors.Is(err, user.ErrNotFound) {
-				return err
-			}
-			return fmt.Errorf("select user by email: %w", err)
-		}
-
-		recordFn(usr)
-
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
-	})
+func (u *Users) UpdateByEmail(
+	ctx context.Context,
+	email user.Email,
+	updateFn func(*user.User) error,
+) (*user.User, error) {
+	return u.update(ctx, `SELECT id FROM users WHERE email = $1 FOR UPDATE`, email.String(), updateFn)
 }
 
 func (u *Users) UpdateByEmailChangeToken(

@@ -13,6 +13,7 @@ var (
 	ErrRegistrationNotFound         = errors.New("registration not found")
 	ErrRegistrationAlreadyConfirmed = errors.New("registration already confirmed")
 	ErrRegistrationNotConfirmed     = errors.New("registration not confirmed")
+	ErrRegistrationEmailMismatch    = errors.New("registration is for another email")
 )
 
 type PendingRegistration struct {
@@ -106,12 +107,15 @@ func (p *PendingRegistration) Confirm(token ConfirmationToken) error {
 	return nil
 }
 
-func (p *PendingRegistration) Supersede(name FullName, hash PasswordHash) error {
+func (p *PendingRegistration) Supersede(newer *PendingRegistration) error {
 	if p.Confirmed() {
 		return ErrRegistrationAlreadyConfirmed
 	}
-	p.fullName = name
-	p.passwordHash = hash
+	if newer.email != p.email {
+		return ErrRegistrationEmailMismatch
+	}
+	p.fullName = newer.fullName
+	p.passwordHash = newer.passwordHash
 	p.issueConfirmationToken(time.Now().UTC())
 	return nil
 }
