@@ -10,8 +10,7 @@ import (
 
 type completeRegistrationRegistrations interface {
 	ByUserID(ctx context.Context, id uuid.UUID) (*user.PendingRegistration, error)
-	DeleteByUserID(ctx context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	Remove(ctx context.Context, p *user.PendingRegistration) error
 }
 
 type completeRegistrationUsers interface {
@@ -45,17 +44,19 @@ func (c *CompleteRegistration) Execute(ctx context.Context, userID uuid.UUID) er
 
 	err = c.users.Add(ctx, usr)
 	if errors.Is(err, user.ErrEmailTaken) {
-		return c.reject(ctx, userID)
+		return c.reject(ctx, pending)
 	}
 	if err != nil {
 		return err
 	}
-	return c.registrations.Delete(ctx, userID)
+	return c.registrations.Remove(ctx, pending)
 }
 
-func (c *CompleteRegistration) reject(ctx context.Context, userID uuid.UUID) error {
-	err := c.registrations.DeleteByUserID(ctx, userID, (*user.PendingRegistration).Reject)
-	if err != nil && !errors.Is(err, user.ErrRegistrationNotFound) {
+func (c *CompleteRegistration) reject(ctx context.Context, pending *user.PendingRegistration) error {
+	if err := pending.Reject(); err != nil {
+		return err
+	}
+	if err := c.registrations.Remove(ctx, pending); err != nil {
 		return err
 	}
 	return user.ErrEmailTaken

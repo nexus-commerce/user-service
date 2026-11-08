@@ -166,41 +166,24 @@ func (r *Registrations) UpdateByToken(
 	return p, nil
 }
 
-func (r *Registrations) DeleteByUserID(ctx context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error {
-	selectQuery := selectPendingRegistration + ` WHERE user_id = $1 FOR UPDATE`
+func (r *Registrations) Remove(ctx context.Context, p *user.PendingRegistration) error {
+	query := `DELETE FROM pending_registrations WHERE user_id = $1`
 
 	return r.db.runInTx(ctx, func(tx *sql.Tx) error {
-		p, err := scanPendingRegistration(tx.QueryRowContext(ctx, selectQuery, id.String()))
+		res, err := tx.ExecContext(ctx, query, p.UserID().String())
 		if err != nil {
-			if errors.Is(err, user.ErrRegistrationNotFound) {
-				return err
-			}
-			return fmt.Errorf("select pending registration for delete: %w", err)
+			return fmt.Errorf("delete pending registration: %w", err)
 		}
-
-		if err = deleteFn(p); err != nil {
-			return err
+		count, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("count deleted pending registrations: %w", err)
 		}
-
-		if err = deletePendingRegistration(ctx, tx, id); err != nil {
-			return err
+		if count == 0 {
+			return nil
 		}
 
 		return r.events.Publish(ctx, outboxProducer{tx: tx}, p.Events())
 	})
-}
-
-func (r *Registrations) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.runInTx(ctx, func(tx *sql.Tx) error {
-		return deletePendingRegistration(ctx, tx, id)
-	})
-}
-
-func deletePendingRegistration(ctx context.Context, tx *sql.Tx, id uuid.UUID) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM pending_registrations WHERE user_id = $1`, id.String()); err != nil {
-		return fmt.Errorf("delete pending registration: %w", err)
-	}
-	return nil
 }
 
 func (r *Registrations) DeleteAbandoned(ctx context.Context, before time.Time) (int64, error) {

@@ -27,7 +27,7 @@ func requestedJane(t *testing.T) (*user.User, *fakeUsers, user.ConfirmationToken
 	if err != nil {
 		t.Fatalf("Reauthenticate() error: %v", err)
 	}
-	if err = usr.RequestEmailChange(email, proof); err != nil {
+	if err = usr.RequestEmailChange(email, false, proof); err != nil {
 		t.Fatalf("RequestEmailChange() error: %v", err)
 	}
 	for _, e := range usr.Events() {

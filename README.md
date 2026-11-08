@@ -52,7 +52,9 @@ then relayed to Kafka.
 Confirmation tokens travel in events sealed with NaCl anonymous box using
 notification-service's public key, so only that service can read them. Duplicate and
 taken-address attempts are reported as events rather than API errors to avoid account
-enumeration.
+enumeration. For the same reason, a taken-address attempt cancels an earlier pending
+email change just as a request to a free address does, so the old confirmation link
+cannot reveal whether the address is registered.
 
 ## API contracts
 

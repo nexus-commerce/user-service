@@ -77,11 +77,22 @@ func (u *User) RecordDuplicateRegistration() {
 	})
 }
 
-func (u *User) RequestEmailChange(newEmail Email, proof Reauthentication) error {
-	if err := u.authorizeEmailChange(newEmail, proof); err != nil {
-		return err
+func (u *User) RequestEmailChange(newEmail Email, taken bool, proof Reauthentication) error {
+	if proof.userID != u.id || proof.passwordHash != u.passwordHash {
+		return ErrInvalidCredentials
+	}
+	if newEmail == u.email {
+		return ErrEmailUnchanged
 	}
 	now := time.Now().UTC()
+	if taken {
+		u.pending = nil
+		u.events = append(u.events, EmailChangeToTakenAddressAttempted{
+			EventMeta: u.newEventMeta(now),
+			NewEmail:  newEmail,
+		})
+		return nil
+	}
 	token := NewConfirmationToken()
 	u.pending = &PendingEmailChange{
 		email:     newEmail,
@@ -95,27 +106,6 @@ func (u *User) RequestEmailChange(newEmail Email, proof Reauthentication) error 
 		Token:     token,
 		ExpiresAt: u.pending.expiresAt,
 	})
-	return nil
-}
-
-func (u *User) RecordEmailChangeToTakenAddress(newEmail Email, proof Reauthentication) error {
-	if err := u.authorizeEmailChange(newEmail, proof); err != nil {
-		return err
-	}
-	u.events = append(u.events, EmailChangeToTakenAddressAttempted{
-		EventMeta: u.newEventMeta(time.Now().UTC()),
-		NewEmail:  newEmail,
-	})
-	return nil
-}
-
-func (u *User) authorizeEmailChange(newEmail Email, proof Reauthentication) error {
-	if proof.userID != u.id || proof.passwordHash != u.passwordHash {
-		return ErrInvalidCredentials
-	}
-	if newEmail == u.email {
-		return ErrEmailUnchanged
-	}
 	return nil
 }
 

@@ -118,12 +118,11 @@ func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.Conf
 }
 
 type fakeRegistrations struct {
-	byEmail           map[user.Email]*user.PendingRegistration
-	readErr           error
-	updateErr         error
-	deleteByUserIDErr error
-	deleteErr         error
-	published         []user.Event
+	byEmail   map[user.Email]*user.PendingRegistration
+	readErr   error
+	updateErr error
+	removeErr error
+	published []user.Event
 }
 
 func copyPending(p *user.PendingRegistration) *user.PendingRegistration {
@@ -182,31 +181,16 @@ func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.Confirmat
 	return p, nil
 }
 
-func (f *fakeRegistrations) DeleteByUserID(_ context.Context, id uuid.UUID, deleteFn func(*user.PendingRegistration) error) error {
-	p, err := f.find(func(p *user.PendingRegistration) bool { return p.UserID() == id })
-	if err != nil {
-		return err
+func (f *fakeRegistrations) Remove(_ context.Context, p *user.PendingRegistration) error {
+	if f.removeErr != nil {
+		return f.removeErr
 	}
-	if err = deleteFn(p); err != nil {
-		return err
-	}
-	if f.deleteByUserIDErr != nil {
-		return f.deleteByUserIDErr
+	stored, ok := f.byEmail[p.Email()]
+	if !ok || stored.UserID() != p.UserID() {
+		return nil
 	}
 	delete(f.byEmail, p.Email())
 	f.published = append(f.published, p.Events()...)
-	return nil
-}
-
-func (f *fakeRegistrations) Delete(_ context.Context, id uuid.UUID) error {
-	if f.deleteErr != nil {
-		return f.deleteErr
-	}
-	for email, p := range f.byEmail {
-		if p.UserID() == id {
-			delete(f.byEmail, email)
-		}
-	}
 	return nil
 }
 

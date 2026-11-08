@@ -53,16 +53,16 @@ func TestCompleteRegistrationIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestCompleteRegistrationRetriesAfterDeleteFailure(t *testing.T) {
+func TestCompleteRegistrationRetriesAfterRemoveFailure(t *testing.T) {
 	users, regs, id := confirmedJane(t)
 	complete := usecase.NewCompleteRegistration(regs, users)
-	want := errors.New("delete failed")
-	regs.deleteErr = want
+	want := errors.New("remove failed")
+	regs.removeErr = want
 
 	if err := complete.Execute(t.Context(), id); !errors.Is(err, want) {
 		t.Fatalf("first Execute() error = %v, want %v", err, want)
 	}
-	regs.deleteErr = nil
+	regs.removeErr = nil
 	if err := complete.Execute(t.Context(), id); err != nil {
 		t.Fatalf("retried Execute() error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestCompleteRegistrationRejectFailure(t *testing.T) {
 	users, regs, id := confirmedJane(t)
 	newUser(t, users, "jane@example.com", "Other", "Jane")
 	want := errors.New("reject failed")
-	regs.deleteByUserIDErr = want
+	regs.removeErr = want
 
 	if err := usecase.NewCompleteRegistration(regs, users).Execute(t.Context(), id); !errors.Is(err, want) {
 		t.Fatalf("Execute() error = %v, want %v", err, want)

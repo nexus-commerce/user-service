@@ -186,7 +186,7 @@ func requestChange(t *testing.T, u *user.User, email, password string) error {
 	if err != nil {
 		return err
 	}
-	return u.RequestEmailChange(mustEmail(t, email), proof)
+	return u.RequestEmailChange(mustEmail(t, email), false, proof)
 }
 
 func TestRequestEmailChange(t *testing.T) {
@@ -228,23 +228,26 @@ func TestRequestEmailChange(t *testing.T) {
 	})
 }
 
-func TestRecordEmailChangeToTakenAddress(t *testing.T) {
+func TestRequestEmailChangeToTakenAddress(t *testing.T) {
 	attempt := func(t *testing.T, u *user.User, email, password string) error {
 		t.Helper()
 		proof, err := u.Reauthenticate(mustPassword(t, password), fakeHasher{})
 		if err != nil {
 			return err
 		}
-		return u.RecordEmailChangeToTakenAddress(mustEmail(t, email), proof)
+		return u.RequestEmailChange(mustEmail(t, email), true, proof)
 	}
 	t.Run("records event without pending change", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			u := mustUser(t)
 			if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-				t.Fatalf("RecordEmailChangeToTakenAddress() error: %v", err)
+				t.Fatalf("RequestEmailChange() error: %v", err)
 			}
 			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
 				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+			}
+			if n := len(eventsOf[user.EmailChangeRequested](u)); n != 0 {
+				t.Errorf("recorded %d EmailChangeRequested, want 0 so no link goes to a taken address", n)
 			}
 			events := eventsOf[user.EmailChangeToTakenAddressAttempted](u)
 			if len(events) != 1 {
@@ -255,16 +258,13 @@ func TestRecordEmailChangeToTakenAddress(t *testing.T) {
 			}
 		})
 	})
-	t.Run("keeps existing pending change", func(t *testing.T) {
-		u := mustUser(t)
-		if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
+	t.Run("invalidates earlier token", func(t *testing.T) {
+		u, earlier := requestedChange(t)
+		if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
 			t.Fatalf("RequestEmailChange() error: %v", err)
 		}
-		if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-			t.Fatalf("RecordEmailChangeToTakenAddress() error: %v", err)
-		}
-		if p, ok := u.PendingEmailChange(); !ok || p.Email().String() != "new@example.com" {
-			t.Errorf("pending = %+v, %v; want new@example.com", p, ok)
+		if err := u.ConfirmEmailChange(earlier); !errors.Is(err, user.ErrInvalidConfirmationToken) {
+			t.Errorf("confirm with earlier token = %v, want %v so it cannot reveal that the address is taken", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 	t.Run("wrong password", func(t *testing.T) {
@@ -286,9 +286,9 @@ func TestRecordEmailChangeToTakenAddress(t *testing.T) {
 }
 
 func TestEmailChangeRejectsInvalidProof(t *testing.T) {
-	changes := map[string]func(*user.User, user.Email, user.Reauthentication) error{
-		"request": (*user.User).RequestEmailChange,
-		"attempt": (*user.User).RecordEmailChangeToTakenAddress,
+	addresses := map[string]bool{
+		"free":  false,
+		"taken": true,
 	}
 	proofs := map[string]func(*testing.T, *user.User) user.Reauthentication{
 		"missing": func(*testing.T, *user.User) user.Reauthentication {
@@ -312,13 +312,13 @@ func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 			return proof
 		},
 	}
-	for changeName, change := range changes {
+	for addressName, taken := range addresses {
 		for proofName, proof := range proofs {
-			t.Run(changeName+"/"+proofName, func(t *testing.T) {
+			t.Run(addressName+"/"+proofName, func(t *testing.T) {
 				u := mustUser(t)
 				events := len(u.Events())
 
-				err := change(u, mustEmail(t, "new@example.com"), proof(t, u))
+				err := u.RequestEmailChange(mustEmail(t, "new@example.com"), taken, proof(t, u))
 				if !errors.Is(err, user.ErrInvalidCredentials) {
 					t.Errorf("error = %v, want %v", err, user.ErrInvalidCredentials)
 				}

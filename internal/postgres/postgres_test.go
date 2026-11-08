@@ -188,6 +188,34 @@ func TestCompleteRegistrationRejectsTakenEmail(t *testing.T) {
 	})
 }
 
+func TestDuplicateRejectionPublishesOnce(t *testing.T) {
+	r := newTestRepos(t)
+	pending, token := r.seedRegistration(t, "jane@example.com")
+	if err := r.confirm().Execute(t.Context(), token.Plaintext()); err != nil {
+		t.Fatalf("ConfirmRegistration error: %v", err)
+	}
+	var rejected []*user.PendingRegistration
+	for range 2 {
+		p, err := r.registrations.ByUserID(t.Context(), pending.UserID())
+		if err != nil {
+			t.Fatalf("ByUserID() error: %v", err)
+		}
+		if err = p.Reject(); err != nil {
+			t.Fatalf("Reject() error: %v", err)
+		}
+		rejected = append(rejected, p)
+	}
+
+	for i, p := range rejected {
+		if err := r.registrations.Remove(t.Context(), p); err != nil {
+			t.Fatalf("Remove #%d error: %v", i+1, err)
+		}
+	}
+	r.assertState(t, pending.UserID(), 0, 0, map[string]int{
+		"user.registration_rejected": 1,
+	})
+}
+
 func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
 	r := newTestRepos(t)
 	pending, token := r.seedRegistration(t, "jane@example.com")
