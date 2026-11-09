@@ -31,7 +31,7 @@ func TestFetchUserServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequestWithContext(context.WithValue(t.Context(), userIDKey{}, id), http.MethodGet, "/users/me", nil)
-			calls := 0
+			var calls int
 			uc := userFetcherFunc(func(ctx context.Context, got uuid.UUID) (usecase.UserView, error) {
 				calls++
 				if ctx != req.Context() || got != id {

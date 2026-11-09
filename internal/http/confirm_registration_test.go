@@ -29,7 +29,7 @@ func TestConfirmRegistrationServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/register/confirm", strings.NewReader(`{"token":"confirmation-token"}`))
-			calls := 0
+			var calls int
 			uc := registrationConfirmerFunc(func(ctx context.Context, token string) error {
 				calls++
 				if ctx != req.Context() || token != "confirmation-token" {

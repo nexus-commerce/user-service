@@ -60,7 +60,7 @@ func TestLoginIssuesToken(t *testing.T) {
 		t.Run(email, func(t *testing.T) {
 			u, users := newJane(t)
 			hasher := &loginHasher{}
-			readCalls, issueCalls := 0, 0
+			var readCalls, issueCalls int
 			repo := loginUsersFunc(func(ctx context.Context, email user.Email) (*user.User, error) {
 				readCalls++
 				if ctx != t.Context() || email != u.Email() {
@@ -122,7 +122,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			u, users := newJane(t)
 			hasher := &loginHasher{verifyErr: tt.verifyErr}
-			readCalls := 0
+			var readCalls int
 			repo := loginUsersFunc(func(ctx context.Context, email user.Email) (*user.User, error) {
 				readCalls++
 				if tt.readErr != nil {
@@ -184,7 +184,7 @@ func TestLoginPropagatesDependencyErrors(t *testing.T) {
 				}
 				return users.ByEmail(ctx, email)
 			})
-			issueCalls := 0
+			var issueCalls int
 			tokens := tokenIssuerFunc(func(uuid.UUID) (string, error) {
 				issueCalls++
 				return "", tt.issueErr

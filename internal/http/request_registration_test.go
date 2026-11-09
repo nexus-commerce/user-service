@@ -32,7 +32,7 @@ func TestRequestRegistrationServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/register", strings.NewReader(body))
-			calls := 0
+			var calls int
 			uc := registrationRequesterFunc(func(ctx context.Context, got usecase.RegistrationRequest) error {
 				calls++
 				want := usecase.RegistrationRequest{FirstName: "Jane", LastName: "Doe", Email: "jane@example.com", Password: "secretpass", PasswordConfirmation: "secretpass"}

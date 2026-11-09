@@ -66,8 +66,8 @@ type Docs struct {
 }
 
 type Notification struct {
-	PublicKey string `env:"NOTIFICATION_PUBLIC_KEY"`
-	KeyID     string `env:"NOTIFICATION_KEY_ID"`
+	PublicKey string `env:"NOTIFICATION_PUBLIC_KEY,required"`
+	KeyID     string `env:"NOTIFICATION_KEY_ID,required"`
 }
 
 func Load[T any]() (*T, error) {

@@ -34,7 +34,7 @@ func TestFetchUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			u, users := newJane(t)
-			calls := 0
+			var calls int
 			repo := userLookupFunc(func(ctx context.Context, id uuid.UUID) (*user.User, error) {
 				calls++
 				if ctx != t.Context() || id != u.ID() {

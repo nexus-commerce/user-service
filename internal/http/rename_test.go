@@ -37,7 +37,7 @@ func TestRenameServeHTTP(t *testing.T) {
 			ctx := context.WithValue(t.Context(), userIDKey{}, id)
 			body := strings.NewReader(`{"firstName":"Janet"}`)
 			req := httptest.NewRequestWithContext(ctx, http.MethodPatch, "/users/me/name", body)
-			calls := 0
+			var calls int
 			uc := userRenamerFunc(func(ctx context.Context, got usecase.NameChange) (usecase.UserView, error) {
 				calls++
 				if ctx != req.Context() {

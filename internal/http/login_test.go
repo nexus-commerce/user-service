@@ -29,7 +29,7 @@ func TestLoginServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", strings.NewReader(`{"email":"jane@example.com","password":"secretpass"}`))
-			calls := 0
+			var calls int
 			uc := authenticatorFunc(func(ctx context.Context, creds usecase.Credentials) (string, error) {
 				calls++
 				want := usecase.Credentials{Email: "jane@example.com", Password: "secretpass"}
