@@ -6,8 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -56,28 +54,37 @@ type controllerTestCase struct {
 	wantBody   string
 }
 
-func checkResponse(t *testing.T, handler string, rec *httptest.ResponseRecorder, wantStatus int, wantBody string) {
+type response struct {
+	Status      int
+	ContentType string
+	Body        any
+}
+
+func responseOf(t *testing.T, rec *httptest.ResponseRecorder) response {
 	t.Helper()
-	if rec.Code != wantStatus {
-		t.Errorf("%s status = %d, want %d; body = %s", handler, rec.Code, wantStatus, rec.Body.String())
+	return response{
+		Status:      rec.Code,
+		ContentType: rec.Header().Get("Content-Type"),
+		Body:        decodeJSON(t, rec.Body.String()),
 	}
-	if wantBody == "" {
-		if rec.Body.Len() != 0 {
-			t.Errorf("%s body = %q, want empty", handler, rec.Body.String())
-		}
-		return
+}
+
+func jsonResponse(t *testing.T, status int, body string) response {
+	t.Helper()
+	if body == "" {
+		return response{Status: status}
 	}
-	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Errorf("%s Content-Type = %q, want application/json", handler, got)
+	return response{Status: status, ContentType: "application/json", Body: decodeJSON(t, body)}
+}
+
+func decodeJSON(t *testing.T, s string) any {
+	t.Helper()
+	if s == "" {
+		return nil
 	}
-	var got, want any
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		t.Fatalf("%s body %q: decode: %v", handler, rec.Body.String(), err)
+	var v any
+	if err := json.Unmarshal([]byte(s), &v); err != nil {
+		t.Fatalf("json.Unmarshal(%q) error: %v", s, err)
 	}
-	if err := json.Unmarshal([]byte(wantBody), &want); err != nil {
-		t.Fatalf("decode expected body %q: %v", wantBody, err)
-	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("%s body mismatch (-want +got):\n%s", handler, diff)
-	}
+	return v
 }

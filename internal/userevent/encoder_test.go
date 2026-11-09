@@ -47,10 +47,7 @@ func TestEncodeUserRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(Registered) error: %v", err)
 	}
-	type header struct{ ID, Topic, Key string }
-	gotHeader := header{msg.ID, msg.Topic, msg.Key}
-	wantHeader := header{e.ID.String(), "users", e.AggregateID.String()}
-	if diff := cmp.Diff(wantHeader, gotHeader); diff != "" {
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
 		t.Errorf("encode(Registered) header mismatch (-want +got):\n%s", diff)
 	}
 
@@ -139,14 +136,14 @@ func newMeta() user.EventMeta {
 	}
 }
 
-func assertHeader(t *testing.T, call string, msg messaging.Message, meta user.EventMeta) {
-	t.Helper()
-	type header struct{ ID, Topic, Key string }
-	got := header{msg.ID, msg.Topic, msg.Key}
-	want := header{meta.ID.String(), "users", meta.AggregateID.String()}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("%s header mismatch (-want +got):\n%s", call, diff)
-	}
+type msgHeader struct{ ID, Topic, Key string }
+
+func headerOf(msg messaging.Message) msgHeader {
+	return msgHeader{msg.ID, msg.Topic, msg.Key}
+}
+
+func usersHeader(meta user.EventMeta) msgHeader {
+	return msgHeader{meta.ID.String(), "users", meta.AggregateID.String()}
 }
 
 type decodedEnvelope[D any] struct {
@@ -172,7 +169,9 @@ func TestEncodeUserRenamed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(Renamed) error: %v", err)
 	}
-	assertHeader(t, "encode(Renamed)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(Renamed) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID    string    `json:"userId"`
@@ -211,7 +210,9 @@ func TestEncodeUserEmailChangeRequested(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(EmailChangeRequested) error: %v", err)
 	}
-	assertHeader(t, "encode(EmailChangeRequested)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(EmailChangeRequested) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID         string    `json:"userId"`
@@ -284,7 +285,9 @@ func TestEncodeUserRegistrationRequested(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(RegistrationRequested) error: %v", err)
 	}
-	assertHeader(t, "encode(RegistrationRequested)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(RegistrationRequested) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID         string    `json:"userId"`
@@ -340,7 +343,9 @@ func TestEncodeUserDuplicateRegistrationAttempted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(DuplicateRegistrationAttempted) error: %v", err)
 	}
-	assertHeader(t, "encode(DuplicateRegistrationAttempted)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(DuplicateRegistrationAttempted) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID      string    `json:"userId"`
@@ -374,7 +379,9 @@ func TestEncodeUserEmailChangeToTakenAddressAttempted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(EmailChangeToTakenAddressAttempted) error: %v", err)
 	}
-	assertHeader(t, "encode(EmailChangeToTakenAddressAttempted)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(EmailChangeToTakenAddressAttempted) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID      string    `json:"userId"`
@@ -405,7 +412,9 @@ func TestEncodeUserEmailChanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(EmailChanged) error: %v", err)
 	}
-	assertHeader(t, "encode(EmailChanged)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(EmailChanged) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID    string    `json:"userId"`
@@ -471,7 +480,9 @@ func TestEncodeUserRegistrationRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(RegistrationRejected) error: %v", err)
 	}
-	assertHeader(t, "encode(RegistrationRejected)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(RegistrationRejected) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID     string    `json:"userId"`
@@ -497,7 +508,9 @@ func TestEncodeUserEmailChangeRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode(EmailChangeRejected) error: %v", err)
 	}
-	assertHeader(t, "encode(EmailChangeRejected)", msg, e.EventMeta)
+	if diff := cmp.Diff(usersHeader(e.EventMeta), headerOf(msg)); diff != "" {
+		t.Errorf("encode(EmailChangeRejected) header mismatch (-want +got):\n%s", diff)
+	}
 
 	type data struct {
 		UserID     string    `json:"userId"`

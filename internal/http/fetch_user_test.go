@@ -9,6 +9,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -44,7 +46,9 @@ func TestFetchUserServeHTTP(t *testing.T) {
 			if calls != 1 {
 				t.Errorf("Execute() calls = %d, want 1", calls)
 			}
-			checkResponse(t, "FetchUser.ServeHTTP()", rec, tt.wantStatus, tt.wantBody)
+			if diff := cmp.Diff(jsonResponse(t, tt.wantStatus, tt.wantBody), responseOf(t, rec)); diff != "" {
+				t.Errorf("FetchUser.ServeHTTP() response mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

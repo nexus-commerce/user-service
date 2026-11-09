@@ -55,7 +55,9 @@ func TestRenameServeHTTP(t *testing.T) {
 			if calls != 1 {
 				t.Errorf("Execute() calls = %d, want 1", calls)
 			}
-			checkResponse(t, "Rename.ServeHTTP()", rec, tt.wantStatus, tt.wantBody)
+			if diff := cmp.Diff(jsonResponse(t, tt.wantStatus, tt.wantBody), responseOf(t, rec)); diff != "" {
+				t.Errorf("Rename.ServeHTTP() response mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

@@ -39,41 +39,30 @@ func TestRequestEmailChange(t *testing.T) {
 			})
 
 			if tt.wantErr != nil {
-				checkRequestError(t, err, tt.wantErr, tt.wantField)
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Execute() error = %v, want %v", err, tt.wantErr)
+				}
+				if tt.wantField != 0 {
+					if fe, ok := errors.AsType[*usecase.FieldError](err); !ok || fe.Field != tt.wantField {
+						t.Errorf("Execute() error = %v, want FieldError for %v", err, tt.wantField)
+					}
+				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("Execute() error: %v", err)
 			}
-			checkEmailChangeRequested(t, u, tt.newEmail)
+			p, ok := u.PendingEmailChange()
+			if !ok {
+				t.Fatal("Execute() left no pending email change, want one")
+			}
+			if got := p.Email().String(); got != tt.newEmail {
+				t.Errorf("Execute() PendingEmailChange().Email() = %q, want %q", got, tt.newEmail)
+			}
+			if n := len(publishedOf[user.EmailChangeRequested](u.Events())); n != 1 {
+				t.Errorf("Execute() recorded %d EmailChangeRequested events, want 1", n)
+			}
 		})
-	}
-}
-
-func checkRequestError(t *testing.T, err, want error, wantField usecase.Field) {
-	t.Helper()
-	if !errors.Is(err, want) {
-		t.Fatalf("Execute() error = %v, want %v", err, want)
-	}
-	if wantField == 0 {
-		return
-	}
-	if fe, ok := errors.AsType[*usecase.FieldError](err); !ok || fe.Field != wantField {
-		t.Errorf("Execute() error = %v, want FieldError for %v", err, wantField)
-	}
-}
-
-func checkEmailChangeRequested(t *testing.T, u *user.User, wantEmail string) {
-	t.Helper()
-	p, ok := u.PendingEmailChange()
-	if !ok {
-		t.Fatal("Execute() left no pending email change, want one")
-	}
-	if got := p.Email().String(); got != wantEmail {
-		t.Errorf("Execute() PendingEmailChange().Email() = %q, want %q", got, wantEmail)
-	}
-	if n := len(publishedOf[user.EmailChangeRequested](u.Events())); n != 1 {
-		t.Errorf("Execute() recorded %d EmailChangeRequested events, want 1", n)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 
@@ -173,21 +174,39 @@ func (r testRepos) count(t *testing.T, query string, args ...any) int {
 	return n
 }
 
-func (r testRepos) assertState(t *testing.T, step string, id uuid.UUID, wantUsers, wantPending int, wantEvents map[string]int) {
+type userState struct {
+	Users   int
+	Pending int
+	Events  map[string]int
+}
+
+func (r testRepos) stateOf(t *testing.T, id uuid.UUID) userState {
 	t.Helper()
-	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1`, id.String()); got != wantUsers {
-		t.Errorf("after %s: users with id %v = %d, want %d", step, id, got, wantUsers)
+	s := userState{
+		Users:   r.count(t, `SELECT count(*) FROM users WHERE id = $1`, id.String()),
+		Pending: r.count(t, `SELECT count(*) FROM pending_registrations WHERE user_id = $1`, id.String()),
 	}
-	if got := r.count(t, `SELECT count(*) FROM pending_registrations WHERE user_id = $1`, id.String()); got != wantPending {
-		t.Errorf("after %s: pending registrations for %v = %d, want %d", step, id, got, wantPending)
+	const query = `SELECT headers->>$2, count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') GROUP BY 1`
+	rows, err := r.db.pool.QueryContext(t.Context(), query, id.String(), messaging.HeaderEventType)
+	if err != nil {
+		t.Fatalf("query %q error: %v", query, err)
 	}
-	query := `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = $3`
-	for typ, want := range wantEvents {
-		got := r.count(t, query, id.String(), messaging.HeaderEventType, typ)
-		if got != want {
-			t.Errorf("after %s: outbox %s events for %v = %d, want %d", step, typ, id, got, want)
+	defer rows.Close()
+	for rows.Next() {
+		var typ string
+		var n int
+		if err := rows.Scan(&typ, &n); err != nil {
+			t.Fatalf("scan outbox event count: %v", err)
 		}
+		if s.Events == nil {
+			s.Events = make(map[string]int)
+		}
+		s.Events[typ] = n
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate outbox event counts: %v", err)
+	}
+	return s
 }
 
 func TestConfirmThenCompleteRegistration(t *testing.T) {
@@ -197,20 +216,21 @@ func TestConfirmThenCompleteRegistration(t *testing.T) {
 	if err := r.confirm().Execute(t.Context(), token.Plaintext()); err != nil {
 		t.Fatalf("ConfirmRegistration.Execute() error: %v", err)
 	}
-	r.assertState(t, "ConfirmRegistration.Execute()", pending.UserID(), 0, 1, map[string]int{
-		userevent.TypeRegistrationConfirmed: 1,
-		"user.registered":                   0,
-	})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1, Events: map[string]int{userevent.TypeRegistrationConfirmed: 1}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after ConfirmRegistration.Execute(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 
 	for i := range 2 {
 		if err := r.complete().Execute(t.Context(), pending.UserID()); err != nil {
 			t.Fatalf("CompleteRegistration.Execute() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, "CompleteRegistration.Execute()", pending.UserID(), 1, 0, map[string]int{
+	if diff := cmp.Diff(userState{Users: 1, Pending: 0, Events: map[string]int{
 		userevent.TypeRegistrationConfirmed: 1,
 		"user.registered":                   1,
-	})
+	}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after CompleteRegistration.Execute(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 	if err := r.confirm().Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("repeated ConfirmRegistration.Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
@@ -227,11 +247,12 @@ func TestCompleteRegistrationRejectsTakenEmail(t *testing.T) {
 	if err := r.complete().Execute(t.Context(), pending.UserID()); !errors.Is(err, user.ErrEmailTaken) {
 		t.Errorf("CompleteRegistration.Execute() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	r.assertState(t, "CompleteRegistration.Execute()", pending.UserID(), 0, 0, map[string]int{
+	if diff := cmp.Diff(userState{Users: 0, Pending: 0, Events: map[string]int{
 		userevent.TypeRegistrationConfirmed: 1,
 		"user.registration_rejected":        1,
-		"user.registered":                   0,
-	})
+	}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after CompleteRegistration.Execute(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 }
 
 func TestDuplicateRejectionPublishesOnce(t *testing.T) {
@@ -257,9 +278,12 @@ func TestDuplicateRejectionPublishesOnce(t *testing.T) {
 			t.Errorf("Registrations.Remove() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, "Registrations.Remove()", pending.UserID(), 0, 0, map[string]int{
-		"user.registration_rejected": 1,
-	})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 0, Events: map[string]int{
+		userevent.TypeRegistrationConfirmed: 1,
+		"user.registration_rejected":        1,
+	}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after Registrations.Remove(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 }
 
 func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
@@ -283,7 +307,9 @@ func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
 	if p.Confirmed() {
 		t.Error("Registrations.UpdateByToken() kept the confirmation after a failed update, want it rolled back")
 	}
-	r.assertState(t, "Registrations.UpdateByToken()", pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 0})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after Registrations.UpdateByToken(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 }
 
 func TestConcurrentConfirmation(t *testing.T) {
@@ -316,7 +342,9 @@ func TestConcurrentConfirmation(t *testing.T) {
 	if successes != 1 || invalid != 1 {
 		t.Errorf("concurrent ConfirmRegistration.Execute() successes, invalid tokens = %d, %d; want 1, 1", successes, invalid)
 	}
-	r.assertState(t, "concurrent ConfirmRegistration.Execute()", pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 1})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1, Events: map[string]int{userevent.TypeRegistrationConfirmed: 1}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after concurrent ConfirmRegistration.Execute(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
 }
 
 func TestSaveKeepsConfirmedRegistration(t *testing.T) {
@@ -338,8 +366,12 @@ func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	if got, want := p.TokenHash().Encoded(), token.Hash().Encoded(); got != want {
 		t.Errorf("Registrations.Save() changed the token hash of a confirmed registration to %q, want %q", got, want)
 	}
-	r.assertState(t, "Registrations.Save()", pending.UserID(), 0, 1, map[string]int{"user.registration_requested": 0})
-	r.assertState(t, "Registrations.Save()", again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1, Events: map[string]int{userevent.TypeRegistrationConfirmed: 1}}, r.stateOf(t, pending.UserID())); diff != "" {
+		t.Errorf("after Registrations.Save(): state of %v mismatch (-want +got):\n%s", pending.UserID(), diff)
+	}
+	if diff := cmp.Diff(userState{Users: 0, Pending: 0}, r.stateOf(t, again.UserID())); diff != "" {
+		t.Errorf("after Registrations.Save(): state of %v mismatch (-want +got):\n%s", again.UserID(), diff)
+	}
 }
 
 func newTestRegistration(t *testing.T, email string, name user.FullName) *user.PendingRegistration {
@@ -383,8 +415,12 @@ func TestSaveSupersedesUnconfirmedRegistration(t *testing.T) {
 	if !p.ExpiresAt().After(first.ExpiresAt()) {
 		t.Errorf("Registrations.Save() ExpiresAt() = %v, want after %v", p.ExpiresAt(), first.ExpiresAt())
 	}
-	r.assertState(t, "Registrations.Save()", first.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
-	r.assertState(t, "Registrations.Save()", again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1, Events: map[string]int{"user.registration_requested": 1}}, r.stateOf(t, first.UserID())); diff != "" {
+		t.Errorf("after Registrations.Save(): state of %v mismatch (-want +got):\n%s", first.UserID(), diff)
+	}
+	if diff := cmp.Diff(userState{Users: 0, Pending: 0}, r.stateOf(t, again.UserID())); diff != "" {
+		t.Errorf("after Registrations.Save(): state of %v mismatch (-want +got):\n%s", again.UserID(), diff)
+	}
 	if err := r.confirm().Execute(t.Context(), oldToken.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("ConfirmRegistration.Execute(superseded token) error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
@@ -433,7 +469,9 @@ func TestUsersAddIsIdempotent(t *testing.T) {
 			t.Fatalf("Users.Add() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, "Users.Add()", u.ID(), 1, 1, map[string]int{"user.registered": 1})
+	if diff := cmp.Diff(userState{Users: 1, Pending: 1, Events: map[string]int{"user.registered": 1}}, r.stateOf(t, u.ID())); diff != "" {
+		t.Errorf("after Users.Add(): state of %v mismatch (-want +got):\n%s", u.ID(), diff)
+	}
 }
 
 func TestUsersAddEmailTaken(t *testing.T) {
@@ -451,7 +489,9 @@ func TestUsersAddEmailTaken(t *testing.T) {
 	if err := r.users.Add(t.Context(), u); !errors.Is(err, user.ErrEmailTaken) {
 		t.Errorf("Users.Add() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	r.assertState(t, "Users.Add()", u.ID(), 0, 1, map[string]int{"user.registered": 0})
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1}, r.stateOf(t, u.ID())); diff != "" {
+		t.Errorf("after Users.Add(): state of %v mismatch (-want +got):\n%s", u.ID(), diff)
+	}
 }
 
 func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
@@ -467,8 +507,12 @@ func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 	if n != 1 {
 		t.Errorf("DeleteAbandonedRegistrations() = %d, want 1", n)
 	}
-	r.assertState(t, "DeleteAbandonedRegistrations()", unconfirmed.UserID(), 0, 0, nil)
-	r.assertState(t, "DeleteAbandonedRegistrations()", confirmed.UserID(), 0, 1, nil)
+	if diff := cmp.Diff(userState{Users: 0, Pending: 0}, r.stateOf(t, unconfirmed.UserID()), cmpopts.IgnoreFields(userState{}, "Events")); diff != "" {
+		t.Errorf("after DeleteAbandonedRegistrations(): state of %v mismatch (-want +got):\n%s", unconfirmed.UserID(), diff)
+	}
+	if diff := cmp.Diff(userState{Users: 0, Pending: 1}, r.stateOf(t, confirmed.UserID()), cmpopts.IgnoreFields(userState{}, "Events")); diff != "" {
+		t.Errorf("after DeleteAbandonedRegistrations(): state of %v mismatch (-want +got):\n%s", confirmed.UserID(), diff)
+	}
 }
 
 func TestOutboxCarriesEventType(t *testing.T) {
@@ -682,7 +726,9 @@ func TestConfirmEmailChangeRejectsTakenEmail(t *testing.T) {
 	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1`, id.String()); got != 0 {
 		t.Errorf("pending email changes for %v = %d, want 0", id, got)
 	}
-	r.assertState(t, "ConfirmEmailChange.Execute()", id, 1, 0, map[string]int{"user.email_change_rejected": 1, "user.email_changed": 0})
+	if diff := cmp.Diff(userState{Users: 1, Pending: 0, Events: map[string]int{"user.email_change_rejected": 1}}, r.stateOf(t, id)); diff != "" {
+		t.Errorf("after ConfirmEmailChange.Execute(): state of %v mismatch (-want +got):\n%s", id, diff)
+	}
 	if err := confirm.Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("repeated ConfirmEmailChange.Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
@@ -720,5 +766,10 @@ func TestUpdateByEmailSavesChangesAndEvents(t *testing.T) {
 	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND first_name = 'Renamed'`, id.String()); got != 1 {
 		t.Errorf("renamed users = %d, want 1", got)
 	}
-	r.assertState(t, "Users.UpdateByEmail()", id, 1, 0, map[string]int{"user.duplicate_registration_attempted": 1, "user.renamed": 1})
+	if diff := cmp.Diff(userState{Users: 1, Pending: 0, Events: map[string]int{
+		"user.duplicate_registration_attempted": 1,
+		"user.renamed":                          1,
+	}}, r.stateOf(t, id)); diff != "" {
+		t.Errorf("after Users.UpdateByEmail(): state of %v mismatch (-want +got):\n%s", id, diff)
+	}
 }
