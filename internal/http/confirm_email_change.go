@@ -1,18 +1,22 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type ConfirmEmailChange struct {
-	uc *usecase.ConfirmEmailChange
+type emailChangeConfirmer interface {
+	Execute(ctx context.Context, token string) error
 }
 
-func NewConfirmEmailChange(uc *usecase.ConfirmEmailChange) *ConfirmEmailChange {
+type ConfirmEmailChange struct {
+	uc emailChangeConfirmer
+}
+
+func NewConfirmEmailChange(uc emailChangeConfirmer) *ConfirmEmailChange {
 	return &ConfirmEmailChange{
 		uc: uc,
 	}

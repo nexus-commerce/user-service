@@ -1,18 +1,22 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
-	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type ConfirmRegistration struct {
-	uc *usecase.ConfirmRegistration
+type registrationConfirmer interface {
+	Execute(ctx context.Context, token string) error
 }
 
-func NewConfirmRegistration(uc *usecase.ConfirmRegistration) *ConfirmRegistration {
+type ConfirmRegistration struct {
+	uc registrationConfirmer
+}
+
+func NewConfirmRegistration(uc registrationConfirmer) *ConfirmRegistration {
 	return &ConfirmRegistration{
 		uc: uc,
 	}

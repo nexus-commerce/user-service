@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -8,11 +9,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type Login struct {
-	uc *usecase.Login
+type authenticator interface {
+	Execute(ctx context.Context, creds usecase.Credentials) (string, error)
 }
 
-func NewLogin(uc *usecase.Login) *Login {
+type Login struct {
+	uc authenticator
+}
+
+func NewLogin(uc authenticator) *Login {
 	return &Login{
 		uc: uc,
 	}

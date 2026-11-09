@@ -1,18 +1,24 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"uuid"
 
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type FetchUser struct {
-	uc *usecase.FetchUser
+type userFetcher interface {
+	Execute(ctx context.Context, userID uuid.UUID) (usecase.UserView, error)
 }
 
-func NewFetchUser(uc *usecase.FetchUser) *FetchUser {
+type FetchUser struct {
+	uc userFetcher
+}
+
+func NewFetchUser(uc userFetcher) *FetchUser {
 	return &FetchUser{
 		uc: uc,
 	}

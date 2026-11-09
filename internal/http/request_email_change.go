@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"uuid"
@@ -9,11 +10,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type RequestEmailChange struct {
-	uc *usecase.RequestEmailChange
+type emailChangeRequester interface {
+	Execute(ctx context.Context, req usecase.EmailChangeRequest) error
 }
 
-func NewRequestEmailChange(uc *usecase.RequestEmailChange) *RequestEmailChange {
+type RequestEmailChange struct {
+	uc emailChangeRequester
+}
+
+func NewRequestEmailChange(uc emailChangeRequester) *RequestEmailChange {
 	return &RequestEmailChange{
 		uc: uc,
 	}

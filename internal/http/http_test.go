@@ -1,7 +1,10 @@
 package http
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/nexus-commerce/user-service/internal/usecase"
@@ -42,5 +45,38 @@ func TestValidationMessage(t *testing.T) {
 				t.Errorf("validationMessage(%v) = %q, want %q", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+type controllerTestCase struct {
+	name       string
+	ucErr      error
+	wantStatus int
+	wantBody   string
+}
+
+func checkResponse(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int, wantBody string) {
+	t.Helper()
+	if rec.Code != wantStatus {
+		t.Errorf("status = %d, want %d; body = %s", rec.Code, wantStatus, rec.Body.String())
+	}
+	if wantBody == "" {
+		if rec.Body.Len() != 0 {
+			t.Errorf("body = %q, want empty", rec.Body.String())
+		}
+		return
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got)
+	}
+	var got, want any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if err := json.Unmarshal([]byte(wantBody), &want); err != nil {
+		t.Fatalf("decode expected response: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("body = %s, want %s", rec.Body.String(), wantBody)
 	}
 }

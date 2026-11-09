@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -8,11 +9,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type RequestRegistration struct {
-	uc *usecase.RequestRegistration
+type registrationRequester interface {
+	Execute(ctx context.Context, req usecase.RegistrationRequest) error
 }
 
-func NewRequestRegistration(uc *usecase.RequestRegistration) *RequestRegistration {
+type RequestRegistration struct {
+	uc registrationRequester
+}
+
+func NewRequestRegistration(uc registrationRequester) *RequestRegistration {
 	return &RequestRegistration{
 		uc: uc,
 	}

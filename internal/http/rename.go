@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"uuid"
@@ -9,11 +10,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type Rename struct {
-	uc *usecase.Rename
+type userRenamer interface {
+	Execute(ctx context.Context, change usecase.NameChange) (usecase.UserView, error)
 }
 
-func NewRename(uc *usecase.Rename) *Rename {
+type Rename struct {
+	uc userRenamer
+}
+
+func NewRename(uc userRenamer) *Rename {
 	return &Rename{
 		uc: uc,
 	}
