@@ -55,11 +55,11 @@ func (p *Worker) Run(ctx context.Context) error {
 
 func (p *Worker) purge(ctx context.Context) {
 	before := time.Now().Add(-p.opts.Grace)
-	p.delete(ctx, "abandoned registrations", before, p.registrations.DeleteAbandonedRegistrations)
-	p.delete(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
+	p.runDeletion(ctx, "abandoned registrations", before, p.registrations.DeleteAbandonedRegistrations)
+	p.runDeletion(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
 }
 
-func (p *Worker) delete(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
+func (p *Worker) runDeletion(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
 	n, err := fn(ctx, before)
 	if err != nil {
 		p.logger.Error("purge failed", "what", what, "err", err)
