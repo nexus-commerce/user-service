@@ -238,7 +238,14 @@ func scanUser(row *sql.Row) (*user.User, error) {
 		)
 		pending = &p
 	}
-	return user.Restore(id, user.RestoreEmail(email), fullName, user.RestorePasswordHash(passwordHash), createdAt, pending), nil
+	return user.Restore(user.Snapshot{
+		ID:                 id,
+		Email:              user.RestoreEmail(email),
+		FullName:           fullName,
+		PasswordHash:       user.RestorePasswordHash(passwordHash),
+		CreatedAt:          createdAt,
+		PendingEmailChange: pending,
+	}), nil
 }
 
 const (

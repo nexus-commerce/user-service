@@ -298,7 +298,14 @@ func TestRestorePendingRegistration(t *testing.T) {
 	tok := user.NewConfirmationToken()
 	expiresAt := time.Now().UTC().Add(time.Hour)
 
-	p := user.RestorePendingRegistration(id, email, name, hash, tok.Hash(), expiresAt, nil)
+	p := user.RestorePendingRegistration(user.PendingRegistrationSnapshot{
+		UserID:       id,
+		Email:        email,
+		FullName:     name,
+		PasswordHash: hash,
+		TokenHash:    tok.Hash(),
+		ExpiresAt:    expiresAt,
+	})
 	matches := p.UserID() == id && p.Email() == email && p.FullName() == name && p.PasswordHash() == hash && p.TokenHash() == tok.Hash() && p.ExpiresAt().Equal(expiresAt)
 	if !matches {
 		t.Errorf("RestorePendingRegistration() = {id: %v, email: %q, hash: %q, expiresAt: %v}, want {id: %v, email: %q, hash: %q, expiresAt: %v}",
@@ -322,7 +329,15 @@ func TestRestoreConfirmedRegistration(t *testing.T) {
 	name := mustFullName(t, janeDoe)
 	hash := mustHash(t)
 
-	p := user.RestorePendingRegistration(uuid.New(), email, name, hash, tok.Hash(), confirmedAt.Add(time.Hour), &confirmedAt)
+	p := user.RestorePendingRegistration(user.PendingRegistrationSnapshot{
+		UserID:       uuid.New(),
+		Email:        email,
+		FullName:     name,
+		PasswordHash: hash,
+		TokenHash:    tok.Hash(),
+		ExpiresAt:    confirmedAt.Add(time.Hour),
+		ConfirmedAt:  &confirmedAt,
+	})
 
 	if at, ok := p.ConfirmedAt(); !ok || !at.Equal(confirmedAt) {
 		t.Errorf("ConfirmedAt() = %v, %v; want %v, true", at, ok, confirmedAt)

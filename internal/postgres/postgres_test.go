@@ -94,7 +94,14 @@ func (r testRepos) seedRegistration(t *testing.T, email string) (*user.PendingRe
 	t.Helper()
 	token := user.NewConfirmationToken()
 	expiresAt := time.Now().UTC().Add(time.Hour)
-	pending := user.RestorePendingRegistration(uuid.New(), user.RestoreEmail(email), testName("Jane", "Doe"), user.RestorePasswordHash("test-hash"), token.Hash(), expiresAt, nil)
+	pending := user.RestorePendingRegistration(user.PendingRegistrationSnapshot{
+		UserID:       uuid.New(),
+		Email:        user.RestoreEmail(email),
+		FullName:     testName("Jane", "Doe"),
+		PasswordHash: user.RestorePasswordHash("test-hash"),
+		TokenHash:    token.Hash(),
+		ExpiresAt:    expiresAt,
+	})
 	if err := r.registrations.Save(t.Context(), pending, supersedeWith(pending)); err != nil {
 		t.Fatal(err)
 	}

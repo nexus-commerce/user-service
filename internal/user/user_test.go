@@ -107,7 +107,13 @@ func TestRestore(t *testing.T) {
 	name := mustFullName(t, fields)
 	createdAt := time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)
 
-	u := user.Restore(id, user.RestoreEmail(legacyEmail), name, hash, createdAt, nil)
+	u := user.Restore(user.Snapshot{
+		ID:           id,
+		Email:        user.RestoreEmail(legacyEmail),
+		FullName:     name,
+		PasswordHash: hash,
+		CreatedAt:    createdAt,
+	})
 	got := fieldsOf(u.FullName())
 	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
 	if !matches {
@@ -295,7 +301,13 @@ func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 			return user.Reauthentication{}
 		},
 		"other user": func(t *testing.T, u *user.User) user.Reauthentication {
-			other := user.Restore(uuid.New(), u.Email(), u.FullName(), u.PasswordHash(), u.CreatedAt(), nil)
+			other := user.Restore(user.Snapshot{
+				ID:           uuid.New(),
+				Email:        u.Email(),
+				FullName:     u.FullName(),
+				PasswordHash: u.PasswordHash(),
+				CreatedAt:    u.CreatedAt(),
+			})
 			proof, err := other.Reauthenticate(mustPassword(t, "s3cretpass"), fakeHasher{})
 			if err != nil {
 				t.Fatalf("Reauthenticate() error: %v", err)
@@ -304,7 +316,13 @@ func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 		},
 		"password changed since": func(t *testing.T, u *user.User) user.Reauthentication {
 			hash := user.RestorePasswordHash("hashed:otherpass1")
-			earlier := user.Restore(u.ID(), u.Email(), u.FullName(), hash, u.CreatedAt(), nil)
+			earlier := user.Restore(user.Snapshot{
+				ID:           u.ID(),
+				Email:        u.Email(),
+				FullName:     u.FullName(),
+				PasswordHash: hash,
+				CreatedAt:    u.CreatedAt(),
+			})
 			proof, err := earlier.Reauthenticate(mustPassword(t, "otherpass1"), fakeHasher{})
 			if err != nil {
 				t.Fatalf("Reauthenticate() error: %v", err)
@@ -427,7 +445,14 @@ func TestRestoreWithPendingEmailChange(t *testing.T) {
 	tok := user.NewConfirmationToken()
 	expiresAt := time.Now().Add(time.Hour)
 	pending := user.RestorePendingEmailChange(user.RestoreEmail("new@example.com"), tok.Hash(), expiresAt)
-	u := user.Restore(uuid.New(), user.RestoreEmail(janeEmail), mustFullName(t, janeDoe), mustHash(t), time.Now(), &pending)
+	u := user.Restore(user.Snapshot{
+		ID:                 uuid.New(),
+		Email:              user.RestoreEmail(janeEmail),
+		FullName:           mustFullName(t, janeDoe),
+		PasswordHash:       mustHash(t),
+		CreatedAt:          time.Now(),
+		PendingEmailChange: &pending,
+	})
 	if err := u.ConfirmEmailChange(tok); err != nil {
 		t.Errorf("ConfirmEmailChange() on restored user error: %v", err)
 	}

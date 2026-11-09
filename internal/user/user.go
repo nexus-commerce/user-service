@@ -30,14 +30,23 @@ type Reauthentication struct {
 	passwordHash PasswordHash
 }
 
-func Restore(id uuid.UUID, email Email, name FullName, passwordHash PasswordHash, createdAt time.Time, pending *PendingEmailChange) *User {
+type Snapshot struct {
+	ID                 uuid.UUID
+	Email              Email
+	FullName           FullName
+	PasswordHash       PasswordHash
+	CreatedAt          time.Time
+	PendingEmailChange *PendingEmailChange
+}
+
+func Restore(s Snapshot) *User {
 	return &User{
-		id:           id,
-		email:        email,
-		fullName:     name,
-		passwordHash: passwordHash,
-		createdAt:    createdAt,
-		pending:      pending,
+		id:           s.ID,
+		email:        s.Email,
+		fullName:     s.FullName,
+		passwordHash: s.PasswordHash,
+		createdAt:    s.CreatedAt,
+		pending:      s.PendingEmailChange,
 	}
 }
 

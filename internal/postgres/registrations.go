@@ -208,13 +208,13 @@ func scanPendingRegistration(row *sql.Row) (*user.PendingRegistration, error) {
 		confirmed = new(confirmedAt.Time)
 	}
 	fullName := user.NewFullName(user.RestoreName(firstName), user.RestoreName(lastName))
-	return user.RestorePendingRegistration(
-		userID,
-		user.RestoreEmail(email),
-		fullName,
-		user.RestorePasswordHash(passwordHash),
-		user.RestoreConfirmationTokenHash(tokenHash),
-		expiresAt,
-		confirmed,
-	), nil
+	return user.RestorePendingRegistration(user.PendingRegistrationSnapshot{
+		UserID:       userID,
+		Email:        user.RestoreEmail(email),
+		FullName:     fullName,
+		PasswordHash: user.RestorePasswordHash(passwordHash),
+		TokenHash:    user.RestoreConfirmationTokenHash(tokenHash),
+		ExpiresAt:    expiresAt,
+		ConfirmedAt:  confirmed,
+	}), nil
 }

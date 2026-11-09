@@ -42,14 +42,24 @@ func RequestRegistration(email Email, name FullName, password Password, hasher H
 	return p, nil
 }
 
-func RestorePendingRegistration(userID uuid.UUID, email Email, name FullName, passwordHash PasswordHash, tokenHash ConfirmationTokenHash, expiresAt time.Time, confirmedAt *time.Time) *PendingRegistration {
+type PendingRegistrationSnapshot struct {
+	UserID       uuid.UUID
+	Email        Email
+	FullName     FullName
+	PasswordHash PasswordHash
+	TokenHash    ConfirmationTokenHash
+	ExpiresAt    time.Time
+	ConfirmedAt  *time.Time
+}
+
+func RestorePendingRegistration(s PendingRegistrationSnapshot) *PendingRegistration {
 	return &PendingRegistration{
-		userID:       userID,
-		email:        email,
-		fullName:     name,
-		passwordHash: passwordHash,
-		confirmation: Confirmation{tokenHash: tokenHash, expiresAt: expiresAt},
-		confirmedAt:  confirmedAt,
+		userID:       s.UserID,
+		email:        s.Email,
+		fullName:     s.FullName,
+		passwordHash: s.PasswordHash,
+		confirmation: Confirmation{tokenHash: s.TokenHash, expiresAt: s.ExpiresAt},
+		confirmedAt:  s.ConfirmedAt,
 	}
 }
 

@@ -130,7 +130,15 @@ func copyPending(p *user.PendingRegistration) *user.PendingRegistration {
 	if at, ok := p.ConfirmedAt(); ok {
 		confirmedAt = &at
 	}
-	return user.RestorePendingRegistration(p.UserID(), p.Email(), p.FullName(), p.PasswordHash(), p.TokenHash(), p.ExpiresAt(), confirmedAt)
+	return user.RestorePendingRegistration(user.PendingRegistrationSnapshot{
+		UserID:       p.UserID(),
+		Email:        p.Email(),
+		FullName:     p.FullName(),
+		PasswordHash: p.PasswordHash(),
+		TokenHash:    p.TokenHash(),
+		ExpiresAt:    p.ExpiresAt(),
+		ConfirmedAt:  confirmedAt,
+	})
 }
 
 func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration, supersede func(*user.PendingRegistration) error) error {
