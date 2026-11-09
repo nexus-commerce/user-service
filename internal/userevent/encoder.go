@@ -130,7 +130,7 @@ func (enc *encoder) encode(e user.Event) (messaging.Message, error) {
 		return messaging.Message{}, fmt.Errorf("no route for event %T", e)
 	}
 	meta := e.Meta()
-	data, err := r.convert(e)
+	payload, err := r.convert(e)
 	if err != nil {
 		return messaging.Message{}, fmt.Errorf("convert %s event: %w", r.typ, err)
 	}
@@ -139,7 +139,7 @@ func (enc *encoder) encode(e user.Event) (messaging.Message, error) {
 		Type:      r.typ,
 		Timestamp: meta.OccurredAt,
 		Version:   r.version,
-		Data:      data,
+		Data:      payload,
 	})
 	if err != nil {
 		return messaging.Message{}, fmt.Errorf("marshal %s event: %w", r.typ, err)
