@@ -97,21 +97,22 @@ func (d *Database) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (d *Database) runInTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (d *Database) runInTx(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
 	tx, err := d.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err = fn(tx); err != nil {
+	defer func() {
 		if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-			return errors.Join(err, fmt.Errorf("rollback tx: %w", rbErr))
+			err = errors.Join(err, fmt.Errorf("rollback tx: %w", rbErr))
 		}
+	}()
+
+	if err := fn(tx); err != nil {
 		return err
 	}
 
-	if err = tx.Commit(); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
 	return nil
