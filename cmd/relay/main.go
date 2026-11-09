@@ -68,7 +68,7 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	outboxRelay := relay.New(postgres.NewOutbox(db), producer, relay.Options{
+	outboxRelay := relay.NewWorker(postgres.NewOutbox(db), producer, relay.Options{
 		Interval:  cfg.Outbox.Interval,
 		BatchSize: cfg.Outbox.BatchSize,
 		Logger:    logger,

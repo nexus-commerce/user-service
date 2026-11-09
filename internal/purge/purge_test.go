@@ -39,7 +39,7 @@ func TestRunPurgesOnStartAndEveryInterval(t *testing.T) {
 		done := make(chan error)
 		start := time.Now()
 
-		go func() { done <- purge.New(registrations, users, opts).Run(ctx) }()
+		go func() { done <- purge.NewWorker(registrations, users, opts).Run(ctx) }()
 		synctest.Wait()
 		time.Sleep(opts.Interval)
 		synctest.Wait()
@@ -63,7 +63,7 @@ func TestRunContinuesAfterError(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		done := make(chan error)
 
-		go func() { done <- purge.New(registrations, users, purge.Options{Interval: time.Hour}).Run(ctx) }()
+		go func() { done <- purge.NewWorker(registrations, users, purge.Options{Interval: time.Hour}).Run(ctx) }()
 		synctest.Wait()
 		time.Sleep(time.Hour)
 		synctest.Wait()

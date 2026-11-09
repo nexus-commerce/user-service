@@ -27,17 +27,17 @@ type NameChange struct {
 	LastName  *string
 }
 
-func (r *Rename) Execute(ctx context.Context, c NameChange) (UserView, error) {
-	first, err := parseName(c.FirstName, FieldFirstName)
+func (r *Rename) Execute(ctx context.Context, change NameChange) (UserView, error) {
+	first, err := parseName(change.FirstName, FieldFirstName)
 	if err != nil {
 		return UserView{}, err
 	}
-	last, err := parseName(c.LastName, FieldLastName)
+	last, err := parseName(change.LastName, FieldLastName)
 	if err != nil {
 		return UserView{}, err
 	}
 
-	renamed, err := r.users.UpdateByID(ctx, c.UserID, func(u *user.User) error {
+	renamed, err := r.users.UpdateByID(ctx, change.UserID, func(u *user.User) error {
 		name := u.FullName()
 		if first != nil {
 			name = name.WithFirstName(*first)

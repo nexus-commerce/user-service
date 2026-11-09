@@ -39,13 +39,13 @@ var registrationFields = wireFields{
 	usecase.FieldPasswordConfirmation: "passwordConfirmation",
 }
 
-func (r *registrationBody) toRegistrationRequest() usecase.RegistrationRequest {
+func (b *registrationBody) toRegistrationRequest() usecase.RegistrationRequest {
 	return usecase.RegistrationRequest{
-		FirstName:            r.FirstName,
-		LastName:             r.LastName,
-		Email:                r.Email,
-		Password:             r.Password,
-		PasswordConfirmation: r.PasswordConfirmation,
+		FirstName:            b.FirstName,
+		LastName:             b.LastName,
+		Email:                b.Email,
+		Password:             b.Password,
+		PasswordConfirmation: b.PasswordConfirmation,
 	}
 }
 

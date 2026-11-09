@@ -18,56 +18,56 @@ type Options struct {
 	Logger    *slog.Logger
 }
 
-type Relay struct {
+type Worker struct {
 	outbox   Outbox
 	producer messaging.Producer
 	opts     Options
 	logger   *slog.Logger
 }
 
-func New(outbox Outbox, producer messaging.Producer, opts Options) *Relay {
+func NewWorker(outbox Outbox, producer messaging.Producer, opts Options) *Worker {
 	logger := opts.Logger
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
-	return &Relay{outbox: outbox, producer: producer, opts: opts, logger: logger}
+	return &Worker{outbox: outbox, producer: producer, opts: opts, logger: logger}
 }
 
-func (r *Relay) Run(ctx context.Context) error {
-	r.logger.Info("starting outbox relay")
+func (w *Worker) Run(ctx context.Context) error {
+	w.logger.Info("starting outbox relay")
 
-	ticker := time.NewTicker(r.opts.Interval)
+	ticker := time.NewTicker(w.opts.Interval)
 	defer ticker.Stop()
 
 	for {
-		r.flush(ctx)
+		w.flush(ctx)
 
 		select {
 		case <-ctx.Done():
-			r.logger.Info("stopping outbox relay")
+			w.logger.Info("stopping outbox relay")
 			return nil
 		case <-ticker.C:
 		}
 	}
 }
 
-func (r *Relay) flush(ctx context.Context) {
+func (w *Worker) flush(ctx context.Context) {
 	for ctx.Err() == nil {
-		n, err := r.processBatch(ctx)
+		n, err := w.processBatch(ctx)
 		if err != nil {
-			r.logger.Error("relay outbox messages", "err", err)
+			w.logger.Error("relay outbox messages", "err", err)
 			return
 		}
-		if n < r.opts.BatchSize {
+		if n < w.opts.BatchSize {
 			return
 		}
 	}
 }
 
-func (r *Relay) processBatch(ctx context.Context) (int, error) {
-	return r.outbox.ProcessBatch(ctx, r.opts.BatchSize, r.produce)
+func (w *Worker) processBatch(ctx context.Context) (int, error) {
+	return w.outbox.ProcessBatch(ctx, w.opts.BatchSize, w.produce)
 }
 
-func (r *Relay) produce(ctx context.Context, msgs []messaging.Message) error {
-	return r.producer.Produce(ctx, msgs...)
+func (w *Worker) produce(ctx context.Context, msgs []messaging.Message) error {
+	return w.producer.Produce(ctx, msgs...)
 }

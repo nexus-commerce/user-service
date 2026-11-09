@@ -28,10 +28,10 @@ type loginBody struct {
 	Password string `json:"password"`
 }
 
-func (r *loginBody) toCredentials() usecase.Credentials {
+func (b *loginBody) toCredentials() usecase.Credentials {
 	return usecase.Credentials{
-		Email:    r.Email,
-		Password: r.Password,
+		Email:    b.Email,
+		Password: b.Password,
 	}
 }
 

@@ -60,7 +60,7 @@ func run(logger *slog.Logger) error {
 	}()
 
 	retention := postgres.NewRetention(db)
-	purger := purge.New(retention, retention, purge.Options{
+	purger := purge.NewWorker(retention, retention, purge.Options{
 		Interval: cfg.Purge.Interval,
 		Grace:    cfg.Purge.Grace,
 		Logger:   logger,

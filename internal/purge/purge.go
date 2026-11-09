@@ -20,22 +20,22 @@ type Options struct {
 	Logger   *slog.Logger
 }
 
-type Purger struct {
+type Worker struct {
 	registrations abandonedRegistrations
 	users         expiredEmailChanges
 	opts          Options
 	logger        *slog.Logger
 }
 
-func New(registrations abandonedRegistrations, users expiredEmailChanges, opts Options) *Purger {
+func NewWorker(registrations abandonedRegistrations, users expiredEmailChanges, opts Options) *Worker {
 	logger := opts.Logger
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
-	return &Purger{registrations: registrations, users: users, opts: opts, logger: logger}
+	return &Worker{registrations: registrations, users: users, opts: opts, logger: logger}
 }
 
-func (p *Purger) Run(ctx context.Context) error {
+func (p *Worker) Run(ctx context.Context) error {
 	p.logger.Info("starting purge")
 
 	ticker := time.NewTicker(p.opts.Interval)
@@ -53,13 +53,13 @@ func (p *Purger) Run(ctx context.Context) error {
 	}
 }
 
-func (p *Purger) purge(ctx context.Context) {
+func (p *Worker) purge(ctx context.Context) {
 	before := time.Now().Add(-p.opts.Grace)
 	p.delete(ctx, "abandoned registrations", before, p.registrations.DeleteAbandonedRegistrations)
 	p.delete(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
 }
 
-func (p *Purger) delete(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
+func (p *Worker) delete(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
 	n, err := fn(ctx, before)
 	if err != nil {
 		p.logger.Error("purge failed", "what", what, "err", err)

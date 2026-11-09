@@ -34,11 +34,11 @@ var renameFields = wireFields{
 	usecase.FieldLastName:  "lastName",
 }
 
-func (r *renameBody) toNameChange(userID uuid.UUID) usecase.NameChange {
+func (b *renameBody) toNameChange(userID uuid.UUID) usecase.NameChange {
 	return usecase.NameChange{
 		UserID:    userID,
-		FirstName: r.FirstName,
-		LastName:  r.LastName,
+		FirstName: b.FirstName,
+		LastName:  b.LastName,
 	}
 }
 

@@ -31,11 +31,11 @@ type emailChangeBody struct {
 
 var emailChangeFields = wireFields{usecase.FieldEmail: "newEmail"}
 
-func (r *emailChangeBody) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
+func (b *emailChangeBody) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
 	return usecase.EmailChangeRequest{
 		UserID:   userID,
-		NewEmail: r.NewEmail,
-		Password: r.Password,
+		NewEmail: b.NewEmail,
+		Password: b.Password,
 	}
 }
 
