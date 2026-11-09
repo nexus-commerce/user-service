@@ -318,8 +318,11 @@ func TestRestorePendingRegistration(t *testing.T) {
 func TestRestoreConfirmedRegistration(t *testing.T) {
 	tok := user.NewConfirmationToken()
 	confirmedAt := time.Now().UTC()
-	p := user.RestorePendingRegistration(uuid.New(), mustEmail(t, janeEmail), mustFullName(t, janeDoe), mustHash(t),
-		tok.Hash(), confirmedAt.Add(time.Hour), &confirmedAt)
+	email := mustEmail(t, janeEmail)
+	name := mustFullName(t, janeDoe)
+	hash := mustHash(t)
+
+	p := user.RestorePendingRegistration(uuid.New(), email, name, hash, tok.Hash(), confirmedAt.Add(time.Hour), &confirmedAt)
 
 	if at, ok := p.ConfirmedAt(); !ok || !at.Equal(confirmedAt) {
 		t.Errorf("ConfirmedAt() = %v, %v; want %v, true", at, ok, confirmedAt)

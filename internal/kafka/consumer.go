@@ -124,7 +124,7 @@ func newRouter(handlers ...Handler) (router, error) {
 	r := make(router, len(handlers))
 	for _, h := range handlers {
 		if _, ok := r[h.EventType()]; ok {
-			return nil, fmt.Errorf("duplicate handler for event type %s", h.EventType())
+			return nil, fmt.Errorf("duplicate handler for event type %q", h.EventType())
 		}
 		r[h.EventType()] = h
 	}
@@ -137,12 +137,12 @@ func (r router) route(ctx context.Context, msg messaging.Message) error {
 		return nil
 	}
 
-	op := fmt.Sprintf("handle %s message with key %s", msg.Type, msg.Key)
+	op := fmt.Sprintf("handle %q message with key %q", msg.Type, msg.Key)
 	err := retry(ctx, op, func(err error) bool { return !errors.Is(err, ErrPermanent) }, func() error {
 		return h.Handle(ctx, msg)
 	})
 	if errors.Is(err, ErrPermanent) {
-		log.Printf("skip %s message with key %s: %v", msg.Type, msg.Key, err)
+		log.Printf("skip %q message with key %q: %v", msg.Type, msg.Key, err)
 		return nil
 	}
 	return err

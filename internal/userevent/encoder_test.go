@@ -8,6 +8,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/messaging"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -52,22 +54,17 @@ func TestEncodeUserRegistered(t *testing.T) {
 		t.Errorf("encode(Registered) header = %+v, want %+v", gotHeader, wantHeader)
 	}
 
-	type payload struct {
-		ID      string `json:"eventId"`
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID string `json:"userId"`
-			Email  string `json:"email"`
-		} `json:"data"`
+	type data struct {
+		UserID string `json:"userId"`
+		Email  string `json:"email"`
 	}
-	var got payload
-	if err := json.Unmarshal(msg.Value, &got); err != nil {
-		t.Fatalf("json.Unmarshal(%s) error: %v", msg.Value, err)
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.registered",
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), Email: "jane@example.com"},
 	}
-	want := payload{ID: e.ID.String(), Type: "user.registered", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.Email = "jane@example.com"
 	if got != want {
 		t.Errorf("encode(Registered) payload = %+v, want %+v", got, want)
 	}
@@ -152,6 +149,13 @@ func assertHeader(t *testing.T, msg messaging.Message, meta user.EventMeta) {
 	}
 }
 
+type decodedEnvelope[D any] struct {
+	ID      string `json:"eventId"`
+	Type    string `json:"eventType"`
+	Version string `json:"version"`
+	Data    D      `json:"data"`
+}
+
 func decode[T any](t *testing.T, msg messaging.Message) T {
 	t.Helper()
 	var v T
@@ -170,22 +174,19 @@ func TestEncodeUserRenamed(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID    string    `json:"userId"`
-			FirstName string    `json:"firstName"`
-			LastName  string    `json:"lastName"`
-			RenamedAt time.Time `json:"renamedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID    string    `json:"userId"`
+		FirstName string    `json:"firstName"`
+		LastName  string    `json:"lastName"`
+		RenamedAt time.Time `json:"renamedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.renamed", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.FirstName = "Jane"
-	want.Data.LastName = "Smith"
-	want.Data.RenamedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.renamed",
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), FirstName: "Jane", LastName: "Smith", RenamedAt: e.OccurredAt},
+	}
 	if got != want {
 		t.Errorf("encode(Renamed) payload = %+v, want %+v", got, want)
 	}
@@ -212,32 +213,34 @@ func TestEncodeUserEmailChangeRequested(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID         string    `json:"userId"`
-			FirstName      string    `json:"firstName"`
-			LastName       string    `json:"lastName"`
-			NewEmail       string    `json:"newEmail"`
-			EncryptedToken []byte    `json:"encryptedToken"`
-			KeyID          string    `json:"keyId"`
-			ExpiresAt      time.Time `json:"expiresAt"`
-			RequestedAt    time.Time `json:"requestedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID         string    `json:"userId"`
+		FirstName      string    `json:"firstName"`
+		LastName       string    `json:"lastName"`
+		NewEmail       string    `json:"newEmail"`
+		EncryptedToken []byte    `json:"encryptedToken"`
+		KeyID          string    `json:"keyId"`
+		ExpiresAt      time.Time `json:"expiresAt"`
+		RequestedAt    time.Time `json:"requestedAt"`
 	}
-	got := decode[payload](t, msg)
-	if got.Type != "user.email_change_requested" || got.Version != "1.0" {
-		t.Errorf("type, version = %q, %q; want user.email_change_requested, 1.0", got.Type, got.Version)
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.email_change_requested",
+		Version: "1.0",
+		Data: data{
+			UserID:         e.AggregateID.String(),
+			FirstName:      "Jane",
+			LastName:       "Doe",
+			NewEmail:       "new@example.com",
+			EncryptedToken: []byte("sealed:" + e.Token.Plaintext()),
+			KeyID:          "test-key",
+			ExpiresAt:      e.ExpiresAt,
+			RequestedAt:    e.OccurredAt,
+		},
 	}
-	d := got.Data
-	if d.UserID != e.AggregateID.String() || d.FirstName != "Jane" || d.LastName != "Doe" ||
-		d.NewEmail != "new@example.com" || d.KeyID != "test-key" ||
-		!d.ExpiresAt.Equal(e.ExpiresAt) || !d.RequestedAt.Equal(e.OccurredAt) {
-		t.Errorf("data = %+v", d)
-	}
-	if want := "sealed:" + e.Token.Plaintext(); string(d.EncryptedToken) != want {
-		t.Errorf("encryptedToken = %q, want %q", d.EncryptedToken, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("encode(EmailChangeRequested) payload mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -283,32 +286,34 @@ func TestEncodeUserRegistrationRequested(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID         string    `json:"userId"`
-			Email          string    `json:"email"`
-			FirstName      string    `json:"firstName"`
-			LastName       string    `json:"lastName"`
-			EncryptedToken []byte    `json:"encryptedToken"`
-			KeyID          string    `json:"keyId"`
-			ExpiresAt      time.Time `json:"expiresAt"`
-			RequestedAt    time.Time `json:"requestedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID         string    `json:"userId"`
+		Email          string    `json:"email"`
+		FirstName      string    `json:"firstName"`
+		LastName       string    `json:"lastName"`
+		EncryptedToken []byte    `json:"encryptedToken"`
+		KeyID          string    `json:"keyId"`
+		ExpiresAt      time.Time `json:"expiresAt"`
+		RequestedAt    time.Time `json:"requestedAt"`
 	}
-	got := decode[payload](t, msg)
-	if got.Type != "user.registration_requested" || got.Version != "1.0" {
-		t.Errorf("type, version = %q, %q; want user.registration_requested, 1.0", got.Type, got.Version)
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.registration_requested",
+		Version: "1.0",
+		Data: data{
+			UserID:         e.AggregateID.String(),
+			Email:          "jane@example.com",
+			FirstName:      "Jane",
+			LastName:       "Doe",
+			EncryptedToken: []byte("sealed:" + e.Token.Plaintext()),
+			KeyID:          "test-key",
+			ExpiresAt:      e.ExpiresAt,
+			RequestedAt:    e.OccurredAt,
+		},
 	}
-	d := got.Data
-	if d.UserID != e.AggregateID.String() || d.Email != "jane@example.com" || d.FirstName != "Jane" ||
-		d.LastName != "Doe" || d.KeyID != "test-key" ||
-		!d.ExpiresAt.Equal(e.ExpiresAt) || !d.RequestedAt.Equal(e.OccurredAt) {
-		t.Errorf("data = %+v", d)
-	}
-	if want := "sealed:" + e.Token.Plaintext(); string(d.EncryptedToken) != want {
-		t.Errorf("encryptedToken = %q, want %q", d.EncryptedToken, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("encode(RegistrationRequested) payload mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -337,24 +342,26 @@ func TestEncodeUserDuplicateRegistrationAttempted(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID      string    `json:"userId"`
-			FirstName   string    `json:"firstName"`
-			LastName    string    `json:"lastName"`
-			Email       string    `json:"email"`
-			AttemptedAt time.Time `json:"attemptedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID      string    `json:"userId"`
+		FirstName   string    `json:"firstName"`
+		LastName    string    `json:"lastName"`
+		Email       string    `json:"email"`
+		AttemptedAt time.Time `json:"attemptedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.duplicate_registration_attempted", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.FirstName = "Jane"
-	want.Data.LastName = "Doe"
-	want.Data.Email = "jane@example.com"
-	want.Data.AttemptedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.duplicate_registration_attempted",
+		Version: "1.0",
+		Data: data{
+			UserID:      e.AggregateID.String(),
+			FirstName:   "Jane",
+			LastName:    "Doe",
+			Email:       "jane@example.com",
+			AttemptedAt: e.OccurredAt,
+		},
+	}
 	if got != want {
 		t.Errorf("encode(DuplicateRegistrationAttempted) payload = %+v, want %+v", got, want)
 	}
@@ -369,20 +376,18 @@ func TestEncodeUserEmailChangeToTakenAddressAttempted(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID      string    `json:"userId"`
-			NewEmail    string    `json:"newEmail"`
-			AttemptedAt time.Time `json:"attemptedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID      string    `json:"userId"`
+		NewEmail    string    `json:"newEmail"`
+		AttemptedAt time.Time `json:"attemptedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.email_change_to_taken_address_attempted", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.NewEmail = "taken@example.com"
-	want.Data.AttemptedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.email_change_to_taken_address_attempted",
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), NewEmail: "taken@example.com", AttemptedAt: e.OccurredAt},
+	}
 	if got != want {
 		t.Errorf("encode(EmailChangeToTakenAddressAttempted) payload = %+v, want %+v", got, want)
 	}
@@ -402,26 +407,28 @@ func TestEncodeUserEmailChanged(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID    string    `json:"userId"`
-			FirstName string    `json:"firstName"`
-			LastName  string    `json:"lastName"`
-			OldEmail  string    `json:"oldEmail"`
-			NewEmail  string    `json:"newEmail"`
-			ChangedAt time.Time `json:"changedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID    string    `json:"userId"`
+		FirstName string    `json:"firstName"`
+		LastName  string    `json:"lastName"`
+		OldEmail  string    `json:"oldEmail"`
+		NewEmail  string    `json:"newEmail"`
+		ChangedAt time.Time `json:"changedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.email_changed", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.FirstName = "Jane"
-	want.Data.LastName = "Doe"
-	want.Data.OldEmail = "jane@example.com"
-	want.Data.NewEmail = "new@example.com"
-	want.Data.ChangedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.email_changed",
+		Version: "1.0",
+		Data: data{
+			UserID:    e.AggregateID.String(),
+			FirstName: "Jane",
+			LastName:  "Doe",
+			OldEmail:  "jane@example.com",
+			NewEmail:  "new@example.com",
+			ChangedAt: e.OccurredAt,
+		},
+	}
 	if got != want {
 		t.Errorf("encode(EmailChanged) payload = %+v, want %+v", got, want)
 	}
@@ -444,18 +451,17 @@ func TestEncodeUserRegistrationConfirmed(t *testing.T) {
 		t.Errorf("Type = %q, want %q", msg.Type, TypeRegistrationConfirmed)
 	}
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID      string    `json:"userId"`
-			ConfirmedAt time.Time `json:"confirmedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID      string    `json:"userId"`
+		ConfirmedAt time.Time `json:"confirmedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: TypeRegistrationConfirmed, Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.ConfirmedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    TypeRegistrationConfirmed,
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), ConfirmedAt: e.OccurredAt},
+	}
 	if got != want {
 		t.Errorf("encode(RegistrationConfirmed) payload = %+v, want %+v", got, want)
 	}
@@ -470,20 +476,18 @@ func TestEncodeUserRegistrationRejected(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID     string    `json:"userId"`
-			Email      string    `json:"email"`
-			RejectedAt time.Time `json:"rejectedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID     string    `json:"userId"`
+		Email      string    `json:"email"`
+		RejectedAt time.Time `json:"rejectedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.registration_rejected", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.Email = "jane@example.com"
-	want.Data.RejectedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.registration_rejected",
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), Email: "jane@example.com", RejectedAt: e.OccurredAt},
+	}
 	if got != want {
 		t.Errorf("encode(RegistrationRejected) payload = %+v, want %+v", got, want)
 	}
@@ -498,20 +502,18 @@ func TestEncodeUserEmailChangeRejected(t *testing.T) {
 	}
 	assertHeader(t, msg, e.EventMeta)
 
-	type payload struct {
-		Type    string `json:"eventType"`
-		Version string `json:"version"`
-		Data    struct {
-			UserID     string    `json:"userId"`
-			NewEmail   string    `json:"newEmail"`
-			RejectedAt time.Time `json:"rejectedAt"`
-		} `json:"data"`
+	type data struct {
+		UserID     string    `json:"userId"`
+		NewEmail   string    `json:"newEmail"`
+		RejectedAt time.Time `json:"rejectedAt"`
 	}
-	got := decode[payload](t, msg)
-	want := payload{Type: "user.email_change_rejected", Version: "1.0"}
-	want.Data.UserID = e.AggregateID.String()
-	want.Data.NewEmail = "new@example.com"
-	want.Data.RejectedAt = e.OccurredAt
+	got := decode[decodedEnvelope[data]](t, msg)
+	want := decodedEnvelope[data]{
+		ID:      e.ID.String(),
+		Type:    "user.email_change_rejected",
+		Version: "1.0",
+		Data:    data{UserID: e.AggregateID.String(), NewEmail: "new@example.com", RejectedAt: e.OccurredAt},
+	}
 	if got != want {
 		t.Errorf("encode(EmailChangeRejected) payload = %+v, want %+v", got, want)
 	}

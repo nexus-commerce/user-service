@@ -65,31 +65,19 @@ func (us *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	return u, err
 }
 
-func (us *Users) UpdateByID(
-	ctx context.Context,
-	id uuid.UUID,
-	update func(*user.User) error,
-) (*user.User, error) {
+func (us *Users) UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error) {
 	lockQuery := `SELECT id FROM users WHERE id = $1 FOR UPDATE`
 
 	return us.update(ctx, lockQuery, id.String(), update)
 }
 
-func (us *Users) UpdateByEmail(
-	ctx context.Context,
-	email user.Email,
-	update func(*user.User) error,
-) (*user.User, error) {
+func (us *Users) UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error) {
 	lockQuery := `SELECT id FROM users WHERE email = $1 FOR UPDATE`
 
 	return us.update(ctx, lockQuery, email.String(), update)
 }
 
-func (us *Users) UpdateByEmailChangeToken(
-	ctx context.Context,
-	hash user.ConfirmationTokenHash,
-	update func(*user.User) error,
-) (*user.User, error) {
+func (us *Users) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error) {
 	lockQuery := `SELECT u.id FROM users u
 		JOIN pending_email_changes p ON p.user_id = u.id
 		WHERE p.token_hash = $1
@@ -98,12 +86,7 @@ func (us *Users) UpdateByEmailChangeToken(
 	return us.update(ctx, lockQuery, hash.Encoded(), update)
 }
 
-func (us *Users) update(
-	ctx context.Context,
-	lockQuery string,
-	arg string,
-	update func(*user.User) error,
-) (*user.User, error) {
+func (us *Users) update(ctx context.Context, lockQuery, arg string, update func(*user.User) error) (*user.User, error) {
 	selectQuery := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
 			p.email, p.token_hash, p.expires_at
 		FROM users u

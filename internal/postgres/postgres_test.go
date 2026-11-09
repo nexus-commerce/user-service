@@ -91,15 +91,26 @@ func (r testRepos) complete() *usecase.CompleteRegistration {
 func (r testRepos) seedRegistration(t *testing.T, email string) (*user.PendingRegistration, user.ConfirmationToken) {
 	t.Helper()
 	token := user.NewConfirmationToken()
-	pending := user.RestorePendingRegistration(
-		uuid.New(), user.RestoreEmail(email),
-		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")),
-		user.RestorePasswordHash("test-hash"), token.Hash(), time.Now().UTC().Add(time.Hour), nil,
-	)
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	pending := user.RestorePendingRegistration(uuid.New(), user.RestoreEmail(email), testName("Jane", "Doe"), user.RestorePasswordHash("test-hash"), token.Hash(), expiresAt, nil)
 	if err := r.registrations.Save(t.Context(), pending, supersedeWith(pending)); err != nil {
 		t.Fatal(err)
 	}
 	return pending, token
+}
+
+func (r testRepos) confirmPending(t *testing.T, token user.ConfirmationToken) {
+	t.Helper()
+	_, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
+		return p.Confirm(token)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func testName(first, last string) user.FullName {
+	return user.NewFullName(user.RestoreName(first), user.RestoreName(last))
 }
 
 func supersedeWith(p *user.PendingRegistration) func(*user.PendingRegistration) error {
@@ -136,9 +147,9 @@ func (r testRepos) assertState(t *testing.T, id uuid.UUID, wantUsers, wantPendin
 	if got := r.count(t, `SELECT count(*) FROM pending_registrations WHERE user_id = $1`, id.String()); got != wantPending {
 		t.Errorf("pending registrations = %d, want %d", got, wantPending)
 	}
+	query := `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = $3`
 	for typ, want := range wantEvents {
-		got := r.count(t, `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = $3`,
-			id.String(), messaging.HeaderEventType, typ)
+		got := r.count(t, query, id.String(), messaging.HeaderEventType, typ)
 		if got != want {
 			t.Errorf("outbox %s events = %d, want %d", typ, got, want)
 		}
@@ -277,17 +288,9 @@ func TestConcurrentConfirmation(t *testing.T) {
 func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	r := newTestRepos(t)
 	pending, token := r.seedRegistration(t, "jane@example.com")
-	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
-		return p.Confirm(token)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r.confirmPending(t, token)
 
-	again, err := user.RequestRegistration(user.RestoreEmail("jane@example.com"),
-		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")), mustTestPassword(t), testHasher{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	again := newTestRegistration(t, "jane@example.com", testName("Jane", "Doe"))
 	if err := r.registrations.Save(t.Context(), again, supersedeWith(again)); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 		t.Fatalf("Save() error = %v, want %v", err, user.ErrRegistrationAlreadyConfirmed)
 	}
@@ -302,10 +305,9 @@ func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
 }
 
-func newTestRegistration(t *testing.T, email string) *user.PendingRegistration {
+func newTestRegistration(t *testing.T, email string, name user.FullName) *user.PendingRegistration {
 	t.Helper()
-	p, err := user.RequestRegistration(user.RestoreEmail(email),
-		user.NewFullName(user.RestoreName("Jane"), user.RestoreName("Doe")), mustTestPassword(t), testHasher{})
+	p, err := user.RequestRegistration(user.RestoreEmail(email), name, mustTestPassword(t), testHasher{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,13 +318,9 @@ func TestSaveSupersedesUnconfirmedRegistration(t *testing.T) {
 	r := newTestRepos(t)
 	first, oldToken := r.seedRegistration(t, "jane@example.com")
 
-	again, err := user.RequestRegistration(user.RestoreEmail("jane@example.com"),
-		user.NewFullName(user.RestoreName("Janet"), user.RestoreName("Roe")), mustTestPassword(t), testHasher{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	again := newTestRegistration(t, "jane@example.com", testName("Janet", "Roe"))
 	var superseded *user.PendingRegistration
-	err = r.registrations.Save(t.Context(), again, func(existing *user.PendingRegistration) error {
+	err := r.registrations.Save(t.Context(), again, func(existing *user.PendingRegistration) error {
 		superseded = existing
 		return supersedeWith(again)(existing)
 	})
@@ -351,8 +349,8 @@ func TestConcurrentSaveOfNewEmail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	regs := []*user.PendingRegistration{
-		newTestRegistration(t, "jane@example.com"),
-		newTestRegistration(t, "jane@example.com"),
+		newTestRegistration(t, "jane@example.com", testName("Jane", "Doe")),
+		newTestRegistration(t, "jane@example.com", testName("Jane", "Doe")),
 	}
 	start := make(chan struct{})
 	results := make(chan error, len(regs))
@@ -414,11 +412,7 @@ func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 	r := newTestRepos(t)
 	unconfirmed, _ := r.seedRegistration(t, "old@example.com")
 	confirmed, token := r.seedRegistration(t, "jane@example.com")
-	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
-		return p.Confirm(token)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r.confirmPending(t, token)
 
 	n, err := NewRetention(r.db).DeleteAbandonedRegistrations(t.Context(), time.Now().Add(2*time.Hour))
 	if err != nil || n != 1 {
@@ -431,11 +425,7 @@ func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 func TestOutboxCarriesEventType(t *testing.T) {
 	r := newTestRepos(t)
 	pending, token := r.seedRegistration(t, "jane@example.com")
-	if _, err := r.registrations.UpdateByToken(t.Context(), token.Hash(), func(p *user.PendingRegistration) error {
-		return p.Confirm(token)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r.confirmPending(t, token)
 
 	var got []messaging.Message
 	_, err := NewOutbox(r.db).ProcessBatch(t.Context(), 10, func(_ context.Context, msgs []messaging.Message) error {
@@ -527,7 +517,7 @@ func consumeEmailChange(id uuid.UUID, newEmail string) func(*sql.Tx) error {
 func (r testRepos) rename(id uuid.UUID) func(context.Context) error {
 	return func(ctx context.Context) error {
 		_, err := r.users.UpdateByID(ctx, id, func(u *user.User) error {
-			u.Rename(user.NewFullName(user.RestoreName("Renamed"), user.RestoreName("User")))
+			u.Rename(testName("Renamed", "User"))
 			return nil
 		})
 		return err
@@ -536,8 +526,8 @@ func (r testRepos) rename(id uuid.UUID) func(context.Context) error {
 
 func (r testRepos) emailChangedEvents(t *testing.T, id uuid.UUID) int {
 	t.Helper()
-	return r.count(t, `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = 'user.email_changed'`,
-		id.String(), messaging.HeaderEventType)
+	query := `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = 'user.email_changed'`
+	return r.count(t, query, id.String(), messaging.HeaderEventType)
 }
 
 func TestRenameWaitingOnConfirmedEmailChangeDoesNotRestoreIt(t *testing.T) {
@@ -665,7 +655,7 @@ func TestUpdateByEmailSavesChangesAndEvents(t *testing.T) {
 
 	_, err := r.users.UpdateByEmail(t.Context(), user.RestoreEmail("jane@example.com"), func(u *user.User) error {
 		u.RecordDuplicateRegistration()
-		u.Rename(user.NewFullName(user.RestoreName("Renamed"), user.RestoreName("User")))
+		u.Rename(testName("Renamed", "User"))
 		return nil
 	})
 	if err != nil {

@@ -24,11 +24,7 @@ func NewRegistrations(db *Database, events eventPublisher) *Registrations {
 	return &Registrations{db: db, events: events}
 }
 
-func (r *Registrations) Save(
-	ctx context.Context,
-	p *user.PendingRegistration,
-	supersede func(existing *user.PendingRegistration) error,
-) error {
+func (r *Registrations) Save(ctx context.Context, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error {
 	var err error
 	for range saveAttempts {
 		err = r.db.runInTx(ctx, func(tx *sql.Tx) error {
@@ -41,12 +37,7 @@ func (r *Registrations) Save(
 	return err
 }
 
-func (r *Registrations) save(
-	ctx context.Context,
-	tx *sql.Tx,
-	p *user.PendingRegistration,
-	supersede func(existing *user.PendingRegistration) error,
-) error {
+func (r *Registrations) save(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error {
 	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
 		FROM pending_registrations
 		WHERE email = $1 FOR UPDATE`
@@ -133,11 +124,7 @@ func (r *Registrations) ByUserID(ctx context.Context, id uuid.UUID) (*user.Pendi
 	return p, err
 }
 
-func (r *Registrations) UpdateByToken(
-	ctx context.Context,
-	hash user.ConfirmationTokenHash,
-	update func(*user.PendingRegistration) error,
-) (*user.PendingRegistration, error) {
+func (r *Registrations) UpdateByToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.PendingRegistration) error) (*user.PendingRegistration, error) {
 	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
 		FROM pending_registrations
 		WHERE token_hash = $1 FOR UPDATE`
