@@ -10,7 +10,6 @@ func NewHealth() *Health {
 	return &Health{}
 }
 
-// ServeHTTP godoc
 // @Summary     Health Check
 // @Description Returns 200 OK when the service is healthy
 // @Tags        System

@@ -43,11 +43,11 @@ type Credentials struct {
 }
 
 func (l *Login) Execute(ctx context.Context, creds Credentials) (string, error) {
-	usr, err := l.authenticate(ctx, creds)
+	u, err := l.authenticate(ctx, creds)
 	if err != nil {
 		return "", err
 	}
-	return l.tokens.Issue(usr.ID())
+	return l.tokens.Issue(u.ID())
 }
 
 func (l *Login) authenticate(ctx context.Context, creds Credentials) (*user.User, error) {
@@ -60,7 +60,7 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*user.User
 		return nil, l.rejectTimingSafe()
 	}
 
-	usr, err := l.users.ByEmail(ctx, email)
+	u, err := l.users.ByEmail(ctx, email)
 	if errors.Is(err, user.ErrNotFound) {
 		return nil, l.rejectTimingSafe()
 	}
@@ -68,10 +68,10 @@ func (l *Login) authenticate(ctx context.Context, creds Credentials) (*user.User
 		return nil, err
 	}
 
-	if err = usr.Authenticate(password, l.hasher); err != nil {
+	if err = u.Authenticate(password, l.hasher); err != nil {
 		return nil, err
 	}
-	return usr, nil
+	return u, nil
 }
 
 type dummyCredentials struct {

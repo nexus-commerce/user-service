@@ -43,25 +43,25 @@ type fakeUsers struct {
 	vanishOnUpdateByEmail bool
 }
 
-func (f *fakeUsers) add(usr *user.User) {
+func (f *fakeUsers) add(u *user.User) {
 	if f.byID == nil {
 		f.byID = make(map[uuid.UUID]*user.User)
 	}
-	f.byID[usr.ID()] = usr
+	f.byID[u.ID()] = u
 }
 
 func (f *fakeUsers) ByID(_ context.Context, id uuid.UUID) (*user.User, error) {
-	usr, ok := f.byID[id]
+	u, ok := f.byID[id]
 	if !ok {
 		return nil, user.ErrNotFound
 	}
-	return usr, nil
+	return u, nil
 }
 
 func (f *fakeUsers) ByEmail(_ context.Context, email user.Email) (*user.User, error) {
-	for _, usr := range f.byID {
-		if usr.Email() == email {
-			return usr, nil
+	for _, u := range f.byID {
+		if u.Email() == email {
+			return u, nil
 		}
 	}
 	return nil, user.ErrNotFound
@@ -72,46 +72,46 @@ func (f *fakeUsers) EmailTaken(ctx context.Context, email user.Email) (bool, err
 	return err == nil, nil
 }
 
-func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
-	usr, err := f.ByID(ctx, id)
+func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error) {
+	u, err := f.ByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	before := *usr
-	if err = f.apply(usr, updateFn); err != nil {
-		*usr = before
+	before := *u
+	if err = f.apply(u, update); err != nil {
+		*u = before
 		return nil, err
 	}
-	return usr, nil
+	return u, nil
 }
 
-func (f *fakeUsers) apply(usr *user.User, updateFn func(*user.User) error) error {
-	if err := updateFn(usr); err != nil {
+func (f *fakeUsers) apply(u *user.User, update func(*user.User) error) error {
+	if err := update(u); err != nil {
 		return err
 	}
 	for _, other := range f.byID {
-		if other.ID() != usr.ID() && other.Email() == usr.Email() {
+		if other.ID() != u.ID() && other.Email() == u.Email() {
 			return user.ErrEmailTaken
 		}
 	}
 	return f.updateErr
 }
 
-func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, updateFn func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error) {
 	if f.vanishOnUpdateByEmail {
 		return nil, user.ErrNotFound
 	}
-	usr, err := f.ByEmail(ctx, email)
+	u, err := f.ByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
-	return f.UpdateByID(ctx, usr.ID(), updateFn)
+	return f.UpdateByID(ctx, u.ID(), update)
 }
 
-func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error) {
-	for id, usr := range f.byID {
-		if p, ok := usr.PendingEmailChange(); ok && p.TokenHash() == hash {
-			return f.UpdateByID(ctx, id, updateFn)
+func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error) {
+	for id, u := range f.byID {
+		if p, ok := u.PendingEmailChange(); ok && p.TokenHash() == hash {
+			return f.UpdateByID(ctx, id, update)
 		}
 	}
 	return nil, user.ErrNotFound
@@ -165,12 +165,12 @@ func (f *fakeRegistrations) ByUserID(_ context.Context, id uuid.UUID) (*user.Pen
 	return f.find(func(p *user.PendingRegistration) bool { return p.UserID() == id })
 }
 
-func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.PendingRegistration) error) (*user.PendingRegistration, error) {
+func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.ConfirmationTokenHash, update func(*user.PendingRegistration) error) (*user.PendingRegistration, error) {
 	p, err := f.find(func(p *user.PendingRegistration) bool { return p.TokenHash() == hash })
 	if err != nil {
 		return nil, err
 	}
-	if err = updateFn(p); err != nil {
+	if err = update(p); err != nil {
 		return nil, err
 	}
 	if f.updateErr != nil {
@@ -194,22 +194,22 @@ func (f *fakeRegistrations) Remove(_ context.Context, p *user.PendingRegistratio
 	return nil
 }
 
-func (f *fakeUsers) Add(ctx context.Context, usr *user.User) error {
+func (f *fakeUsers) Add(ctx context.Context, u *user.User) error {
 	f.addCalls++
 	if f.addErr != nil {
 		return f.addErr
 	}
-	if _, ok := f.byID[usr.ID()]; ok {
+	if _, ok := f.byID[u.ID()]; ok {
 		return nil
 	}
-	taken, err := f.EmailTaken(ctx, usr.Email())
+	taken, err := f.EmailTaken(ctx, u.Email())
 	if err != nil {
 		return err
 	}
 	if taken {
 		return user.ErrEmailTaken
 	}
-	f.add(usr)
+	f.add(u)
 	return nil
 }
 
@@ -263,12 +263,12 @@ func newUser(t *testing.T, users *fakeUsers, email, first, last string) *user.Us
 	if err := p.Confirm(token); err != nil {
 		t.Fatalf("Confirm() error: %v", err)
 	}
-	usr, err := p.Complete()
+	u, err := p.Complete()
 	if err != nil {
 		t.Fatalf("Complete() error: %v", err)
 	}
-	users.add(usr)
-	return usr
+	users.add(u)
+	return u
 }
 
 func newJane(t *testing.T) (*user.User, *fakeUsers) {

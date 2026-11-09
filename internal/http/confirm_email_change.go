@@ -26,7 +26,6 @@ type confirmEmailChangeRequest struct {
 	Token string `json:"token"`
 }
 
-// ServeHTTP godoc
 // @Summary     Confirm email change
 // @Description Confirms a pending email change with the token from the confirmation link and makes the new email current
 // @Tags        Users

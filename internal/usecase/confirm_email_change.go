@@ -8,7 +8,7 @@ import (
 )
 
 type confirmEmailChangeUsers interface {
-	UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error)
 }
 
 type ConfirmEmailChange struct {
@@ -27,8 +27,8 @@ func (c *ConfirmEmailChange) Execute(ctx context.Context, rawToken string) error
 		return err
 	}
 
-	_, err = c.users.UpdateByEmailChangeToken(ctx, token.Hash(), func(usr *user.User) error {
-		return usr.ConfirmEmailChange(token)
+	_, err = c.users.UpdateByEmailChangeToken(ctx, token.Hash(), func(u *user.User) error {
+		return u.ConfirmEmailChange(token)
 	})
 	switch {
 	case errors.Is(err, user.ErrNotFound):
@@ -40,8 +40,8 @@ func (c *ConfirmEmailChange) Execute(ctx context.Context, rawToken string) error
 }
 
 func (c *ConfirmEmailChange) reject(ctx context.Context, token user.ConfirmationToken) error {
-	_, err := c.users.UpdateByEmailChangeToken(ctx, token.Hash(), func(usr *user.User) error {
-		return usr.RejectEmailChange(token)
+	_, err := c.users.UpdateByEmailChangeToken(ctx, token.Hash(), func(u *user.User) error {
+		return u.RejectEmailChange(token)
 	})
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
 		return err

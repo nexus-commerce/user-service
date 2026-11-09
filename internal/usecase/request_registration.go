@@ -9,7 +9,7 @@ import (
 
 type requestRegistrationUsers interface {
 	EmailTaken(ctx context.Context, email user.Email) (bool, error)
-	UpdateByEmail(ctx context.Context, email user.Email, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error)
 }
 
 type requestRegistrationRegistrations interface {
@@ -78,8 +78,8 @@ func (r *RequestRegistration) Execute(ctx context.Context, req RegistrationReque
 		return err
 	}
 
-	_, err = r.users.UpdateByEmail(ctx, email, func(usr *user.User) error {
-		usr.RecordDuplicateRegistration()
+	_, err = r.users.UpdateByEmail(ctx, email, func(u *user.User) error {
+		u.RecordDuplicateRegistration()
 		return nil
 	})
 	if errors.Is(err, user.ErrNotFound) {

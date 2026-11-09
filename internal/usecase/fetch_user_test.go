@@ -31,12 +31,12 @@ func TestFetchUser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			usr, users := newJane(t)
+			u, users := newJane(t)
 			calls := 0
 			repo := fetchUserUsersFunc(func(ctx context.Context, id uuid.UUID) (*user.User, error) {
 				calls++
-				if ctx != t.Context() || id != usr.ID() {
-					t.Errorf("ByID() got context %v, ID %v; want test context, %v", ctx, id, usr.ID())
+				if ctx != t.Context() || id != u.ID() {
+					t.Errorf("ByID() got context %v, ID %v; want test context, %v", ctx, id, u.ID())
 				}
 				if tt.readErr != nil {
 					return nil, tt.readErr
@@ -44,13 +44,13 @@ func TestFetchUser(t *testing.T) {
 				return users.ByID(ctx, id)
 			})
 
-			view, err := usecase.NewFetchUser(repo).Execute(t.Context(), usr.ID())
+			view, err := usecase.NewFetchUser(repo).Execute(t.Context(), u.ID())
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("Execute() error = %v, want %v", err, tt.wantErr)
 			}
 			wantView := usecase.UserView{}
 			if tt.wantErr == nil {
-				wantView = usecase.UserView{ID: usr.ID(), Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
+				wantView = usecase.UserView{ID: u.ID(), Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 			}
 			if view != wantView {
 				t.Errorf("Execute() view = %+v, want %+v", view, wantView)

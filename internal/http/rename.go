@@ -42,7 +42,6 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 	}
 }
 
-// ServeHTTP godoc
 // @Summary     Rename user
 // @Description Partially changes the first and last name of the authenticated user; only provided fields are changed
 // @Tags        Users
@@ -58,7 +57,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /users/me/name [patch]
 func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	userID, err := UserIDFromContext(r.Context())
+	userID, err := userIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return
@@ -70,7 +69,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usr, err := h.uc.Execute(r.Context(), reqBody.toNameChange(userID))
+	view, err := h.uc.Execute(r.Context(), reqBody.toNameChange(userID))
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
@@ -84,7 +83,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, toUserEnvelope(usr))
+	writeJSON(rw, r, http.StatusOK, toUserEnvelope(view))
 }
 
 func (h *Rename) Route() Route {

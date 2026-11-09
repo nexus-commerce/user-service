@@ -49,9 +49,9 @@ func (r *requestRegistrationRequest) toRegistrationRequest() usecase.Registratio
 	}
 }
 
-// ServeHTTP godoc
 // @Summary     Request registration
-// @Description Starts a registration: sends a confirmation link to a new email or an "account already exists" notice to a registered one. The response does not reveal which.
+// @Description Starts a registration: sends a confirmation link to a new email or an "account already exists" notice to a registered one.
+// @Description The response does not reveal which.
 // @Tags        Auth
 // @Accept      json
 // @Produce     json

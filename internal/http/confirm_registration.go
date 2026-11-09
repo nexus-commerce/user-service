@@ -30,9 +30,10 @@ type confirmRegistrationResponse struct {
 	Status string `json:"status"`
 }
 
-// ServeHTTP godoc
 // @Summary     Confirm registration
-// @Description Confirms a pending registration with the token from the confirmation link. The account is created asynchronously: a user.registered event follows, or user.registration_rejected if the email was taken meanwhile. Log in via /auth/login once the account exists
+// @Description Confirms a pending registration with the token from the confirmation link.
+// @Description The account is created asynchronously: a user.registered event follows, or user.registration_rejected if the email was taken meanwhile.
+// @Description Log in via /auth/login once the account exists
 // @Tags        Auth
 // @Accept      json
 // @Produce     json

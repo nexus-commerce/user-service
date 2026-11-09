@@ -11,7 +11,7 @@ import (
 type requestEmailChangeUsers interface {
 	ByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 	EmailTaken(ctx context.Context, email user.Email) (bool, error)
-	UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error)
+	UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error)
 }
 
 type RequestEmailChange struct {
@@ -42,11 +42,11 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return user.ErrInvalidCredentials
 	}
 
-	usr, err := r.users.ByID(ctx, req.UserID)
+	u, err := r.users.ByID(ctx, req.UserID)
 	if err != nil {
 		return err
 	}
-	proof, err := usr.Reauthenticate(password, r.hasher)
+	proof, err := u.Reauthenticate(password, r.hasher)
 	if err != nil {
 		return err
 	}
@@ -56,8 +56,8 @@ func (r *RequestEmailChange) Execute(ctx context.Context, req EmailChangeRequest
 		return err
 	}
 
-	_, err = r.users.UpdateByID(ctx, req.UserID, func(usr *user.User) error {
-		return usr.RequestEmailChange(email, taken, proof)
+	_, err = r.users.UpdateByID(ctx, req.UserID, func(locked *user.User) error {
+		return locked.RequestEmailChange(email, taken, proof)
 	})
 	if errors.Is(err, user.ErrEmailUnchanged) {
 		return &FieldError{Field: FieldEmail, Err: err}

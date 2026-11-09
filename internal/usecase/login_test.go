@@ -56,20 +56,20 @@ func (h *loginHasher) Verify(hash user.PasswordHash, p user.Password) (bool, err
 func TestLoginIssuesToken(t *testing.T) {
 	for _, email := range []string{"jane@example.com", "JANE@EXAMPLE.COM"} {
 		t.Run(email, func(t *testing.T) {
-			usr, users := newJane(t)
+			u, users := newJane(t)
 			hasher := &loginHasher{}
 			readCalls, issueCalls := 0, 0
 			repo := loginUsersFunc(func(ctx context.Context, email user.Email) (*user.User, error) {
 				readCalls++
-				if ctx != t.Context() || email != usr.Email() {
-					t.Errorf("ByEmail() got context %v, email %v; want test context, %v", ctx, email, usr.Email())
+				if ctx != t.Context() || email != u.Email() {
+					t.Errorf("ByEmail() got context %v, email %v; want test context, %v", ctx, email, u.Email())
 				}
 				return users.ByEmail(ctx, email)
 			})
 			tokens := tokenIssuerFunc(func(id uuid.UUID) (string, error) {
 				issueCalls++
-				if id != usr.ID() {
-					t.Errorf("Issue() user ID = %v, want %v", id, usr.ID())
+				if id != u.ID() {
+					t.Errorf("Issue() user ID = %v, want %v", id, u.ID())
 				}
 				if len(hasher.verifications) != 1 {
 					t.Error("token issued before password verification")
@@ -88,7 +88,7 @@ func TestLoginIssuesToken(t *testing.T) {
 			if readCalls != 1 || issueCalls != 1 {
 				t.Errorf("ByEmail/Issue calls = %d/%d, want 1/1", readCalls, issueCalls)
 			}
-			want := loginVerification{hash: usr.PasswordHash(), password: "s3cretpass"}
+			want := loginVerification{hash: u.PasswordHash(), password: "s3cretpass"}
 			if len(hasher.verifications) != 1 || hasher.verifications[0] != want {
 				t.Errorf("Verify calls = %+v, want [%+v]", hasher.verifications, want)
 			}
@@ -118,7 +118,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			usr, users := newJane(t)
+			u, users := newJane(t)
 			hasher := &loginHasher{verifyErr: tt.verifyErr}
 			readCalls := 0
 			repo := loginUsersFunc(func(ctx context.Context, email user.Email) (*user.User, error) {
@@ -149,7 +149,7 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 			}
 			want := hasher.dummy
 			if tt.realPassword {
-				want = loginVerification{hash: usr.PasswordHash(), password: tt.password}
+				want = loginVerification{hash: u.PasswordHash(), password: tt.password}
 			}
 			if len(hasher.verifications) != 1 || hasher.verifications[0] != want {
 				t.Errorf("Verify calls = %+v, want [%+v]", hasher.verifications, want)

@@ -11,7 +11,7 @@ type confirmRegistrationRegistrations interface {
 	UpdateByToken(
 		ctx context.Context,
 		hash user.ConfirmationTokenHash,
-		updateFn func(*user.PendingRegistration) error,
+		update func(*user.PendingRegistration) error,
 	) (*user.PendingRegistration, error)
 }
 

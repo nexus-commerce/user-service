@@ -58,7 +58,7 @@ func BearerAuth(p TokenParser) Middleware {
 	}
 }
 
-func UserIDFromContext(ctx context.Context) (uuid.UUID, error) {
+func userIDFromContext(ctx context.Context) (uuid.UUID, error) {
 	id, ok := ctx.Value(userIDKey{}).(uuid.UUID)
 	if !ok || id == uuid.Nil() {
 		return uuid.Nil(), ErrNoUserID

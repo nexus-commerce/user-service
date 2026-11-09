@@ -46,7 +46,6 @@ func toUserEnvelope(v usecase.UserView) userEnvelope {
 	}
 }
 
-// ServeHTTP godoc
 // @Summary     Get current user
 // @Description Returns the authenticated user
 // @Tags        Users
@@ -58,13 +57,13 @@ func toUserEnvelope(v usecase.UserView) userEnvelope {
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/me [get]
 func (h *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	userID, err := UserIDFromContext(r.Context())
+	userID, err := userIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return
 	}
 
-	usr, err := h.uc.Execute(r.Context(), userID)
+	view, err := h.uc.Execute(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
@@ -74,7 +73,7 @@ func (h *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, r, http.StatusOK, toUserEnvelope(usr))
+	writeJSON(rw, r, http.StatusOK, toUserEnvelope(view))
 }
 
 func (h *FetchUser) Route() Route {

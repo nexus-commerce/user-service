@@ -39,7 +39,6 @@ type loginResponse struct {
 	Token string `json:"token"`
 }
 
-// ServeHTTP godoc
 // @Summary     Login
 // @Description Authenticates a user by email and password and returns a JWT token
 // @Tags        Auth

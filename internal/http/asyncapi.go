@@ -31,7 +31,6 @@ func NewAsyncAPIDocs() *AsyncAPIDocs {
 	return &AsyncAPIDocs{}
 }
 
-// ServeHTTP godoc
 // @Summary     Events Documentation
 // @Description Serves the interactive AsyncAPI reference UI for the events this service publishes
 // @Tags        System
@@ -64,7 +63,6 @@ func NewAsyncAPI(spec []byte) *AsyncAPI {
 	return &AsyncAPI{spec: spec}
 }
 
-// ServeHTTP godoc
 // @Summary     Events Specification
 // @Description Serves the AsyncAPI specification of the events this service publishes
 // @Tags        System

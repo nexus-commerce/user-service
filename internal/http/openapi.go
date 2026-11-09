@@ -25,7 +25,6 @@ func NewOpenAPIDocs() *OpenAPIDocs {
 	return &OpenAPIDocs{}
 }
 
-// ServeHTTP godoc
 // @Summary     API Documentation
 // @Description Serves the interactive API reference UI
 // @Tags        System
@@ -58,7 +57,6 @@ func NewOpenAPI(spec string) *OpenAPI {
 	return &OpenAPI{spec: []byte(spec)}
 }
 
-// ServeHTTP godoc
 // @Summary     API Specification
 // @Description Serves the OpenAPI specification used by the API reference UI
 // @Tags        System

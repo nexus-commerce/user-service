@@ -27,11 +27,11 @@ func TestCompleteRegistrationCreatesUser(t *testing.T) {
 	if err := usecase.NewCompleteRegistration(regs, users).Execute(t.Context(), id); err != nil {
 		t.Fatalf("Execute() error: %v", err)
 	}
-	usr, err := users.ByID(t.Context(), id)
+	u, err := users.ByID(t.Context(), id)
 	if err != nil {
 		t.Fatalf("ByID() error: %v", err)
 	}
-	if n := len(publishedOf[user.Registered](usr.Events())); n != 1 {
+	if n := len(publishedOf[user.Registered](u.Events())); n != 1 {
 		t.Errorf("user has %d Registered events, want 1", n)
 	}
 	if len(regs.byEmail) != 0 {

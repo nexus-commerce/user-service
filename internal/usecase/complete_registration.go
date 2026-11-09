@@ -14,7 +14,7 @@ type completeRegistrationRegistrations interface {
 }
 
 type completeRegistrationUsers interface {
-	Add(ctx context.Context, usr *user.User) error
+	Add(ctx context.Context, u *user.User) error
 }
 
 type CompleteRegistration struct {
@@ -37,12 +37,12 @@ func (c *CompleteRegistration) Execute(ctx context.Context, userID uuid.UUID) er
 	if err != nil {
 		return err
 	}
-	usr, err := pending.Complete()
+	u, err := pending.Complete()
 	if err != nil {
 		return err
 	}
 
-	err = c.users.Add(ctx, usr)
+	err = c.users.Add(ctx, u)
 	if errors.Is(err, user.ErrEmailTaken) {
 		return c.reject(ctx, pending)
 	}

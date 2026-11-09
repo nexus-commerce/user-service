@@ -38,9 +38,9 @@ func toUserView(u *user.User) UserView {
 }
 
 func (fu *FetchUser) Execute(ctx context.Context, userID uuid.UUID) (UserView, error) {
-	usr, err := fu.users.ByID(ctx, userID)
+	u, err := fu.users.ByID(ctx, userID)
 	if err != nil {
 		return UserView{}, err
 	}
-	return toUserView(usr), nil
+	return toUserView(u), nil
 }

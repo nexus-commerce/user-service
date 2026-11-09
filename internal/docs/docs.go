@@ -75,7 +75,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Starts a registration: sends a confirmation link to a new email or an \"account already exists\" notice to a registered one. The response does not reveal which.",
+                "description": "Starts a registration: sends a confirmation link to a new email or an \"account already exists\" notice to a registered one.\nThe response does not reveal which.",
                 "consumes": [
                     "application/json"
                 ],
@@ -124,7 +124,7 @@ const docTemplate = `{
         },
         "/auth/register/confirm": {
             "post": {
-                "description": "Confirms a pending registration with the token from the confirmation link. The account is created asynchronously: a user.registered event follows, or user.registration_rejected if the email was taken meanwhile. Log in via /auth/login once the account exists",
+                "description": "Confirms a pending registration with the token from the confirmation link.\nThe account is created asynchronously: a user.registered event follows, or user.registration_rejected if the email was taken meanwhile.\nLog in via /auth/login once the account exists",
                 "consumes": [
                     "application/json"
                 ],
@@ -420,7 +420,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it. If the new email already belongs to another account, the response is the same and that address gets a notice instead of a link",
+                "description": "Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it.\nIf the new email already belongs to another account, the response is the same and that address gets a notice instead of a link",
                 "consumes": [
                     "application/json"
                 ],

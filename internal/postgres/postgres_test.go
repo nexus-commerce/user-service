@@ -19,7 +19,7 @@ import (
 	"github.com/nexus-commerce/user-service/internal/userevent"
 )
 
-// Each test gets its own search_path, including its own migration history.
+// testDB gives each test its own search_path, including its own migration history.
 func testDB(t *testing.T) *Database {
 	t.Helper()
 	dsn := os.Getenv("TEST_POSTGRES_DSN")
@@ -379,17 +379,17 @@ func TestUsersAddIsIdempotent(t *testing.T) {
 	if err := pending.Confirm(token); err != nil {
 		t.Fatal(err)
 	}
-	usr, err := pending.Complete()
+	u, err := pending.Complete()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := range 2 {
-		if err := r.users.Add(t.Context(), usr); err != nil {
+		if err := r.users.Add(t.Context(), u); err != nil {
 			t.Fatalf("Add() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, usr.ID(), 1, 1, map[string]int{"user.registered": 1})
+	r.assertState(t, u.ID(), 1, 1, map[string]int{"user.registered": 1})
 }
 
 func TestUsersAddEmailTaken(t *testing.T) {
@@ -399,15 +399,15 @@ func TestUsersAddEmailTaken(t *testing.T) {
 	if err := pending.Confirm(token); err != nil {
 		t.Fatal(err)
 	}
-	usr, err := pending.Complete()
+	u, err := pending.Complete()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.users.Add(t.Context(), usr); !errors.Is(err, user.ErrEmailTaken) {
+	if err := r.users.Add(t.Context(), u); !errors.Is(err, user.ErrEmailTaken) {
 		t.Fatalf("Add() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	r.assertState(t, usr.ID(), 0, 1, map[string]int{"user.registered": 0})
+	r.assertState(t, u.ID(), 0, 1, map[string]int{"user.registered": 0})
 }
 
 func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {

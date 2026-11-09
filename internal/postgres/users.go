@@ -27,82 +27,82 @@ func NewUsers(db *Database, events eventPublisher) *Users {
 	return &Users{db: db, events: events}
 }
 
-func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, error) {
+func (us *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, error) {
 	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
 			p.email, p.token_hash, p.expires_at
 		FROM users u
 		LEFT JOIN pending_email_changes p ON p.user_id = u.id
 		WHERE u.email = $1`
 
-	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
+	u, err := scanUser(us.db.pool.QueryRowContext(ctx, query, email.String()))
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
 		return nil, fmt.Errorf("select user by email: %w", err)
 	}
-	return usr, err
+	return u, err
 }
 
-func (u *Users) EmailTaken(ctx context.Context, email user.Email) (bool, error) {
+func (us *Users) EmailTaken(ctx context.Context, email user.Email) (bool, error) {
 	query := `SELECT EXISTS (SELECT 1 FROM users WHERE email = $1)`
 
 	var taken bool
-	if err := u.db.pool.QueryRowContext(ctx, query, email.String()).Scan(&taken); err != nil {
+	if err := us.db.pool.QueryRowContext(ctx, query, email.String()).Scan(&taken); err != nil {
 		return false, fmt.Errorf("check email taken: %w", err)
 	}
 	return taken, nil
 }
 
-func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
+func (us *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
 			p.email, p.token_hash, p.expires_at
 		FROM users u
 		LEFT JOIN pending_email_changes p ON p.user_id = u.id
 		WHERE u.id = $1`
 
-	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
+	u, err := scanUser(us.db.pool.QueryRowContext(ctx, query, id.String()))
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
 		return nil, fmt.Errorf("select user by id: %w", err)
 	}
-	return usr, err
+	return u, err
 }
 
-func (u *Users) UpdateByID(
+func (us *Users) UpdateByID(
 	ctx context.Context,
 	id uuid.UUID,
-	updateFn func(*user.User) error,
+	update func(*user.User) error,
 ) (*user.User, error) {
 	lockQuery := `SELECT id FROM users WHERE id = $1 FOR UPDATE`
 
-	return u.update(ctx, lockQuery, id.String(), updateFn)
+	return us.update(ctx, lockQuery, id.String(), update)
 }
 
-func (u *Users) UpdateByEmail(
+func (us *Users) UpdateByEmail(
 	ctx context.Context,
 	email user.Email,
-	updateFn func(*user.User) error,
+	update func(*user.User) error,
 ) (*user.User, error) {
 	lockQuery := `SELECT id FROM users WHERE email = $1 FOR UPDATE`
 
-	return u.update(ctx, lockQuery, email.String(), updateFn)
+	return us.update(ctx, lockQuery, email.String(), update)
 }
 
-func (u *Users) UpdateByEmailChangeToken(
+func (us *Users) UpdateByEmailChangeToken(
 	ctx context.Context,
 	hash user.ConfirmationTokenHash,
-	updateFn func(*user.User) error,
+	update func(*user.User) error,
 ) (*user.User, error) {
 	lockQuery := `SELECT u.id FROM users u
 		JOIN pending_email_changes p ON p.user_id = u.id
 		WHERE p.token_hash = $1
 		FOR UPDATE OF u`
 
-	return u.update(ctx, lockQuery, hash.Encoded(), updateFn)
+	return us.update(ctx, lockQuery, hash.Encoded(), update)
 }
 
-func (u *Users) update(
+func (us *Users) update(
 	ctx context.Context,
 	lockQuery string,
 	arg string,
-	updateFn func(*user.User) error,
+	update func(*user.User) error,
 ) (*user.User, error) {
 	selectQuery := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
 			p.email, p.token_hash, p.expires_at
@@ -111,8 +111,8 @@ func (u *Users) update(
 		WHERE u.id = $1`
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
-	var usr *user.User
-	err := u.db.runInTx(ctx, func(tx *sql.Tx) error {
+	var u *user.User
+	err := us.db.runInTx(ctx, func(tx *sql.Tx) error {
 		var id string
 		err := tx.QueryRowContext(ctx, lockQuery, arg).Scan(&id)
 		if err != nil {
@@ -122,7 +122,7 @@ func (u *Users) update(
 			return fmt.Errorf("lock user for update: %w", err)
 		}
 
-		usr, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id))
+		u, err = scanUser(tx.QueryRowContext(ctx, selectQuery, id))
 		if err != nil {
 			if errors.Is(err, user.ErrNotFound) {
 				return err
@@ -130,16 +130,16 @@ func (u *Users) update(
 			return fmt.Errorf("select user for update: %w", err)
 		}
 
-		if err = updateFn(usr); err != nil {
+		if err = update(u); err != nil {
 			return err
 		}
 
 		_, err = tx.ExecContext(ctx, updateQuery,
-			usr.FullName().FirstName().String(),
-			usr.FullName().LastName().String(),
-			usr.Email().String(),
-			usr.PasswordHash().Encoded(),
-			usr.ID().String(),
+			u.FullName().FirstName().String(),
+			u.FullName().LastName().String(),
+			u.Email().String(),
+			u.PasswordHash().Encoded(),
+			u.ID().String(),
 		)
 		if err != nil {
 			if isEmailUniqueViolation(err) {
@@ -148,30 +148,30 @@ func (u *Users) update(
 			return fmt.Errorf("update user: %w", err)
 		}
 
-		if err = savePendingEmailChange(ctx, tx, usr); err != nil {
+		if err = savePendingEmailChange(ctx, tx, u); err != nil {
 			return err
 		}
 
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
+		return us.events.Publish(ctx, outboxProducer{tx: tx}, u.Events())
 	})
 	if err != nil {
 		return nil, err
 	}
-	return usr, nil
+	return u, nil
 }
 
-func (u *Users) Add(ctx context.Context, usr *user.User) error {
+func (us *Users) Add(ctx context.Context, u *user.User) error {
 	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (id) DO NOTHING`
 
-	return u.db.runInTx(ctx, func(tx *sql.Tx) error {
+	return us.db.runInTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, query,
-			usr.ID().String(),
-			usr.FullName().FirstName().String(),
-			usr.FullName().LastName().String(),
-			usr.Email().String(),
-			usr.PasswordHash().Encoded(),
-			usr.CreatedAt(),
+			u.ID().String(),
+			u.FullName().FirstName().String(),
+			u.FullName().LastName().String(),
+			u.Email().String(),
+			u.PasswordHash().Encoded(),
+			u.CreatedAt(),
 		)
 		if err != nil {
 			if isEmailUniqueViolation(err) {
@@ -187,25 +187,25 @@ func (u *Users) Add(ctx context.Context, usr *user.User) error {
 			return nil
 		}
 
-		return u.events.Publish(ctx, outboxProducer{tx: tx}, usr.Events())
+		return us.events.Publish(ctx, outboxProducer{tx: tx}, u.Events())
 	})
 }
 
-func savePendingEmailChange(ctx context.Context, tx *sql.Tx, usr *user.User) error {
+func savePendingEmailChange(ctx context.Context, tx *sql.Tx, u *user.User) error {
 	upsertQuery := `INSERT INTO pending_email_changes (user_id, email, token_hash, expires_at) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at`
 	deleteQuery := `DELETE FROM pending_email_changes WHERE user_id = $1`
 
-	p, ok := usr.PendingEmailChange()
+	p, ok := u.PendingEmailChange()
 	if !ok {
-		if _, err := tx.ExecContext(ctx, deleteQuery, usr.ID().String()); err != nil {
+		if _, err := tx.ExecContext(ctx, deleteQuery, u.ID().String()); err != nil {
 			return fmt.Errorf("delete pending email change: %w", err)
 		}
 		return nil
 	}
 
 	_, err := tx.ExecContext(ctx, upsertQuery,
-		usr.ID().String(),
+		u.ID().String(),
 		p.Email().String(),
 		p.TokenHash().Encoded(),
 		p.ExpiresAt(),

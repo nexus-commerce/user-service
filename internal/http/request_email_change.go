@@ -39,9 +39,9 @@ func (r *requestEmailChangeRequest) toEmailChangeRequest(userID uuid.UUID) useca
 	}
 }
 
-// ServeHTTP godoc
 // @Summary     Request email change
-// @Description Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it. If the new email already belongs to another account, the response is the same and that address gets a notice instead of a link
+// @Description Starts an email change for the authenticated user; the new email takes effect only after it is confirmed via the link sent to it.
+// @Description If the new email already belongs to another account, the response is the same and that address gets a notice instead of a link
 // @Tags        Users
 // @Accept      json
 // @Produce     json
@@ -56,7 +56,7 @@ func (r *requestEmailChangeRequest) toEmailChangeRequest(userID uuid.UUID) useca
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/me/email [post]
 func (h *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	userID, err := UserIDFromContext(r.Context())
+	userID, err := userIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return

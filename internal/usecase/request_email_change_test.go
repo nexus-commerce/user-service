@@ -27,11 +27,11 @@ func TestRequestEmailChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			usr, users := newJane(t)
+			u, users := newJane(t)
 			newUser(t, users, "john@example.com", "John", "Roe")
 
 			err := usecase.NewRequestEmailChange(users, fakeHasher{}).Execute(t.Context(), usecase.EmailChangeRequest{
-				UserID:   usr.ID(),
+				UserID:   u.ID(),
 				NewEmail: tt.newEmail,
 				Password: tt.password,
 			})
@@ -50,12 +50,12 @@ func TestRequestEmailChange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Execute() error: %v", err)
 			}
-			p, ok := usr.PendingEmailChange()
+			p, ok := u.PendingEmailChange()
 			if !ok || p.Email().String() != "new@example.com" {
 				t.Errorf("PendingEmailChange() = %+v, %v; want new@example.com", p, ok)
 			}
 			var requested int
-			for _, e := range usr.Events() {
+			for _, e := range u.Events() {
 				if _, ok := e.(user.EmailChangeRequested); ok {
 					requested++
 				}
@@ -73,25 +73,25 @@ type hashFreeUpdates struct {
 	hasher *countingHasher
 }
 
-func (u hashFreeUpdates) UpdateByID(ctx context.Context, id uuid.UUID, updateFn func(*user.User) error) (*user.User, error) {
-	u.t.Helper()
-	before := u.hasher.verifies
-	usr, err := u.fakeUsers.UpdateByID(ctx, id, updateFn)
-	if u.hasher.verifies != before {
-		u.t.Errorf("hasher ran %d times during UpdateByID, want 0", u.hasher.verifies-before)
+func (hf hashFreeUpdates) UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error) {
+	hf.t.Helper()
+	before := hf.hasher.verifies
+	u, err := hf.fakeUsers.UpdateByID(ctx, id, update)
+	if hf.hasher.verifies != before {
+		hf.t.Errorf("hasher ran %d times during UpdateByID, want 0", hf.hasher.verifies-before)
 	}
-	return usr, err
+	return u, err
 }
 
 func TestRequestEmailChangeVerifiesPasswordOutsideUpdate(t *testing.T) {
 	for _, newEmail := range []string{"new@example.com", "john@example.com"} {
 		t.Run(newEmail, func(t *testing.T) {
-			usr, users := newJane(t)
+			u, users := newJane(t)
 			newUser(t, users, "john@example.com", "John", "Roe")
 			hasher := &countingHasher{}
 
 			err := usecase.NewRequestEmailChange(hashFreeUpdates{fakeUsers: users, t: t, hasher: hasher}, hasher).Execute(t.Context(), usecase.EmailChangeRequest{
-				UserID:   usr.ID(),
+				UserID:   u.ID(),
 				NewEmail: newEmail,
 				Password: "s3cretpass",
 			})
@@ -119,22 +119,22 @@ func TestRequestEmailChangeUnknownUser(t *testing.T) {
 }
 
 func TestRequestEmailChangeToTakenAddress(t *testing.T) {
-	usr, users := newJane(t)
+	u, users := newJane(t)
 	john := newUser(t, users, "john@example.com", "John", "Roe")
 
 	err := usecase.NewRequestEmailChange(users, fakeHasher{}).Execute(t.Context(), usecase.EmailChangeRequest{
-		UserID:   usr.ID(),
+		UserID:   u.ID(),
 		NewEmail: "john@example.com",
 		Password: "s3cretpass",
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v, want nil so a taken email is not revealed", err)
 	}
-	if _, ok := usr.PendingEmailChange(); ok {
+	if _, ok := u.PendingEmailChange(); ok {
 		t.Error("PendingEmailChange() exists, want none for a taken email")
 	}
 	var attempts []user.EmailChangeToTakenAddressAttempted
-	for _, e := range usr.Events() {
+	for _, e := range u.Events() {
 		if a, ok := e.(user.EmailChangeToTakenAddressAttempted); ok {
 			attempts = append(attempts, a)
 		}

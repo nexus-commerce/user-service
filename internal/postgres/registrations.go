@@ -136,7 +136,7 @@ func (r *Registrations) ByUserID(ctx context.Context, id uuid.UUID) (*user.Pendi
 func (r *Registrations) UpdateByToken(
 	ctx context.Context,
 	hash user.ConfirmationTokenHash,
-	updateFn func(*user.PendingRegistration) error,
+	update func(*user.PendingRegistration) error,
 ) (*user.PendingRegistration, error) {
 	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
 		FROM pending_registrations
@@ -153,7 +153,7 @@ func (r *Registrations) UpdateByToken(
 			return fmt.Errorf("select pending registration for update: %w", err)
 		}
 
-		if err = updateFn(p); err != nil {
+		if err = update(p); err != nil {
 			return err
 		}
 
