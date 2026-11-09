@@ -61,7 +61,7 @@ func (t *Tokens) Parse(token string) (uuid.UUID, error) {
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return uuid.Nil(), fmt.Errorf("%w: %v", ErrInvalid, err)
+		return uuid.Nil(), fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if c.UserID == uuid.Nil() {
 		return uuid.Nil(), fmt.Errorf("%w: missing user ID", ErrInvalid)

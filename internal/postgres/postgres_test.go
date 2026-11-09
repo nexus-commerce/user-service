@@ -481,7 +481,7 @@ func (r testRepos) seedPendingEmailChange(t *testing.T, id uuid.UUID, email stri
 	}
 }
 
-func (r testRepos) runBlockedBy(t *testing.T, change func(*sql.Tx) error, op func(context.Context) error) error {
+func (r testRepos) runBlockedBy(t *testing.T, change func(context.Context, *sql.Tx) error, op func(context.Context) error) error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -494,7 +494,7 @@ func (r testRepos) runBlockedBy(t *testing.T, change func(*sql.Tx) error, op fun
 	if err := tx.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
 		t.Fatal(err)
 	}
-	if err := change(tx); err != nil {
+	if err := change(ctx, tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -517,12 +517,12 @@ func (r testRepos) runBlockedBy(t *testing.T, change func(*sql.Tx) error, op fun
 	return <-done
 }
 
-func consumeEmailChange(id uuid.UUID, newEmail string) func(*sql.Tx) error {
-	return func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`UPDATE users SET email = $1 WHERE id = $2`, newEmail, id.String()); err != nil {
+func consumeEmailChange(id uuid.UUID, newEmail string) func(context.Context, *sql.Tx) error {
+	return func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET email = $1 WHERE id = $2`, newEmail, id.String()); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`DELETE FROM pending_email_changes WHERE user_id = $1`, id.String())
+		_, err := tx.ExecContext(ctx, `DELETE FROM pending_email_changes WHERE user_id = $1`, id.String())
 		return err
 	}
 }
@@ -565,11 +565,11 @@ func TestRenameWaitingOnRequestedEmailChangeKeepsIt(t *testing.T) {
 	id := r.seedUser(t, "old@example.com")
 	token := user.NewConfirmationToken()
 
-	request := func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`UPDATE users SET first_name = first_name WHERE id = $1`, id.String()); err != nil {
+	request := func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET first_name = first_name WHERE id = $1`, id.String()); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`INSERT INTO pending_email_changes (user_id, email, token_hash, expires_at)
+		_, err := tx.ExecContext(ctx, `INSERT INTO pending_email_changes (user_id, email, token_hash, expires_at)
 			VALUES ($1, 'new@example.com', $2, $3)`, id.String(), token.Hash().Encoded(), time.Now().UTC().Add(time.Hour))
 		return err
 	}

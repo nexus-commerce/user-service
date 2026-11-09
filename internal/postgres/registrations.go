@@ -37,32 +37,6 @@ func (r *Registrations) Save(ctx context.Context, p *user.PendingRegistration, s
 	return err
 }
 
-func (r *Registrations) save(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error {
-	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
-		FROM pending_registrations
-		WHERE email = $1 FOR UPDATE`
-
-	saved := p
-	existing, err := scanPendingRegistration(tx.QueryRowContext(ctx, selectQuery, p.Email().String()))
-	switch {
-	case errors.Is(err, user.ErrRegistrationNotFound):
-		err = insertPendingRegistration(ctx, tx, p)
-	case err != nil:
-		return fmt.Errorf("select pending registration by email: %w", err)
-	default:
-		if err = supersede(existing); err != nil {
-			return err
-		}
-		saved = existing
-		err = updatePendingRegistration(ctx, tx, existing)
-	}
-	if err != nil {
-		return err
-	}
-
-	return r.events.Publish(ctx, outboxProducer{tx: tx}, saved.Events())
-}
-
 func insertPendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration) error {
 	query := `INSERT INTO pending_registrations (email, user_id, first_name, last_name, password_hash, token_hash, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -174,6 +148,32 @@ func (r *Registrations) Remove(ctx context.Context, p *user.PendingRegistration)
 
 		return r.events.Publish(ctx, outboxProducer{tx: tx}, p.Events())
 	})
+}
+
+func (r *Registrations) save(ctx context.Context, tx *sql.Tx, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error {
+	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
+		FROM pending_registrations
+		WHERE email = $1 FOR UPDATE`
+
+	saved := p
+	existing, err := scanPendingRegistration(tx.QueryRowContext(ctx, selectQuery, p.Email().String()))
+	switch {
+	case errors.Is(err, user.ErrRegistrationNotFound):
+		err = insertPendingRegistration(ctx, tx, p)
+	case err != nil:
+		return fmt.Errorf("select pending registration by email: %w", err)
+	default:
+		if err = supersede(existing); err != nil {
+			return err
+		}
+		saved = existing
+		err = updatePendingRegistration(ctx, tx, existing)
+	}
+	if err != nil {
+		return err
+	}
+
+	return r.events.Publish(ctx, outboxProducer{tx: tx}, saved.Events())
 }
 
 func scanPendingRegistration(row *sql.Row) (*user.PendingRegistration, error) {

@@ -43,13 +43,6 @@ type fakeUsers struct {
 	vanishOnUpdateByEmail bool
 }
 
-func (f *fakeUsers) add(u *user.User) {
-	if f.byID == nil {
-		f.byID = make(map[uuid.UUID]*user.User)
-	}
-	f.byID[u.ID()] = u
-}
-
 func (f *fakeUsers) ByID(_ context.Context, id uuid.UUID) (*user.User, error) {
 	u, ok := f.byID[id]
 	if !ok {
@@ -83,18 +76,6 @@ func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, update func(*u
 		return nil, err
 	}
 	return u, nil
-}
-
-func (f *fakeUsers) apply(u *user.User, update func(*user.User) error) error {
-	if err := update(u); err != nil {
-		return err
-	}
-	for _, other := range f.byID {
-		if other.ID() != u.ID() && other.Email() == u.Email() {
-			return user.ErrEmailTaken
-		}
-	}
-	return f.updateErr
 }
 
 func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error) {
@@ -157,18 +138,6 @@ func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration,
 	return nil
 }
 
-func (f *fakeRegistrations) find(match func(*user.PendingRegistration) bool) (*user.PendingRegistration, error) {
-	if f.readErr != nil {
-		return nil, f.readErr
-	}
-	for _, p := range f.byEmail {
-		if match(p) {
-			return copyPending(p), nil
-		}
-	}
-	return nil, user.ErrRegistrationNotFound
-}
-
 func (f *fakeRegistrations) ByUserID(_ context.Context, id uuid.UUID) (*user.PendingRegistration, error) {
 	return f.find(func(p *user.PendingRegistration) bool { return p.UserID() == id })
 }
@@ -202,6 +171,18 @@ func (f *fakeRegistrations) Remove(_ context.Context, p *user.PendingRegistratio
 	return nil
 }
 
+func (f *fakeRegistrations) find(match func(*user.PendingRegistration) bool) (*user.PendingRegistration, error) {
+	if f.readErr != nil {
+		return nil, f.readErr
+	}
+	for _, p := range f.byEmail {
+		if match(p) {
+			return copyPending(p), nil
+		}
+	}
+	return nil, user.ErrRegistrationNotFound
+}
+
 func (f *fakeUsers) Add(ctx context.Context, u *user.User) error {
 	f.addCalls++
 	if f.addErr != nil {
@@ -219,6 +200,25 @@ func (f *fakeUsers) Add(ctx context.Context, u *user.User) error {
 	}
 	f.add(u)
 	return nil
+}
+
+func (f *fakeUsers) add(u *user.User) {
+	if f.byID == nil {
+		f.byID = make(map[uuid.UUID]*user.User)
+	}
+	f.byID[u.ID()] = u
+}
+
+func (f *fakeUsers) apply(u *user.User, update func(*user.User) error) error {
+	if err := update(u); err != nil {
+		return err
+	}
+	for _, other := range f.byID {
+		if other.ID() != u.ID() && other.Email() == u.Email() {
+			return user.ErrEmailTaken
+		}
+	}
+	return f.updateErr
 }
 
 func tokenFor(t *testing.T, regs *fakeRegistrations, email string) user.ConfirmationToken {

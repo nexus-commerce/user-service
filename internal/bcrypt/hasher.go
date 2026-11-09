@@ -38,6 +38,6 @@ func (h *Hasher) Verify(hash user.PasswordHash, p user.Password) (bool, error) {
 	case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword), errors.Is(err, bcrypt.ErrPasswordTooLong):
 		return false, nil
 	default:
-		return false, fmt.Errorf("%w: %v", user.ErrMalformedPasswordHash, err)
+		return false, fmt.Errorf("%w: %w", user.ErrMalformedPasswordHash, err)
 	}
 }

@@ -84,10 +84,6 @@ func (p *PendingRegistration) ConfirmedAt() (time.Time, bool) {
 
 func (p *PendingRegistration) Confirmed() bool { return p.confirmedAt != nil }
 
-func (p *PendingRegistration) newEventMeta(at time.Time) EventMeta {
-	return newEventMeta(p.userID, at)
-}
-
 func (p *PendingRegistration) Events() []Event {
 	return slices.Clone(p.events)
 }
@@ -120,18 +116,6 @@ func (p *PendingRegistration) Supersede(newer *PendingRegistration) error {
 	return nil
 }
 
-func (p *PendingRegistration) issueConfirmationToken(now time.Time) {
-	confirmation, token := issueConfirmation(now, registrationTTL)
-	p.confirmation = confirmation
-	p.events = append(p.events, RegistrationRequested{
-		EventMeta: p.newEventMeta(now),
-		Email:     p.email,
-		FullName:  p.fullName,
-		Token:     token,
-		ExpiresAt: confirmation.expiresAt,
-	})
-}
-
 func (p *PendingRegistration) Reject() error {
 	if !p.Confirmed() {
 		return ErrRegistrationNotConfirmed
@@ -160,4 +144,20 @@ func (p *PendingRegistration) Complete() (*User, error) {
 		FullName:  u.fullName,
 	})
 	return u, nil
+}
+
+func (p *PendingRegistration) newEventMeta(at time.Time) EventMeta {
+	return newEventMeta(p.userID, at)
+}
+
+func (p *PendingRegistration) issueConfirmationToken(now time.Time) {
+	confirmation, token := issueConfirmation(now, registrationTTL)
+	p.confirmation = confirmation
+	p.events = append(p.events, RegistrationRequested{
+		EventMeta: p.newEventMeta(now),
+		Email:     p.email,
+		FullName:  p.fullName,
+		Token:     token,
+		ExpiresAt: confirmation.expiresAt,
+	})
 }

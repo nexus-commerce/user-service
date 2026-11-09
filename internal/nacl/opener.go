@@ -26,7 +26,7 @@ func NewOpener(privateKey string) (*Opener, error) {
 	}
 	rawPub, err := curve25519.X25519(raw, curve25519.Basepoint)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidPrivateKey, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPrivateKey, err)
 	}
 	var priv, pub [keySize]byte
 	copy(priv[:], raw)

@@ -165,10 +165,10 @@ func (u *User) Reauthenticate(password Password, hasher Hasher) (Reauthenticatio
 	return Reauthentication{userID: u.id, passwordHash: u.passwordHash}, nil
 }
 
-func (u *User) newEventMeta(at time.Time) EventMeta {
-	return newEventMeta(u.id, at)
-}
-
 func (u *User) Events() []Event {
 	return slices.Clone(u.events)
+}
+
+func (u *User) newEventMeta(at time.Time) EventMeta {
+	return newEventMeta(u.id, at)
 }

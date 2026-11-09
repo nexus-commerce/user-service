@@ -86,6 +86,37 @@ func (us *Users) UpdateByEmailChangeToken(ctx context.Context, hash user.Confirm
 	return us.update(ctx, lockQuery, hash.Encoded(), update)
 }
 
+func (us *Users) Add(ctx context.Context, u *user.User) error {
+	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (id) DO NOTHING`
+
+	return us.db.runInTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, query,
+			u.ID().String(),
+			u.FullName().FirstName().String(),
+			u.FullName().LastName().String(),
+			u.Email().String(),
+			u.PasswordHash().Encoded(),
+			u.CreatedAt(),
+		)
+		if err != nil {
+			if isEmailUniqueViolation(err) {
+				return user.ErrEmailTaken
+			}
+			return fmt.Errorf("insert user: %w", err)
+		}
+		count, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("count inserted users: %w", err)
+		}
+		if count == 0 {
+			return nil
+		}
+
+		return us.events.Publish(ctx, outboxProducer{tx: tx}, u.Events())
+	})
+}
+
 func (us *Users) update(ctx context.Context, lockQuery, arg string, update func(*user.User) error) (*user.User, error) {
 	selectQuery := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
 			p.email, p.token_hash, p.expires_at
@@ -141,37 +172,6 @@ func (us *Users) update(ctx context.Context, lockQuery, arg string, update func(
 		return nil, err
 	}
 	return u, nil
-}
-
-func (us *Users) Add(ctx context.Context, u *user.User) error {
-	query := `INSERT INTO users (id, first_name, last_name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (id) DO NOTHING`
-
-	return us.db.runInTx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, query,
-			u.ID().String(),
-			u.FullName().FirstName().String(),
-			u.FullName().LastName().String(),
-			u.Email().String(),
-			u.PasswordHash().Encoded(),
-			u.CreatedAt(),
-		)
-		if err != nil {
-			if isEmailUniqueViolation(err) {
-				return user.ErrEmailTaken
-			}
-			return fmt.Errorf("insert user: %w", err)
-		}
-		count, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("count inserted users: %w", err)
-		}
-		if count == 0 {
-			return nil
-		}
-
-		return us.events.Publish(ctx, outboxProducer{tx: tx}, u.Events())
-	})
 }
 
 func savePendingEmailChange(ctx context.Context, tx *sql.Tx, u *user.User) error {
