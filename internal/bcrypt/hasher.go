@@ -9,7 +9,10 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-const DefaultCost = bcrypt.DefaultCost
+const (
+	MinCost     = bcrypt.MinCost
+	DefaultCost = bcrypt.DefaultCost
+)
 
 type Hasher struct {
 	cost int

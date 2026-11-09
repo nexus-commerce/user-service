@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	xbcrypt "golang.org/x/crypto/bcrypt"
-
 	"github.com/nexus-commerce/user-service/internal/bcrypt"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -20,7 +18,7 @@ func mustPassword(t *testing.T, s string) user.Password {
 }
 
 func TestHasherVerify(t *testing.T) {
-	h := bcrypt.NewHasher(xbcrypt.MinCost)
+	h := bcrypt.NewHasher(bcrypt.MinCost)
 	p := mustPassword(t, "s3cretpass")
 	other := mustPassword(t, "otherpass")
 
@@ -37,7 +35,7 @@ func TestHasherVerify(t *testing.T) {
 }
 
 func TestHasherVerifyMalformedHash(t *testing.T) {
-	h := bcrypt.NewHasher(xbcrypt.MinCost)
+	h := bcrypt.NewHasher(bcrypt.MinCost)
 	hash, err := user.NewPasswordHash("not-a-bcrypt-hash")
 	if err != nil {
 		t.Fatalf("NewPasswordHash() error: %v", err)
