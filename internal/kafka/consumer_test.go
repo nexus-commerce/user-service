@@ -9,6 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/segmentio/kafka-go"
 
 	"github.com/nexus-commerce/user-service/internal/messaging"
@@ -134,8 +135,8 @@ func TestToMessageReadsEventType(t *testing.T) {
 		Headers: []kafka.Header{{Key: "other", Value: []byte("x")}, {Key: messaging.HeaderEventType, Value: []byte("user.renamed")}},
 	})
 	want := messaging.Message{Type: "user.renamed", Topic: "users", Key: "key", Value: []byte("value")}
-	if msg.Type != want.Type || msg.Topic != want.Topic || msg.Key != want.Key || string(msg.Value) != string(want.Value) {
-		t.Errorf("toMessage() = %+v, want %+v", msg, want)
+	if diff := cmp.Diff(want, msg); diff != "" {
+		t.Errorf("toMessage() mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -202,8 +203,12 @@ func TestRunRetriesTemporaryKafkaErrors(t *testing.T) {
 		if h.calls != 1 {
 			t.Errorf("handler called %d times, want 1", h.calls)
 		}
-		if len(reader.committed) != 1 || reader.committed[0].Offset != 7 {
-			t.Errorf("committed %+v, want offset 7", reader.committed)
+		var offsets []int64
+		for _, m := range reader.committed {
+			offsets = append(offsets, m.Offset)
+		}
+		if diff := cmp.Diff([]int64{7}, offsets); diff != "" {
+			t.Errorf("Run() committed offsets mismatch (-want +got):\n%s", diff)
 		}
 	})
 }

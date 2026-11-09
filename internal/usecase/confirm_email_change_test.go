@@ -8,6 +8,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -77,15 +79,19 @@ func TestConfirmEmailChangeEmailTakenMeanwhile(t *testing.T) {
 	if err := confirm.Execute(t.Context(), tok.Plaintext()); !errors.Is(err, user.ErrEmailTaken) {
 		t.Fatalf("Execute() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	if _, ok := u.PendingEmailChange(); ok || u.Email().String() != "jane@example.com" {
-		t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+	if got := u.Email().String(); got != "jane@example.com" {
+		t.Errorf("Execute() Email() = %q, want %q", got, "jane@example.com")
+	}
+	if _, ok := u.PendingEmailChange(); ok {
+		t.Error("Execute() left a pending email change, want none")
 	}
 	rejected := publishedOf[user.EmailChangeRejected](u.Events())
-	if len(rejected) != 1 || rejected[0].NewEmail != mustEmail(t, "new@example.com") {
-		t.Errorf("EmailChangeRejected events = %+v, want one for new@example.com", rejected)
+	want := []user.EmailChangeRejected{{AggregateID: u.ID(), NewEmail: mustEmail(t, "new@example.com")}}
+	if diff := cmp.Diff(want, rejected, valueObjects, ignoreEventMeta); diff != "" {
+		t.Errorf("Execute() EmailChangeRejected events mismatch (-want +got):\n%s", diff)
 	}
 	if n := len(publishedOf[user.EmailChanged](u.Events())); n != 0 {
-		t.Errorf("recorded %d EmailChanged events, want 0", n)
+		t.Errorf("Execute() recorded %d EmailChanged events, want 0", n)
 	}
 	if err := confirm.Execute(t.Context(), tok.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("repeated Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)

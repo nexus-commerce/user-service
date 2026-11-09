@@ -6,6 +6,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -64,11 +66,14 @@ func checkRequestError(t *testing.T, err, want error, wantField usecase.Field) {
 func checkEmailChangeRequested(t *testing.T, u *user.User, wantEmail string) {
 	t.Helper()
 	p, ok := u.PendingEmailChange()
-	if !ok || p.Email().String() != wantEmail {
-		t.Errorf("PendingEmailChange() = %+v, %v; want %s", p, ok, wantEmail)
+	if !ok {
+		t.Error("Execute() left no pending email change, want one")
+	}
+	if got := p.Email().String(); got != wantEmail {
+		t.Errorf("Execute() PendingEmailChange().Email() = %q, want %q", got, wantEmail)
 	}
 	if n := len(publishedOf[user.EmailChangeRequested](u.Events())); n != 1 {
-		t.Errorf("recorded %d EmailChangeRequested events, want 1", n)
+		t.Errorf("Execute() recorded %d EmailChangeRequested events, want 1", n)
 	}
 }
 
@@ -139,16 +144,12 @@ func TestRequestEmailChangeToTakenAddress(t *testing.T) {
 	if _, ok := u.PendingEmailChange(); ok {
 		t.Error("PendingEmailChange() exists, want none for a taken email")
 	}
-	var attempts []user.EmailChangeToTakenAddressAttempted
-	for _, e := range u.Events() {
-		if a, ok := e.(user.EmailChangeToTakenAddressAttempted); ok {
-			attempts = append(attempts, a)
-		}
-		if _, ok := e.(user.EmailChangeRequested); ok {
-			t.Error("recorded EmailChangeRequested for a taken email")
-		}
+	if n := len(publishedOf[user.EmailChangeRequested](u.Events())); n != 0 {
+		t.Errorf("Execute() recorded %d EmailChangeRequested events for a taken email, want 0", n)
 	}
-	if len(attempts) != 1 || attempts[0].NewEmail != john.Email() {
-		t.Errorf("EmailChangeToTakenAddressAttempted events = %+v, want one for %q", attempts, john.Email())
+	attempts := publishedOf[user.EmailChangeToTakenAddressAttempted](u.Events())
+	want := []user.EmailChangeToTakenAddressAttempted{{AggregateID: u.ID(), NewEmail: john.Email()}}
+	if diff := cmp.Diff(want, attempts, valueObjects, ignoreEventMeta); diff != "" {
+		t.Errorf("Execute() EmailChangeToTakenAddressAttempted events mismatch (-want +got):\n%s", diff)
 	}
 }

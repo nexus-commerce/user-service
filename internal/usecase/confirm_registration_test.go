@@ -7,6 +7,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -57,11 +59,12 @@ func TestConfirmRegistration(t *testing.T) {
 	}
 	p := pendingJane(t, regs)
 	if !p.Confirmed() {
-		t.Error("registration is not confirmed")
+		t.Error("Execute() left registration unconfirmed")
 	}
 	confirmed := publishedOf[user.RegistrationConfirmed](regs.published)
-	if len(confirmed) != 1 || confirmed[0].AggregateID != p.UserID() {
-		t.Errorf("RegistrationConfirmed events = %+v, want one for %v", confirmed, p.UserID())
+	want := []user.RegistrationConfirmed{{AggregateID: p.UserID()}}
+	if diff := cmp.Diff(want, confirmed, ignoreEventMeta); diff != "" {
+		t.Errorf("Execute() RegistrationConfirmed events mismatch (-want +got):\n%s", diff)
 	}
 	if len(users.byID) != 0 || users.addCalls != 0 {
 		t.Errorf("users = %d, Add calls = %d; want 0, 0", len(users.byID), users.addCalls)

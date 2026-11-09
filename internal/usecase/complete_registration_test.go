@@ -5,6 +5,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -104,11 +106,12 @@ func TestCompleteRegistrationEmailTaken(t *testing.T) {
 		t.Errorf("ByID() error = %v, want %v", err, user.ErrNotFound)
 	}
 	if len(regs.byEmail) != 0 {
-		t.Errorf("%d pending registrations left, want 0", len(regs.byEmail))
+		t.Errorf("Execute() left %d pending registrations, want 0", len(regs.byEmail))
 	}
 	rejected := publishedOf[user.RegistrationRejected](regs.published)
-	if len(rejected) != 1 || rejected[0].AggregateID != id || rejected[0].Email != mustEmail(t, "jane@example.com") {
-		t.Errorf("RegistrationRejected events = %+v, want one for %v", rejected, id)
+	want := []user.RegistrationRejected{{AggregateID: id, Email: mustEmail(t, "jane@example.com")}}
+	if diff := cmp.Diff(want, rejected, valueObjects, ignoreEventMeta); diff != "" {
+		t.Errorf("Execute() RegistrationRejected events mismatch (-want +got):\n%s", diff)
 	}
 }
 

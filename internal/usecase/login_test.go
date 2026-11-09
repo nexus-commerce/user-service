@@ -8,6 +8,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -23,8 +25,8 @@ type tokenIssuerFunc func(uuid.UUID) (string, error)
 func (f tokenIssuerFunc) Issue(id uuid.UUID) (string, error) { return f(id) }
 
 type loginVerification struct {
-	hash     user.PasswordHash
-	password string
+	Hash     string
+	Password string
 }
 
 type loginHasher struct {
@@ -41,12 +43,12 @@ func (h *loginHasher) Hash(p user.Password) (user.PasswordHash, error) {
 		return user.PasswordHash{}, h.hashErr
 	}
 	hash, err := (fakeHasher{}).Hash(p)
-	h.dummy = loginVerification{hash: hash, password: p.Plaintext()}
+	h.dummy = loginVerification{Hash: hash.Encoded(), Password: p.Plaintext()}
 	return hash, err
 }
 
 func (h *loginHasher) Verify(hash user.PasswordHash, p user.Password) (bool, error) {
-	h.verifications = append(h.verifications, loginVerification{hash: hash, password: p.Plaintext()})
+	h.verifications = append(h.verifications, loginVerification{Hash: hash.Encoded(), Password: p.Plaintext()})
 	if h.verifyErr != nil {
 		return false, h.verifyErr
 	}
@@ -86,11 +88,11 @@ func TestLoginIssuesToken(t *testing.T) {
 				t.Errorf("Execute() = %q, %v; want access-token, nil", token, err)
 			}
 			if readCalls != 1 || issueCalls != 1 {
-				t.Errorf("ByEmail/Issue calls = %d/%d, want 1/1", readCalls, issueCalls)
+				t.Errorf("Execute() ByEmail/Issue calls = %d/%d, want 1/1", readCalls, issueCalls)
 			}
-			want := loginVerification{hash: u.PasswordHash(), password: "s3cretpass"}
-			if len(hasher.verifications) != 1 || hasher.verifications[0] != want {
-				t.Errorf("Verify calls = %+v, want [%+v]", hasher.verifications, want)
+			want := []loginVerification{{Hash: u.PasswordHash().Encoded(), Password: "s3cretpass"}}
+			if diff := cmp.Diff(want, hasher.verifications); diff != "" {
+				t.Errorf("Execute() Verify calls mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -142,17 +144,17 @@ func TestLoginRejectsInvalidCredentials(t *testing.T) {
 				t.Errorf("Execute() = %q, %v; want empty token, %v", token, err, user.ErrInvalidCredentials)
 			}
 			if readCalls != tt.wantReadCalls {
-				t.Errorf("ByEmail calls = %d, want %d", readCalls, tt.wantReadCalls)
+				t.Errorf("Execute() ByEmail calls = %d, want %d", readCalls, tt.wantReadCalls)
 			}
 			if hasher.hashCalls != 1 {
-				t.Errorf("Hash calls = %d, want one at initialization", hasher.hashCalls)
+				t.Errorf("Hash() calls = %d, want one at initialization", hasher.hashCalls)
 			}
 			want := hasher.dummy
 			if tt.realPassword {
-				want = loginVerification{hash: u.PasswordHash(), password: tt.password}
+				want = loginVerification{Hash: u.PasswordHash().Encoded(), Password: tt.password}
 			}
-			if len(hasher.verifications) != 1 || hasher.verifications[0] != want {
-				t.Errorf("Verify calls = %+v, want [%+v]", hasher.verifications, want)
+			if diff := cmp.Diff([]loginVerification{want}, hasher.verifications); diff != "" {
+				t.Errorf("Execute() Verify calls mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -197,7 +199,7 @@ func TestLoginPropagatesDependencyErrors(t *testing.T) {
 				t.Errorf("Execute() = %q, %v; want empty token, %v", token, err, want)
 			}
 			if len(hasher.verifications) != tt.wantVerifyCalls || issueCalls != tt.wantIssueCalls {
-				t.Errorf("Verify/Issue calls = %d/%d, want %d/%d", len(hasher.verifications), issueCalls, tt.wantVerifyCalls, tt.wantIssueCalls)
+				t.Errorf("Execute() Verify/Issue calls = %d/%d, want %d/%d", len(hasher.verifications), issueCalls, tt.wantVerifyCalls, tt.wantIssueCalls)
 			}
 		})
 	}
@@ -220,6 +222,6 @@ func TestNewLoginReturnsDummyHashError(t *testing.T) {
 		t.Errorf("NewLogin() = %v, %v; want nil, %v", login, err, want)
 	}
 	if hasher.hashCalls != 1 || len(hasher.verifications) != 0 {
-		t.Errorf("Hash/Verify calls = %d/%d, want 1/0", hasher.hashCalls, len(hasher.verifications))
+		t.Errorf("NewLogin() Hash/Verify calls = %d/%d, want 1/0", hasher.hashCalls, len(hasher.verifications))
 	}
 }

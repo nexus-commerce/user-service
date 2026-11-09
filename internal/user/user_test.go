@@ -8,10 +8,19 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
 const janeEmail = "jane@example.com"
+
+var (
+	valueObjects      = cmp.AllowUnexported(user.Email{}, user.Name{}, user.FullName{}, user.ConfirmationToken{}, user.ConfirmationTokenHash{}, user.PasswordHash{})
+	ignoreEventID     = cmpopts.IgnoreFields(user.EventMeta{}, "ID")
+	ignoreChangeToken = cmpopts.IgnoreFields(user.EmailChangeRequested{}, "Token")
+)
 
 type nameFields struct {
 	FirstName string
@@ -51,6 +60,39 @@ func fieldsOf(n user.FullName) nameFields {
 	}
 }
 
+type userFields struct {
+	ID           uuid.UUID
+	Email        string
+	FullName     nameFields
+	PasswordHash string
+	CreatedAt    time.Time
+}
+
+func userOf(u *user.User) userFields {
+	return userFields{
+		ID:           u.ID(),
+		Email:        u.Email().String(),
+		FullName:     fieldsOf(u.FullName()),
+		PasswordHash: u.PasswordHash().Encoded(),
+		CreatedAt:    u.CreatedAt(),
+	}
+}
+
+type pendingEmailFields struct {
+	Email     string
+	TokenHash string
+	ExpiresAt time.Time
+}
+
+func pendingEmailOf(u *user.User) (pendingEmailFields, bool) {
+	p, ok := u.PendingEmailChange()
+	return pendingEmailFields{
+		Email:     p.Email().String(),
+		TokenHash: p.TokenHash().Encoded(),
+		ExpiresAt: p.ExpiresAt(),
+	}, ok
+}
+
 func TestEventsReturnsCopy(t *testing.T) {
 	u := mustUser(t)
 
@@ -58,7 +100,7 @@ func TestEventsReturnsCopy(t *testing.T) {
 	events[0] = nil
 
 	if u.Events()[0] == nil {
-		t.Error("modifying the returned slice changed the aggregate's events")
+		t.Error("modifying the slice returned by Events() changed the aggregate's events")
 	}
 }
 
@@ -88,7 +130,7 @@ func TestRestoreName(t *testing.T) {
 	longName := strings.Repeat("a", 51)
 
 	if _, err := user.NewName(longName); err == nil {
-		t.Fatal("NewName accepted data that should fail current rules")
+		t.Fatalf("NewName(%d chars) error = nil, want error", len(longName))
 	}
 	if got := user.RestoreName(longName).String(); got != longName {
 		t.Errorf("RestoreName(%q) = %q, want %q", longName, got, longName)
@@ -114,14 +156,18 @@ func TestRestore(t *testing.T) {
 		PasswordHash: hash,
 		CreatedAt:    createdAt,
 	})
-	got := fieldsOf(u.FullName())
-	matches := u.ID() == id && u.Email().String() == legacyEmail && got == fields && u.PasswordHash() == hash && u.CreatedAt().Equal(createdAt)
-	if !matches {
-		t.Errorf("Restore() = {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}, want {id: %v, email: %q, fullName: %+v, hash: %q, createdAt: %v}",
-			u.ID(), u.Email(), got, u.PasswordHash().Encoded(), u.CreatedAt(), id, legacyEmail, fields, hash.Encoded(), createdAt)
+	want := userFields{
+		ID:           id,
+		Email:        legacyEmail,
+		FullName:     fields,
+		PasswordHash: hash.Encoded(),
+		CreatedAt:    createdAt,
+	}
+	if diff := cmp.Diff(want, userOf(u)); diff != "" {
+		t.Errorf("Restore() mismatch (-want +got):\n%s", diff)
 	}
 	if err := u.Authenticate(password, fakeHasher{}); err != nil {
-		t.Errorf("Authenticate = %v, want nil", err)
+		t.Errorf("Authenticate() error = %v, want nil", err)
 	}
 	if events := u.Events(); len(events) != 0 {
 		t.Errorf("Events() after Restore returned %d events, want 0", len(events))
@@ -133,7 +179,7 @@ func TestAuthenticateRejectsWrongPassword(t *testing.T) {
 	u := mustUser(t)
 
 	if err := u.Authenticate(other, fakeHasher{}); !errors.Is(err, user.ErrInvalidCredentials) {
-		t.Errorf("Authenticate(wrong) = %v, want %v", err, user.ErrInvalidCredentials)
+		t.Errorf("Authenticate(wrong) error = %v, want %v", err, user.ErrInvalidCredentials)
 	}
 }
 
@@ -167,25 +213,33 @@ func eventsOf[E user.Event](u *user.User) []E {
 
 func TestRename(t *testing.T) {
 	t.Run("changed", func(t *testing.T) {
-		u := mustUser(t)
-		u.Rename(user.NewFullName(mustName(t, "Jane"), mustName(t, "Smith")))
-		events := eventsOf[user.Renamed](u)
-		if u.FullName().LastName().String() != "Smith" || len(events) != 1 {
-			t.Fatalf("after Rename: lastName=%q, %d Renamed; want Smith, 1", u.FullName().LastName(), len(events))
-		}
-		e := events[0]
-		matches := e.AggregateID == u.ID() &&
-			e.FullName.FirstName().String() == "Jane" &&
-			e.FullName.LastName().String() == "Smith"
-		if !matches {
-			t.Errorf("Renamed = %+v", e)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			u := mustUser(t)
+			name := user.NewFullName(mustName(t, "Jane"), mustName(t, "Smith"))
+			u.Rename(name)
+			wantName := nameFields{FirstName: "Jane", LastName: "Smith"}
+			if diff := cmp.Diff(wantName, fieldsOf(u.FullName())); diff != "" {
+				t.Errorf("Rename() FullName() mismatch (-want +got):\n%s", diff)
+			}
+			events := eventsOf[user.Renamed](u)
+			if len(events) != 1 {
+				t.Fatalf("Rename() recorded %d Renamed events, want 1", len(events))
+			}
+			want := user.Renamed{
+				AggregateID: u.ID(),
+				OccurredAt:  time.Now(),
+				FullName:    name,
+			}
+			if diff := cmp.Diff(want, events[0], valueObjects, ignoreEventID); diff != "" {
+				t.Errorf("Rename() Renamed event mismatch (-want +got):\n%s", diff)
+			}
+		})
 	})
 	t.Run("same values", func(t *testing.T) {
 		u := mustUser(t)
 		u.Rename(user.NewFullName(mustName(t, "Jane"), mustName(t, "Doe")))
 		if n := len(eventsOf[user.Renamed](u)); n != 0 {
-			t.Errorf("recorded %d Renamed, want 0", n)
+			t.Errorf("Rename(same name) recorded %d Renamed events, want 0", n)
 		}
 	})
 }
@@ -207,42 +261,54 @@ func TestRequestEmailChange(t *testing.T) {
 			if err := requestChange(t, u, "new@example.com", "s3cretpass"); err != nil {
 				t.Fatalf("RequestEmailChange() error: %v", err)
 			}
-			if u.Email().String() != "jane@example.com" {
-				t.Errorf("Email() = %q, want unchanged until confirmation", u.Email())
+			if got := u.Email().String(); got != janeEmail {
+				t.Errorf("RequestEmailChange() Email() = %q, want %q until confirmation", got, janeEmail)
 			}
-			p, ok := u.PendingEmailChange()
 			events := eventsOf[user.EmailChangeRequested](u)
-			requested := ok &&
-				p.Email().String() == "new@example.com" &&
-				p.ExpiresAt().Equal(now.Add(24*time.Hour)) &&
-				len(events) == 1
-			if !requested {
-				t.Fatalf("pending = %+v, %v; %d events", p, ok, len(events))
+			if len(events) != 1 {
+				t.Fatalf("RequestEmailChange() recorded %d EmailChangeRequested events, want 1", len(events))
 			}
 			e := events[0]
-			matches := e.Token.Hash() == p.TokenHash() &&
-				e.NewEmail == p.Email() &&
-				e.ExpiresAt.Equal(p.ExpiresAt()) &&
-				e.OccurredAt.Equal(now)
-			if !matches {
-				t.Errorf("EmailChangeRequested = %+v does not match pending %+v", e, p)
+			want := user.EmailChangeRequested{
+				AggregateID: u.ID(),
+				OccurredAt:  now,
+				FullName:    u.FullName(),
+				NewEmail:    mustEmail(t, "new@example.com"),
+				ExpiresAt:   now.Add(24 * time.Hour),
+			}
+			if diff := cmp.Diff(want, e, valueObjects, ignoreEventID, ignoreChangeToken); diff != "" {
+				t.Errorf("RequestEmailChange() EmailChangeRequested event mismatch (-want +got):\n%s", diff)
+			}
+			got, ok := pendingEmailOf(u)
+			if !ok {
+				t.Fatal("RequestEmailChange() left no pending email change, want one")
+			}
+			wantPending := pendingEmailFields{Email: "new@example.com", TokenHash: e.Token.Hash().Encoded(), ExpiresAt: now.Add(24 * time.Hour)}
+			if diff := cmp.Diff(wantPending, got); diff != "" {
+				t.Errorf("RequestEmailChange() pending change mismatch (-want +got):\n%s", diff)
 			}
 		})
 	})
 	t.Run("wrong password", func(t *testing.T) {
 		u := mustUser(t)
 		if err := requestChange(t, u, "new@example.com", "wrongpass"); !errors.Is(err, user.ErrInvalidCredentials) {
-			t.Errorf("error = %v, want %v", err, user.ErrInvalidCredentials)
+			t.Errorf("Reauthenticate(wrong) error = %v, want %v", err, user.ErrInvalidCredentials)
 		}
-		if _, ok := u.PendingEmailChange(); ok || len(u.Events()) != 1 {
-			t.Error("failed request left pending change or extra events")
+		if got, ok := pendingEmailOf(u); ok {
+			t.Errorf("Reauthenticate(wrong) left pending change %+v, want none", got)
+		}
+		if n := len(u.Events()); n != 1 {
+			t.Errorf("Reauthenticate(wrong) Events() len = %d, want 1", n)
 		}
 	})
 	t.Run("same email in other case", func(t *testing.T) {
 		u := mustUser(t)
 		err := requestChange(t, u, "Jane@Example.com", "s3cretpass")
-		if !errors.Is(err, user.ErrEmailUnchanged) || !errors.Is(err, user.ErrValidation) {
-			t.Errorf("error = %v, want %v", err, user.ErrEmailUnchanged)
+		if !errors.Is(err, user.ErrEmailUnchanged) {
+			t.Errorf("RequestEmailChange(own email) error = %v, want %v", err, user.ErrEmailUnchanged)
+		}
+		if !errors.Is(err, user.ErrValidation) {
+			t.Errorf("RequestEmailChange(own email) error = %v, want %v", err, user.ErrValidation)
 		}
 	})
 }
@@ -260,50 +326,50 @@ func TestRequestEmailChangeToTakenAddress(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			u := mustUser(t)
 			if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-				t.Fatalf("RequestEmailChange() error: %v", err)
+				t.Fatalf("RequestEmailChange(taken) error: %v", err)
 			}
-			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
-				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+			if got := u.Email().String(); got != janeEmail {
+				t.Errorf("RequestEmailChange(taken) Email() = %q, want %q", got, janeEmail)
+			}
+			if got, ok := pendingEmailOf(u); ok {
+				t.Errorf("RequestEmailChange(taken) left pending change %+v, want none", got)
 			}
 			if n := len(eventsOf[user.EmailChangeRequested](u)); n != 0 {
-				t.Errorf("recorded %d EmailChangeRequested, want 0 so no link goes to a taken address", n)
+				t.Errorf("RequestEmailChange(taken) recorded %d EmailChangeRequested events, want 0 so no link goes to a taken address", n)
 			}
 			events := eventsOf[user.EmailChangeToTakenAddressAttempted](u)
 			if len(events) != 1 {
-				t.Fatalf("recorded %d EmailChangeToTakenAddressAttempted, want 1", len(events))
+				t.Fatalf("RequestEmailChange(taken) recorded %d EmailChangeToTakenAddressAttempted events, want 1", len(events))
 			}
-			e := events[0]
-			matches := e.AggregateID == u.ID() &&
-				e.NewEmail.String() == "taken@example.com" &&
-				e.OccurredAt.Equal(time.Now())
-			if !matches {
-				t.Errorf("EmailChangeToTakenAddressAttempted = %+v", e)
+			want := user.EmailChangeToTakenAddressAttempted{AggregateID: u.ID(), OccurredAt: time.Now(), NewEmail: mustEmail(t, "taken@example.com")}
+			if diff := cmp.Diff(want, events[0], valueObjects, ignoreEventID); diff != "" {
+				t.Errorf("RequestEmailChange(taken) event mismatch (-want +got):\n%s", diff)
 			}
 		})
 	})
 	t.Run("invalidates earlier token", func(t *testing.T) {
 		u, earlier := requestedChange(t)
 		if err := attempt(t, u, "taken@example.com", "s3cretpass"); err != nil {
-			t.Fatalf("RequestEmailChange() error: %v", err)
+			t.Fatalf("RequestEmailChange(taken) error: %v", err)
 		}
 		if err := u.ConfirmEmailChange(earlier); !errors.Is(err, user.ErrInvalidConfirmationToken) {
-			t.Errorf("confirm with earlier token = %v, want %v so it cannot reveal that the address is taken", err, user.ErrInvalidConfirmationToken)
+			t.Errorf("ConfirmEmailChange(earlier token) error = %v, want %v so it cannot reveal that the address is taken", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 	t.Run("wrong password", func(t *testing.T) {
 		u := mustUser(t)
 		if err := attempt(t, u, "taken@example.com", "wrongpass"); !errors.Is(err, user.ErrInvalidCredentials) {
-			t.Errorf("error = %v, want %v", err, user.ErrInvalidCredentials)
+			t.Errorf("Reauthenticate(wrong) error = %v, want %v", err, user.ErrInvalidCredentials)
 		}
 		if n := len(eventsOf[user.EmailChangeToTakenAddressAttempted](u)); n != 0 {
-			t.Errorf("recorded %d EmailChangeToTakenAddressAttempted, want 0", n)
+			t.Errorf("Reauthenticate(wrong) recorded %d EmailChangeToTakenAddressAttempted events, want 0", n)
 		}
 	})
 	t.Run("own email", func(t *testing.T) {
 		u := mustUser(t)
 		err := attempt(t, u, "Jane@Example.com", "s3cretpass")
 		if !errors.Is(err, user.ErrEmailUnchanged) {
-			t.Errorf("error = %v, want %v", err, user.ErrEmailUnchanged)
+			t.Errorf("RequestEmailChange(own email) error = %v, want %v", err, user.ErrEmailUnchanged)
 		}
 	})
 }
@@ -355,10 +421,13 @@ func TestEmailChangeRejectsInvalidProof(t *testing.T) {
 
 				err := u.RequestEmailChange(mustEmail(t, "new@example.com"), taken, proof(t, u))
 				if !errors.Is(err, user.ErrInvalidCredentials) {
-					t.Errorf("error = %v, want %v", err, user.ErrInvalidCredentials)
+					t.Errorf("RequestEmailChange() error = %v, want %v", err, user.ErrInvalidCredentials)
 				}
-				if _, ok := u.PendingEmailChange(); ok || len(u.Events()) != events {
-					t.Error("rejected proof left pending change or extra events")
+				if got, ok := pendingEmailOf(u); ok {
+					t.Errorf("RequestEmailChange() left pending change %+v, want none", got)
+				}
+				if n := len(u.Events()); n != events {
+					t.Errorf("RequestEmailChange() Events() len = %d, want %d", n, events)
 				}
 			})
 		}
@@ -382,16 +451,25 @@ func TestConfirmEmailChange(t *testing.T) {
 			if err := u.ConfirmEmailChange(tok); err != nil {
 				t.Fatalf("ConfirmEmailChange() error: %v", err)
 			}
-			events := eventsOf[user.EmailChanged](u)
-			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != "new@example.com" || len(events) != 1 {
-				t.Fatalf("after confirm: email=%q pending=%v events=%d", u.Email(), ok, len(events))
+			if got := u.Email().String(); got != "new@example.com" {
+				t.Errorf("ConfirmEmailChange() Email() = %q, want %q", got, "new@example.com")
 			}
-			e := events[0]
-			matches := e.OldEmail.String() == "jane@example.com" &&
-				e.NewEmail.String() == "new@example.com" &&
-				e.OccurredAt.Equal(time.Now())
-			if !matches {
-				t.Errorf("EmailChanged = %+v", e)
+			if got, ok := pendingEmailOf(u); ok {
+				t.Errorf("ConfirmEmailChange() left pending change %+v, want none", got)
+			}
+			events := eventsOf[user.EmailChanged](u)
+			if len(events) != 1 {
+				t.Fatalf("ConfirmEmailChange() recorded %d EmailChanged events, want 1", len(events))
+			}
+			want := user.EmailChanged{
+				AggregateID: u.ID(),
+				OccurredAt:  time.Now(),
+				FullName:    u.FullName(),
+				OldEmail:    mustEmail(t, janeEmail),
+				NewEmail:    mustEmail(t, "new@example.com"),
+			}
+			if diff := cmp.Diff(want, events[0], valueObjects, ignoreEventID); diff != "" {
+				t.Errorf("ConfirmEmailChange() EmailChanged event mismatch (-want +got):\n%s", diff)
 			}
 		})
 	})
@@ -399,9 +477,11 @@ func TestConfirmEmailChange(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			u, tok := requestedChange(t)
 			time.Sleep(24*time.Hour + time.Nanosecond)
-			err := u.ConfirmEmailChange(tok)
-			if !errors.Is(err, user.ErrConfirmationTokenExpired) || u.Email().String() != "jane@example.com" {
-				t.Errorf("error = %v, email = %q; want %v, unchanged", err, u.Email(), user.ErrConfirmationTokenExpired)
+			if err := u.ConfirmEmailChange(tok); !errors.Is(err, user.ErrConfirmationTokenExpired) {
+				t.Errorf("ConfirmEmailChange(expired) error = %v, want %v", err, user.ErrConfirmationTokenExpired)
+			}
+			if got := u.Email().String(); got != janeEmail {
+				t.Errorf("ConfirmEmailChange(expired) Email() = %q, want %q", got, janeEmail)
 			}
 		})
 	})
@@ -411,13 +491,13 @@ func TestConfirmEmailChange(t *testing.T) {
 			t.Fatalf("second RequestEmailChange() error: %v", err)
 		}
 		if err := u.ConfirmEmailChange(old); !errors.Is(err, user.ErrInvalidConfirmationToken) {
-			t.Errorf("confirm with superseded token = %v, want %v", err, user.ErrInvalidConfirmationToken)
+			t.Errorf("ConfirmEmailChange(superseded token) error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 	t.Run("no pending change", func(t *testing.T) {
 		u := mustUser(t)
 		if err := u.ConfirmEmailChange(user.NewConfirmationToken()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
-			t.Errorf("error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+			t.Errorf("ConfirmEmailChange() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 }
@@ -429,19 +509,23 @@ func TestRejectEmailChange(t *testing.T) {
 			if err := u.RejectEmailChange(tok); err != nil {
 				t.Fatalf("RejectEmailChange() error: %v", err)
 			}
-			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != janeEmail {
-				t.Errorf("email = %q, pending = %v; want unchanged, no pending", u.Email(), ok)
+			if got := u.Email().String(); got != janeEmail {
+				t.Errorf("RejectEmailChange() Email() = %q, want %q", got, janeEmail)
+			}
+			if got, ok := pendingEmailOf(u); ok {
+				t.Errorf("RejectEmailChange() left pending change %+v, want none", got)
 			}
 			events := eventsOf[user.EmailChangeRejected](u)
 			if len(events) != 1 {
-				t.Fatalf("recorded %d EmailChangeRejected, want 1", len(events))
+				t.Fatalf("RejectEmailChange() recorded %d EmailChangeRejected events, want 1", len(events))
 			}
-			e := events[0]
-			matches := e.AggregateID == u.ID() &&
-				e.NewEmail.String() == "new@example.com" &&
-				e.OccurredAt.Equal(time.Now())
-			if !matches {
-				t.Errorf("EmailChangeRejected = %+v", e)
+			want := user.EmailChangeRejected{
+				AggregateID: u.ID(),
+				OccurredAt:  time.Now(),
+				NewEmail:    mustEmail(t, "new@example.com"),
+			}
+			if diff := cmp.Diff(want, events[0], valueObjects, ignoreEventID); diff != "" {
+				t.Errorf("RejectEmailChange() EmailChangeRejected event mismatch (-want +got):\n%s", diff)
 			}
 		})
 	})
@@ -450,18 +534,25 @@ func TestRejectEmailChange(t *testing.T) {
 		if err := requestChange(t, u, "other@example.com", "s3cretpass"); err != nil {
 			t.Fatalf("second RequestEmailChange() error: %v", err)
 		}
+		before, _ := pendingEmailOf(u)
 		if err := u.RejectEmailChange(old); !errors.Is(err, user.ErrInvalidConfirmationToken) {
-			t.Errorf("reject with superseded token = %v, want %v", err, user.ErrInvalidConfirmationToken)
+			t.Errorf("RejectEmailChange(superseded token) error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
-		p, ok := u.PendingEmailChange()
-		if !ok || p.Email().String() != "other@example.com" || len(eventsOf[user.EmailChangeRejected](u)) != 0 {
-			t.Errorf("pending = %+v, %v; want other@example.com kept and no EmailChangeRejected", p, ok)
+		got, ok := pendingEmailOf(u)
+		if !ok {
+			t.Error("RejectEmailChange(superseded token) discarded the pending change, want it kept")
+		}
+		if diff := cmp.Diff(before, got); diff != "" {
+			t.Errorf("RejectEmailChange(superseded token) changed the pending change (-want +got):\n%s", diff)
+		}
+		if n := len(eventsOf[user.EmailChangeRejected](u)); n != 0 {
+			t.Errorf("RejectEmailChange(superseded token) recorded %d EmailChangeRejected events, want 0", n)
 		}
 	})
 	t.Run("no pending change", func(t *testing.T) {
 		u := mustUser(t)
 		if err := u.RejectEmailChange(user.NewConfirmationToken()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
-			t.Errorf("error = %v, want %v", err, user.ErrInvalidConfirmationToken)
+			t.Errorf("RejectEmailChange() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 		}
 	})
 }
@@ -484,22 +575,30 @@ func TestRestoreWithPendingEmailChange(t *testing.T) {
 }
 
 func TestRecordDuplicateRegistration(t *testing.T) {
-	u := mustUser(t)
-	email, name, hash := u.Email(), u.FullName(), u.PasswordHash()
-	before := len(u.Events())
-	u.RecordDuplicateRegistration()
-	events := u.Events()
-	if len(events) != before+1 {
-		t.Fatalf("recorded %d events, want %d", len(events), before+1)
-	}
-	e, ok := events[len(events)-1].(user.DuplicateRegistrationAttempted)
-	if !ok {
-		t.Fatalf("last event = %T, want user.DuplicateRegistrationAttempted", events[len(events)-1])
-	}
-	if e.AggregateID != u.ID() || e.Email != u.Email() {
-		t.Errorf("DuplicateRegistrationAttempted = %+v", e)
-	}
-	if u.Email() != email || u.FullName() != name || u.PasswordHash() != hash {
-		t.Errorf("user state changed after RecordDuplicateRegistration")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		u := mustUser(t)
+		before := userOf(u)
+		count := len(u.Events())
+		u.RecordDuplicateRegistration()
+		events := u.Events()
+		if len(events) != count+1 {
+			t.Fatalf("RecordDuplicateRegistration() Events() len = %d, want %d", len(events), count+1)
+		}
+		e, ok := events[len(events)-1].(user.DuplicateRegistrationAttempted)
+		if !ok {
+			t.Fatalf("RecordDuplicateRegistration() last event = %T, want user.DuplicateRegistrationAttempted", events[len(events)-1])
+		}
+		want := user.DuplicateRegistrationAttempted{
+			AggregateID: u.ID(),
+			OccurredAt:  time.Now(),
+			FullName:    u.FullName(),
+			Email:       u.Email(),
+		}
+		if diff := cmp.Diff(want, e, valueObjects, ignoreEventID); diff != "" {
+			t.Errorf("RecordDuplicateRegistration() event mismatch (-want +got):\n%s", diff)
+		}
+		if diff := cmp.Diff(before, userOf(u)); diff != "" {
+			t.Errorf("RecordDuplicateRegistration() changed user state (-want +got):\n%s", diff)
+		}
+	})
 }

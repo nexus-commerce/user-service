@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http/httptest"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
@@ -55,28 +56,28 @@ type controllerTestCase struct {
 	wantBody   string
 }
 
-func checkResponse(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int, wantBody string) {
+func checkResponse(t *testing.T, handler string, rec *httptest.ResponseRecorder, wantStatus int, wantBody string) {
 	t.Helper()
 	if rec.Code != wantStatus {
-		t.Errorf("status = %d, want %d; body = %s", rec.Code, wantStatus, rec.Body.String())
+		t.Errorf("%s status = %d, want %d; body = %s", handler, rec.Code, wantStatus, rec.Body.String())
 	}
 	if wantBody == "" {
 		if rec.Body.Len() != 0 {
-			t.Errorf("body = %q, want empty", rec.Body.String())
+			t.Errorf("%s body = %q, want empty", handler, rec.Body.String())
 		}
 		return
 	}
 	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Errorf("Content-Type = %q, want application/json", got)
+		t.Errorf("%s Content-Type = %q, want application/json", handler, got)
 	}
 	var got, want any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf("%s body %q: decode: %v", handler, rec.Body.String(), err)
 	}
 	if err := json.Unmarshal([]byte(wantBody), &want); err != nil {
-		t.Fatalf("decode expected response: %v", err)
+		t.Fatalf("decode expected body %q: %v", wantBody, err)
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("body = %s, want %s", rec.Body.String(), wantBody)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("%s body mismatch (-want +got):\n%s", handler, diff)
 	}
 }

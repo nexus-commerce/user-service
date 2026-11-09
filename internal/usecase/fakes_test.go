@@ -6,7 +6,15 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/nexus-commerce/user-service/internal/user"
+)
+
+var (
+	valueObjects    = cmp.AllowUnexported(user.Email{}, user.Name{}, user.FullName{}, user.ConfirmationToken{}, user.ConfirmationTokenHash{}, user.PasswordHash{})
+	ignoreEventMeta = cmpopts.IgnoreFields(user.EventMeta{}, "ID", "OccurredAt")
 )
 
 type fakeHasher struct{}

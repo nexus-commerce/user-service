@@ -7,8 +7,31 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"github.com/nexus-commerce/user-service/internal/user"
 )
+
+type registrationFields struct {
+	UserID       uuid.UUID
+	Email        string
+	FullName     nameFields
+	PasswordHash string
+	TokenHash    string
+	ExpiresAt    time.Time
+}
+
+func registrationOf(p *user.PendingRegistration) registrationFields {
+	return registrationFields{
+		UserID:       p.UserID(),
+		Email:        p.Email().String(),
+		FullName:     fieldsOf(p.FullName()),
+		PasswordHash: p.PasswordHash().Encoded(),
+		TokenHash:    p.TokenHash().Encoded(),
+		ExpiresAt:    p.ExpiresAt(),
+	}
+}
 
 func mustPending(t *testing.T) (*user.PendingRegistration, user.ConfirmationToken) {
 	t.Helper()
@@ -30,7 +53,7 @@ func lastRequested(t *testing.T, p *user.PendingRegistration) user.RegistrationR
 	events := p.Events()
 	e, ok := events[len(events)-1].(user.RegistrationRequested)
 	if !ok {
-		t.Fatalf("last event is %T, want RegistrationRequested", events[len(events)-1])
+		t.Fatalf("Events() last event is %T, want RegistrationRequested", events[len(events)-1])
 	}
 	return e
 }
@@ -40,26 +63,36 @@ func TestRequestRegistrationRecordsEvent(t *testing.T) {
 		p, tok := mustPending(t)
 		events := p.Events()
 		if len(events) != 1 {
-			t.Fatalf("Events() len = %d, want 1", len(events))
+			t.Fatalf("RequestRegistration() Events() len = %d, want 1", len(events))
 		}
 		e, ok := events[0].(user.RegistrationRequested)
 		if !ok {
-			t.Fatalf("Events()[0] is %T, want RegistrationRequested", events[0])
+			t.Fatalf("RequestRegistration() Events()[0] is %T, want RegistrationRequested", events[0])
 		}
-		if e.ID == uuid.Nil() || e.AggregateID != p.UserID() || e.Email != p.Email() || e.FullName != p.FullName() {
-			t.Errorf("RegistrationRequested = %+v does not match pending registration", e)
+		if e.ID == uuid.Nil() {
+			t.Error("RequestRegistration() RegistrationRequested.ID = nil, want non-nil")
 		}
-		if e.Token.Hash() != p.TokenHash() || p.TokenHash() != tok.Hash() {
-			t.Errorf("token hash = %q, pending hash = %q, want equal", e.Token.Hash().Encoded(), p.TokenHash().Encoded())
+		want := user.RegistrationRequested{
+			AggregateID: p.UserID(),
+			OccurredAt:  time.Now(),
+			Email:       mustEmail(t, janeEmail),
+			FullName:    mustFullName(t, janeDoe),
+			Token:       tok,
+			ExpiresAt:   time.Now().Add(24 * time.Hour),
 		}
-		timed := e.OccurredAt.Equal(time.Now()) &&
-			e.ExpiresAt.Equal(p.ExpiresAt()) &&
-			e.ExpiresAt.Equal(e.OccurredAt.Add(24*time.Hour))
-		if !timed {
-			t.Errorf("OccurredAt = %v, ExpiresAt = %v, pending ExpiresAt = %v", e.OccurredAt, e.ExpiresAt, p.ExpiresAt())
+		if diff := cmp.Diff(want, e, valueObjects, ignoreEventID); diff != "" {
+			t.Errorf("RequestRegistration() RegistrationRequested event mismatch (-want +got):\n%s", diff)
 		}
-		if got := p.PasswordHash().Encoded(); got != "hashed:s3cretpass" {
-			t.Errorf("PasswordHash() = %q, want %q", got, "hashed:s3cretpass")
+		wantPending := registrationFields{
+			Email:        janeEmail,
+			FullName:     janeDoe,
+			PasswordHash: "hashed:s3cretpass",
+			TokenHash:    tok.Hash().Encoded(),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
+		}
+		ignoreUserID := cmpopts.IgnoreFields(registrationFields{}, "UserID")
+		if diff := cmp.Diff(wantPending, registrationOf(p), ignoreUserID); diff != "" {
+			t.Errorf("RequestRegistration() mismatch (-want +got):\n%s", diff)
 		}
 	})
 }
@@ -71,20 +104,26 @@ func TestConfirmMarksRegistrationConfirmed(t *testing.T) {
 		if err := p.Confirm(tok); err != nil {
 			t.Fatalf("Confirm() error: %v", err)
 		}
-		at, ok := p.ConfirmedAt()
-		if !ok || !p.Confirmed() || !at.Equal(time.Now()) {
-			t.Errorf("ConfirmedAt() = %v, %v; want %v, true", at, ok, time.Now())
+		if !p.Confirmed() {
+			t.Error("Confirm() left Confirmed() = false, want true")
+		}
+		if at, ok := p.ConfirmedAt(); !ok || !at.Equal(time.Now()) {
+			t.Errorf("Confirm() ConfirmedAt() = %v, %v; want %v, true", at, ok, time.Now())
 		}
 		events := p.Events()
 		if len(events) != 2 {
-			t.Fatalf("Events() len = %d, want 2", len(events))
+			t.Fatalf("Confirm() Events() len = %d, want 2", len(events))
 		}
 		e, ok := events[1].(user.RegistrationConfirmed)
 		if !ok {
-			t.Fatalf("Events()[1] is %T, want RegistrationConfirmed", events[1])
+			t.Fatalf("Confirm() Events()[1] is %T, want RegistrationConfirmed", events[1])
 		}
-		if e.ID == uuid.Nil() || e.AggregateID != p.UserID() || !e.OccurredAt.Equal(at) {
-			t.Errorf("RegistrationConfirmed = %+v, want aggregate %v at %v", e, p.UserID(), at)
+		if e.ID == uuid.Nil() {
+			t.Error("Confirm() RegistrationConfirmed.ID = nil, want non-nil")
+		}
+		want := user.RegistrationConfirmed{AggregateID: p.UserID(), OccurredAt: time.Now()}
+		if diff := cmp.Diff(want, e, ignoreEventID); diff != "" {
+			t.Errorf("Confirm() RegistrationConfirmed event mismatch (-want +got):\n%s", diff)
 		}
 	})
 }
@@ -108,7 +147,7 @@ func TestConfirmTwiceRejectsToken(t *testing.T) {
 		t.Errorf("second Confirm() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
 	if n := len(p.Events()); n != 2 {
-		t.Errorf("Events() len = %d, want 2", n)
+		t.Errorf("second Confirm() Events() len = %d, want 2", n)
 	}
 }
 
@@ -157,27 +196,34 @@ func TestSupersedeRenewsRegistration(t *testing.T) {
 		if err := p.Supersede(newer); err != nil {
 			t.Fatalf("Supersede() error: %v", err)
 		}
-		if p.UserID() != id || p.Email() != email || p.FullName() != name || p.PasswordHash() != hash {
-			t.Errorf("Supersede() = {id: %v, email: %q, name: %+v, hash: %q}, want {id: %v, email: %q, name: %+v, hash: %q}",
-				p.UserID(), p.Email(), fieldsOf(p.FullName()), p.PasswordHash().Encoded(), id, email, fieldsOf(name), hash.Encoded())
+		want := registrationFields{
+			UserID:       id,
+			Email:        email.String(),
+			FullName:     fieldsOf(name),
+			PasswordHash: hash.Encoded(),
+			ExpiresAt:    time.Now().Add(24 * time.Hour),
 		}
-		if want := time.Now().Add(24 * time.Hour); !p.ExpiresAt().Equal(want) {
-			t.Errorf("ExpiresAt() = %v, want %v", p.ExpiresAt(), want)
+		ignoreToken := cmpopts.IgnoreFields(registrationFields{}, "TokenHash")
+		if diff := cmp.Diff(want, registrationOf(p), ignoreToken); diff != "" {
+			t.Errorf("Supersede() mismatch (-want +got):\n%s", diff)
 		}
 		if n := len(p.Events()); n != 2 {
-			t.Fatalf("Events() len = %d, want 2", n)
+			t.Fatalf("Supersede() Events() len = %d, want 2", n)
 		}
 		e := lastRequested(t, p)
-		matches := e.AggregateID == id &&
-			e.Email == email &&
-			e.FullName == name &&
-			e.OccurredAt.Equal(time.Now()) &&
-			e.ExpiresAt.Equal(p.ExpiresAt())
-		if !matches {
-			t.Errorf("RegistrationRequested = %+v does not match superseded registration", e)
+		wantEvent := user.RegistrationRequested{
+			AggregateID: id,
+			OccurredAt:  time.Now(),
+			Email:       email,
+			FullName:    name,
+			ExpiresAt:   time.Now().Add(24 * time.Hour),
 		}
-		if e.Token.Hash() != p.TokenHash() {
-			t.Errorf("token hash = %q, pending hash = %q, want equal", e.Token.Hash().Encoded(), p.TokenHash().Encoded())
+		ignoreEventToken := cmpopts.IgnoreFields(user.RegistrationRequested{}, "Token")
+		if diff := cmp.Diff(wantEvent, e, valueObjects, ignoreEventID, ignoreEventToken); diff != "" {
+			t.Errorf("Supersede() RegistrationRequested event mismatch (-want +got):\n%s", diff)
+		}
+		if got, want := e.Token.Hash().Encoded(), p.TokenHash().Encoded(); got != want {
+			t.Errorf("Supersede() event token hash = %q, want pending token hash %q", got, want)
 		}
 	})
 }
@@ -205,21 +251,29 @@ func TestSupersedeRejectsConfirmedRegistration(t *testing.T) {
 	if err := p.Confirm(tok); err != nil {
 		t.Fatalf("Confirm() error: %v", err)
 	}
+	before := registrationOf(p)
 	if err := p.Supersede(newerRequest(t, janeEmail)); !errors.Is(err, user.ErrRegistrationAlreadyConfirmed) {
 		t.Errorf("Supersede() error = %v, want %v", err, user.ErrRegistrationAlreadyConfirmed)
 	}
-	if p.FullName() != mustFullName(t, janeDoe) || p.TokenHash() != tok.Hash() || len(p.Events()) != 2 {
-		t.Error("Supersede() changed a confirmed registration")
+	if diff := cmp.Diff(before, registrationOf(p)); diff != "" {
+		t.Errorf("Supersede() changed a confirmed registration (-want +got):\n%s", diff)
+	}
+	if n := len(p.Events()); n != 2 {
+		t.Errorf("Supersede() Events() len = %d, want 2", n)
 	}
 }
 
 func TestSupersedeRejectsOtherEmail(t *testing.T) {
-	p, tok := mustPending(t)
+	p, _ := mustPending(t)
+	before := registrationOf(p)
 	if err := p.Supersede(newerRequest(t, "other@example.com")); !errors.Is(err, user.ErrRegistrationEmailMismatch) {
 		t.Errorf("Supersede() error = %v, want %v", err, user.ErrRegistrationEmailMismatch)
 	}
-	if p.FullName() != mustFullName(t, janeDoe) || p.TokenHash() != tok.Hash() || len(p.Events()) != 1 {
-		t.Error("Supersede() changed a registration for another email")
+	if diff := cmp.Diff(before, registrationOf(p)); diff != "" {
+		t.Errorf("Supersede(other email) changed the registration (-want +got):\n%s", diff)
+	}
+	if n := len(p.Events()); n != 1 {
+		t.Errorf("Supersede(other email) Events() len = %d, want 1", n)
 	}
 }
 
@@ -242,10 +296,15 @@ func TestRejectRecordsEvent(t *testing.T) {
 		events := p.Events()
 		e, ok := events[len(events)-1].(user.RegistrationRejected)
 		if !ok {
-			t.Fatalf("last event is %T, want RegistrationRejected", events[len(events)-1])
+			t.Fatalf("Reject() last event is %T, want RegistrationRejected", events[len(events)-1])
 		}
-		if e.AggregateID != p.UserID() || e.Email != p.Email() || !e.OccurredAt.Equal(time.Now()) {
-			t.Errorf("RegistrationRejected = %+v, want aggregate %v, email %q", e, p.UserID(), p.Email())
+		want := user.RegistrationRejected{
+			AggregateID: p.UserID(),
+			OccurredAt:  time.Now(),
+			Email:       mustEmail(t, janeEmail),
+		}
+		if diff := cmp.Diff(want, e, valueObjects, ignoreEventID); diff != "" {
+			t.Errorf("Reject() RegistrationRejected event mismatch (-want +got):\n%s", diff)
 		}
 	})
 }
@@ -266,13 +325,15 @@ func TestCompleteCreatesRegisteredUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Complete() error: %v", err)
 	}
-	matches := u.ID() == p.UserID() &&
-		u.Email() == p.Email() &&
-		u.FullName() == p.FullName() &&
-		u.PasswordHash() == p.PasswordHash()
-	if !matches {
-		t.Errorf("Complete() = {id: %v, email: %q, hash: %q}, want {id: %v, email: %q, hash: %q}",
-			u.ID(), u.Email(), u.PasswordHash().Encoded(), p.UserID(), p.Email(), p.PasswordHash().Encoded())
+	wantUser := userFields{
+		ID:           p.UserID(),
+		Email:        p.Email().String(),
+		FullName:     fieldsOf(p.FullName()),
+		PasswordHash: p.PasswordHash().Encoded(),
+	}
+	ignoreCreatedAt := cmpopts.IgnoreFields(userFields{}, "CreatedAt")
+	if diff := cmp.Diff(wantUser, userOf(u), ignoreCreatedAt); diff != "" {
+		t.Errorf("Complete() mismatch (-want +got):\n%s", diff)
 	}
 	if _, pending := u.PendingEmailChange(); pending {
 		t.Error("new user has a pending email change")
@@ -283,22 +344,23 @@ func TestCompleteCreatesRegisteredUser(t *testing.T) {
 
 	events := u.Events()
 	if len(events) != 1 {
-		t.Fatalf("Events() returned %d events, want 1", len(events))
+		t.Fatalf("Complete() Events() returned %d events, want 1", len(events))
 	}
 	reg, ok := events[0].(user.Registered)
 	if !ok {
-		t.Fatalf("Events()[0] is %T, want Registered", events[0])
+		t.Fatalf("Complete() Events()[0] is %T, want Registered", events[0])
 	}
 	if reg.ID == uuid.Nil() {
-		t.Errorf("Events()[0].ID = nil, want non-nil")
+		t.Error("Complete() Registered.ID = nil, want non-nil")
 	}
 	want := user.Registered{
-		EventMeta: user.EventMeta{ID: reg.ID, AggregateID: p.UserID(), OccurredAt: u.CreatedAt()},
-		Email:     p.Email(),
-		FullName:  p.FullName(),
+		AggregateID: p.UserID(),
+		OccurredAt:  u.CreatedAt(),
+		Email:       mustEmail(t, janeEmail),
+		FullName:    mustFullName(t, janeDoe),
 	}
-	if reg != want {
-		t.Errorf("Events()[0] = %+v, want %+v", reg, want)
+	if diff := cmp.Diff(want, reg, valueObjects, ignoreEventID); diff != "" {
+		t.Errorf("Complete() Registered event mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -318,10 +380,16 @@ func TestRestorePendingRegistration(t *testing.T) {
 		TokenHash:    tok.Hash(),
 		ExpiresAt:    expiresAt,
 	})
-	matches := p.UserID() == id && p.Email() == email && p.FullName() == name && p.PasswordHash() == hash && p.TokenHash() == tok.Hash() && p.ExpiresAt().Equal(expiresAt)
-	if !matches {
-		t.Errorf("RestorePendingRegistration() = {id: %v, email: %q, hash: %q, expiresAt: %v}, want {id: %v, email: %q, hash: %q, expiresAt: %v}",
-			p.UserID(), p.Email(), p.PasswordHash().Encoded(), p.ExpiresAt(), id, email, hash.Encoded(), expiresAt)
+	want := registrationFields{
+		UserID:       id,
+		Email:        email.String(),
+		FullName:     fieldsOf(name),
+		PasswordHash: hash.Encoded(),
+		TokenHash:    tok.Hash().Encoded(),
+		ExpiresAt:    expiresAt,
+	}
+	if diff := cmp.Diff(want, registrationOf(p)); diff != "" {
+		t.Errorf("RestorePendingRegistration() mismatch (-want +got):\n%s", diff)
 	}
 	if p.Confirmed() {
 		t.Error("restored unconfirmed registration reports Confirmed()")

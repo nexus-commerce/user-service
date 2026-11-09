@@ -3,6 +3,9 @@ package usecase_test
 import (
 	"errors"
 	"testing"
+	"uuid"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
@@ -140,10 +143,22 @@ func TestRequestRegistrationAgainSupersedesPending(t *testing.T) {
 	if len(regs.byEmail) != 1 {
 		t.Fatalf("saved %d pending registrations, want 1", len(regs.byEmail))
 	}
+	type registrationFields struct {
+		UserID       uuid.UUID
+		FirstName    string
+		LastName     string
+		PasswordHash string
+	}
 	p := pendingJane(t, regs)
-	if p.UserID() != id || p.FullName().FirstName().String() != "Janet" || p.PasswordHash().Encoded() != "hashed:n3wpassword" {
-		t.Errorf("registration = {id: %v, first name: %s, hash: %q}, want {id: %v, first name: Janet, hash: %q}",
-			p.UserID(), p.FullName().FirstName(), p.PasswordHash().Encoded(), id, "hashed:n3wpassword")
+	got := registrationFields{
+		UserID:       p.UserID(),
+		FirstName:    p.FullName().FirstName().String(),
+		LastName:     p.FullName().LastName().String(),
+		PasswordHash: p.PasswordHash().Encoded(),
+	}
+	want := registrationFields{UserID: id, FirstName: "Janet", LastName: "Doe", PasswordHash: "hashed:n3wpassword"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("registration mismatch (-want +got):\n%s", diff)
 	}
 	second := tokenFor(t, regs, "jane@example.com")
 

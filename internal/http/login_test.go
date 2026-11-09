@@ -43,7 +43,7 @@ func TestLoginServeHTTP(t *testing.T) {
 			if calls != 1 {
 				t.Errorf("Execute() calls = %d, want 1", calls)
 			}
-			checkResponse(t, rec, tt.wantStatus, tt.wantBody)
+			checkResponse(t, "Login.ServeHTTP()", rec, tt.wantStatus, tt.wantBody)
 		})
 	}
 }

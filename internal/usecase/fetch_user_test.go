@@ -7,6 +7,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -52,11 +54,11 @@ func TestFetchUser(t *testing.T) {
 			if tt.wantErr == nil {
 				wantView = usecase.UserView{ID: u.ID(), Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 			}
-			if view != wantView {
-				t.Errorf("Execute() view = %+v, want %+v", view, wantView)
+			if diff := cmp.Diff(wantView, view); diff != "" {
+				t.Errorf("Execute() view mismatch (-want +got):\n%s", diff)
 			}
 			if calls != 1 {
-				t.Errorf("ByID calls = %d, want 1", calls)
+				t.Errorf("ByID() calls = %d, want 1", calls)
 			}
 		})
 	}

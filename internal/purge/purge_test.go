@@ -7,6 +7,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/purge"
 )
 
@@ -48,8 +50,8 @@ func TestRunPurgesOnStartAndEveryInterval(t *testing.T) {
 		}
 		want := []time.Time{start.Add(-opts.Grace), start.Add(opts.Interval - opts.Grace)}
 		for name, got := range map[string][]time.Time{"registrations": registrations.purged, "email changes": users.purged} {
-			if len(got) != len(want) || !got[0].Equal(want[0]) || !got[1].Equal(want[1]) {
-				t.Errorf("%s purged with before = %v, want %v", name, got, want)
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("Run() %s purge cutoffs mismatch (-want +got):\n%s", name, diff)
 			}
 		}
 	})
@@ -71,7 +73,7 @@ func TestRunContinuesAfterError(t *testing.T) {
 			t.Fatalf("Run() error = %v, want nil", err)
 		}
 		if len(registrations.purged) != 2 || len(users.purged) != 2 {
-			t.Errorf("purged registrations %d times, email changes %d times; want 2 each", len(registrations.purged), len(users.purged))
+			t.Errorf("Run() purged registrations %d times, email changes %d times; want 2 each", len(registrations.purged), len(users.purged))
 		}
 	})
 }

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/nexus-commerce/user-service/internal/usecase"
 	"github.com/nexus-commerce/user-service/internal/user"
 )
@@ -38,8 +40,13 @@ func TestRenameServeHTTP(t *testing.T) {
 			calls := 0
 			uc := userRenamerFunc(func(ctx context.Context, got usecase.NameChange) (usecase.UserView, error) {
 				calls++
-				if ctx != req.Context() || got.UserID != id || got.FirstName == nil || *got.FirstName != "Janet" || got.LastName != nil {
-					t.Errorf("Execute() got context %v, change %+v; want request context, user %v, first name Janet, omitted last name", ctx, got, id)
+				if ctx != req.Context() {
+					t.Errorf("Execute() got context %v, want request context", ctx)
+				}
+				firstName := "Janet"
+				want := usecase.NameChange{UserID: id, FirstName: &firstName}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("Execute() change mismatch (-want +got):\n%s", diff)
 				}
 				return view, tt.ucErr
 			})
@@ -48,7 +55,7 @@ func TestRenameServeHTTP(t *testing.T) {
 			if calls != 1 {
 				t.Errorf("Execute() calls = %d, want 1", calls)
 			}
-			checkResponse(t, rec, tt.wantStatus, tt.wantBody)
+			checkResponse(t, "Rename.ServeHTTP()", rec, tt.wantStatus, tt.wantBody)
 		})
 	}
 }
