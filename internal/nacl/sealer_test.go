@@ -30,15 +30,18 @@ func TestSealerRoundTrip(t *testing.T) {
 
 func TestNewSealerRejectsInvalidInput(t *testing.T) {
 	valid := base64.StdEncoding.EncodeToString(make([]byte, 32))
-	tests := []struct{ name, key, keyID string }{
-		{"empty key", "", "k1"},
-		{"not base64", "%%%", "k1"},
-		{"wrong length", base64.StdEncoding.EncodeToString(make([]byte, 31)), "k1"},
-		{"empty key id", valid, ""},
+	tests := []struct {
+		name, key, keyID string
+		wantErr          error
+	}{
+		{name: "empty key", keyID: "k1", wantErr: ErrInvalidPublicKey},
+		{name: "not base64", key: "%%%", keyID: "k1", wantErr: ErrInvalidPublicKey},
+		{name: "wrong length", key: base64.StdEncoding.EncodeToString(make([]byte, 31)), keyID: "k1", wantErr: ErrInvalidPublicKey},
+		{name: "empty key id", key: valid, wantErr: ErrEmptyKeyID},
 	}
 	for _, tt := range tests {
-		if _, err := NewSealer(tt.key, tt.keyID); err == nil {
-			t.Errorf("NewSealer(%s) = _, nil; want error", tt.name)
+		if _, err := NewSealer(tt.key, tt.keyID); !errors.Is(err, tt.wantErr) {
+			t.Errorf("NewSealer(%s) error = %v, want %v", tt.name, err, tt.wantErr)
 		}
 	}
 }

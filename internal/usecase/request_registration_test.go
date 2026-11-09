@@ -98,16 +98,18 @@ func TestRequestRegistrationTakenEmailRecordsDuplicate(t *testing.T) {
 
 func TestRequestRegistrationHashesOnceInBothBranches(t *testing.T) {
 	for _, email := range []string{"new@example.com", "jane@example.com"} {
-		_, users := newJane(t)
-		regs := &fakeRegistrations{}
-		hasher := &countingHasher{}
+		t.Run(email, func(t *testing.T) {
+			_, users := newJane(t)
+			regs := &fakeRegistrations{}
+			hasher := &countingHasher{}
 
-		if err := usecase.NewRequestRegistration(users, regs, hasher).Execute(t.Context(), validRegistrationRequest(email)); err != nil {
-			t.Fatalf("Execute(%q) error: %v", email, err)
-		}
-		if hasher.hashes != 1 {
-			t.Errorf("Execute(%q) hashed %d times, want 1", email, hasher.hashes)
-		}
+			if err := usecase.NewRequestRegistration(users, regs, hasher).Execute(t.Context(), validRegistrationRequest(email)); err != nil {
+				t.Fatalf("Execute(%q) error: %v", email, err)
+			}
+			if hasher.hashes != 1 {
+				t.Errorf("Execute(%q) hashed %d times, want 1", email, hasher.hashes)
+			}
+		})
 	}
 }
 
