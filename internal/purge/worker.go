@@ -35,37 +35,37 @@ func NewWorker(registrations abandonedRegistrations, users expiredEmailChanges, 
 	return &Worker{registrations: registrations, users: users, opts: opts, logger: logger}
 }
 
-func (p *Worker) Run(ctx context.Context) error {
-	p.logger.Info("starting purge")
+func (w *Worker) Run(ctx context.Context) error {
+	w.logger.Info("starting purge")
 
-	ticker := time.NewTicker(p.opts.Interval)
+	ticker := time.NewTicker(w.opts.Interval)
 	defer ticker.Stop()
 
 	for {
-		p.purge(ctx)
+		w.purge(ctx)
 
 		select {
 		case <-ctx.Done():
-			p.logger.Info("stopping purge")
+			w.logger.Info("stopping purge")
 			return nil
 		case <-ticker.C:
 		}
 	}
 }
 
-func (p *Worker) purge(ctx context.Context) {
-	before := time.Now().Add(-p.opts.Grace)
-	p.runDeletion(ctx, "abandoned registrations", before, p.registrations.DeleteAbandonedRegistrations)
-	p.runDeletion(ctx, "expired email changes", before, p.users.DeleteExpiredEmailChanges)
+func (w *Worker) purge(ctx context.Context) {
+	before := time.Now().Add(-w.opts.Grace)
+	w.runDeletion(ctx, "abandoned registrations", before, w.registrations.DeleteAbandonedRegistrations)
+	w.runDeletion(ctx, "expired email changes", before, w.users.DeleteExpiredEmailChanges)
 }
 
-func (p *Worker) runDeletion(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
+func (w *Worker) runDeletion(ctx context.Context, what string, before time.Time, fn func(context.Context, time.Time) (int64, error)) {
 	n, err := fn(ctx, before)
 	if err != nil {
-		p.logger.Error("purge failed", "what", what, "err", err)
+		w.logger.Error("purge failed", "what", what, "err", err)
 		return
 	}
 	if n > 0 {
-		p.logger.Info("purged", "what", what, "count", n)
+		w.logger.Info("purged", "what", what, "count", n)
 	}
 }
