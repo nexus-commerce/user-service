@@ -9,7 +9,7 @@ import (
 
 type requestRegistrationUsers interface {
 	EmailTaken(ctx context.Context, email user.Email) (bool, error)
-	UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error)
+	UpdateByEmail(ctx context.Context, email user.Email, update user.Update) (*user.User, error)
 }
 
 type requestRegistrationPending interface {

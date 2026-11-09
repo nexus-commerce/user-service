@@ -117,7 +117,7 @@ type vanishingEmailChange struct {
 	calls int
 }
 
-func (v *vanishingEmailChange) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error) {
+func (v *vanishingEmailChange) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update user.Update) (*user.User, error) {
 	v.calls++
 	if v.calls > 1 {
 		return nil, user.ErrNotFound

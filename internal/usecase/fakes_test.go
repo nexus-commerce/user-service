@@ -73,7 +73,7 @@ func (f *fakeUsers) EmailTaken(ctx context.Context, email user.Email) (bool, err
 	return err == nil, nil
 }
 
-func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, update user.Update) (*user.User, error) {
 	u, err := f.ByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (f *fakeUsers) UpdateByID(ctx context.Context, id uuid.UUID, update func(*u
 	return u, nil
 }
 
-func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, update user.Update) (*user.User, error) {
 	if f.vanishOnUpdateByEmail {
 		return nil, user.ErrNotFound
 	}
@@ -97,7 +97,7 @@ func (f *fakeUsers) UpdateByEmail(ctx context.Context, email user.Email, update 
 	return f.UpdateByID(ctx, u.ID(), update)
 }
 
-func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error) {
+func (f *fakeUsers) UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update user.Update) (*user.User, error) {
 	for id, u := range f.byID {
 		if p, ok := u.PendingEmailChange(); ok && p.TokenHash() == hash {
 			return f.UpdateByID(ctx, id, update)
@@ -217,7 +217,7 @@ func (f *fakeUsers) add(u *user.User) {
 	f.byID[u.ID()] = u
 }
 
-func (f *fakeUsers) apply(u *user.User, update func(*user.User) error) error {
+func (f *fakeUsers) apply(u *user.User, update user.Update) error {
 	if err := update(u); err != nil {
 		return err
 	}

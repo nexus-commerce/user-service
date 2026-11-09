@@ -25,6 +25,8 @@ type User struct {
 	events []Event
 }
 
+type Update func(*User) error
+
 type Reauthentication struct {
 	userID       uuid.UUID
 	passwordHash PasswordHash

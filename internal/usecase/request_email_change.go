@@ -11,7 +11,7 @@ import (
 type requestEmailChangeUsers interface {
 	ByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 	EmailTaken(ctx context.Context, email user.Email) (bool, error)
-	UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error)
+	UpdateByID(ctx context.Context, id uuid.UUID, update user.Update) (*user.User, error)
 }
 
 type RequestEmailChange struct {

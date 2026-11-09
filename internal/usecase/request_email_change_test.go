@@ -83,7 +83,7 @@ type hashFreeUpdates struct {
 	hasher *countingHasher
 }
 
-func (hf hashFreeUpdates) UpdateByID(ctx context.Context, id uuid.UUID, update func(*user.User) error) (*user.User, error) {
+func (hf hashFreeUpdates) UpdateByID(ctx context.Context, id uuid.UUID, update user.Update) (*user.User, error) {
 	hf.t.Helper()
 	before := hf.hasher.verifies
 	u, err := hf.fakeUsers.UpdateByID(ctx, id, update)

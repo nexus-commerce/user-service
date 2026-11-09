@@ -8,7 +8,7 @@ import (
 )
 
 type confirmEmailChangeUsers interface {
-	UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.User) error) (*user.User, error)
+	UpdateByEmailChangeToken(ctx context.Context, hash user.ConfirmationTokenHash, update user.Update) (*user.User, error)
 }
 
 type ConfirmEmailChange struct {
