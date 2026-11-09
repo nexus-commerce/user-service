@@ -10,6 +10,8 @@ func NewHealth() *Health {
 	return &Health{}
 }
 
+// ServeHTTP reports that the service is healthy.
+//
 // @Summary     Health Check
 // @Description Returns 200 OK when the service is healthy
 // @Tags        System

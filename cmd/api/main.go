@@ -45,6 +45,7 @@ type appConfig struct {
 // @description                JWT token in the format "Bearer {token}"
 //
 // @securityDefinitions.basic BasicAuth
+
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(logger); err != nil {

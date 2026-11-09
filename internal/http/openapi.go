@@ -22,6 +22,8 @@ func NewOpenAPIDocs() *OpenAPIDocs {
 	return &OpenAPIDocs{}
 }
 
+// ServeHTTP serves the interactive API reference UI.
+//
 // @Summary     API Documentation
 // @Description Serves the interactive API reference UI
 // @Tags        System
@@ -38,10 +40,10 @@ func (*OpenAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *OpenAPIDocs) Route() Route {
+func (d *OpenAPIDocs) Route() Route {
 	return Route{
 		Pattern: "GET /docs/openapi",
-		Handler: h,
+		Handler: d,
 		Auth:    AuthBasic,
 	}
 }
@@ -54,6 +56,8 @@ func NewOpenAPI(spec string) *OpenAPI {
 	return &OpenAPI{spec: []byte(spec)}
 }
 
+// ServeHTTP serves the OpenAPI specification.
+//
 // @Summary     API Specification
 // @Description Serves the OpenAPI specification used by the API reference UI
 // @Tags        System
@@ -62,18 +66,18 @@ func NewOpenAPI(spec string) *OpenAPI {
 // @Success     200  {object}  object  "OpenAPI 2.0 specification"
 // @Failure     401  {object}  errorResponse  "Missing or invalid credentials"
 // @Router      /docs/openapi.json [get]
-func (h *OpenAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (o *OpenAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
-	if _, err := rw.Write(h.spec); err != nil {
+	if _, err := rw.Write(o.spec); err != nil {
 		logRequestError(r, "write response", err)
 	}
 }
 
-func (h *OpenAPI) Route() Route {
+func (o *OpenAPI) Route() Route {
 	return Route{
 		Pattern: "GET /docs/openapi.json",
-		Handler: h,
+		Handler: o,
 		Auth:    AuthBasic,
 	}
 }

@@ -28,6 +28,8 @@ func NewAsyncAPIDocs() *AsyncAPIDocs {
 	return &AsyncAPIDocs{}
 }
 
+// ServeHTTP serves the interactive AsyncAPI reference UI.
+//
 // @Summary     Events Documentation
 // @Description Serves the interactive AsyncAPI reference UI for the events this service publishes
 // @Tags        System
@@ -44,10 +46,10 @@ func (*AsyncAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *AsyncAPIDocs) Route() Route {
+func (d *AsyncAPIDocs) Route() Route {
 	return Route{
 		Pattern: "GET /docs/asyncapi",
-		Handler: h,
+		Handler: d,
 		Auth:    AuthBasic,
 	}
 }
@@ -60,6 +62,8 @@ func NewAsyncAPI(spec []byte) *AsyncAPI {
 	return &AsyncAPI{spec: spec}
 }
 
+// ServeHTTP serves the AsyncAPI specification of the published events.
+//
 // @Summary     Events Specification
 // @Description Serves the AsyncAPI specification of the events this service publishes
 // @Tags        System
@@ -68,18 +72,18 @@ func NewAsyncAPI(spec []byte) *AsyncAPI {
 // @Success     200  {string}  string  "AsyncAPI 3.0 specification"
 // @Failure     401  {object}  errorResponse  "Missing or invalid credentials"
 // @Router      /docs/asyncapi.yaml [get]
-func (h *AsyncAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (a *AsyncAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/yaml")
 
-	if _, err := rw.Write(h.spec); err != nil {
+	if _, err := rw.Write(a.spec); err != nil {
 		logRequestError(r, "write response", err)
 	}
 }
 
-func (h *AsyncAPI) Route() Route {
+func (a *AsyncAPI) Route() Route {
 	return Route{
 		Pattern: "GET /docs/asyncapi.yaml",
-		Handler: h,
+		Handler: a,
 		Auth:    AuthBasic,
 	}
 }

@@ -39,6 +39,8 @@ type loginResponse struct {
 	Token string `json:"token"`
 }
 
+// ServeHTTP authenticates a user and returns a JWT token.
+//
 // @Summary     Login
 // @Description Authenticates a user by email and password and returns a JWT token
 // @Tags        Auth
@@ -51,14 +53,14 @@ type loginResponse struct {
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/login [post]
-func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (l *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	reqBody, err := readJSON[loginRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
 	}
 
-	token, err := h.uc.Execute(r.Context(), reqBody.toCredentials())
+	token, err := l.uc.Execute(r.Context(), reqBody.toCredentials())
 	if err != nil {
 		if errors.Is(err, user.ErrInvalidCredentials) {
 			writeError(rw, r, http.StatusUnauthorized, msgInvalidCredentials)
@@ -71,9 +73,9 @@ func (h *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, r, http.StatusOK, loginResponse{Token: token})
 }
 
-func (h *Login) Route() Route {
+func (l *Login) Route() Route {
 	return Route{
 		Pattern: "POST /auth/login",
-		Handler: h,
+		Handler: l,
 	}
 }

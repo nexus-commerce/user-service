@@ -34,7 +34,11 @@ func testDB(t *testing.T) *Database {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = admin.Close() })
+	t.Cleanup(func() {
+		if err := admin.Close(); err != nil {
+			t.Errorf("close admin db: %v", err)
+		}
+	})
 	schema := "postgres_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 	quoted := pgx.Identifier{schema}.Sanitize()
 	if _, err := admin.pool.ExecContext(ctx, "CREATE SCHEMA "+quoted); err != nil {
@@ -53,7 +57,11 @@ func testDB(t *testing.T) *Database {
 	}
 	config.RuntimeParams["search_path"] = schema
 	db := &Database{pool: stdlib.OpenDB(*config), logger: logger}
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("close test db: %v", err)
+		}
+	})
 	if err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}

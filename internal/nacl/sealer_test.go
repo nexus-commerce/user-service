@@ -68,10 +68,22 @@ func TestOpenerOpensSealed(t *testing.T) {
 }
 
 func TestOpenerRejectsForeignBox(t *testing.T) {
-	pub, _, _ := box.GenerateKey(rand.Reader)
-	_, otherPriv, _ := box.GenerateKey(rand.Reader)
-	s, _ := NewSealer(base64.StdEncoding.EncodeToString(pub[:]), "k1")
-	sealed, _ := s.Seal([]byte("token"))
+	pub, _, err := box.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error: %v", err)
+	}
+	_, otherPriv, err := box.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error: %v", err)
+	}
+	s, err := NewSealer(base64.StdEncoding.EncodeToString(pub[:]), "k1")
+	if err != nil {
+		t.Fatalf("NewSealer() error: %v", err)
+	}
+	sealed, err := s.Seal([]byte("token"))
+	if err != nil {
+		t.Fatalf("Seal() error: %v", err)
+	}
 
 	o, err := NewOpener(base64.StdEncoding.EncodeToString(otherPriv[:]))
 	if err != nil {

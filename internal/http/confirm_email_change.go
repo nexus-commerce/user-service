@@ -26,8 +26,11 @@ type confirmEmailChangeRequest struct {
 	Token string `json:"token"`
 }
 
+// ServeHTTP confirms a pending email change and makes the new email current.
+//
 // @Summary     Confirm email change
-// @Description Confirms a pending email change with the token from the confirmation link and makes the new email current
+// @Description Confirms a pending email change with the token from the confirmation link
+// @Description and makes the new email current
 // @Tags        Users
 // @Accept      json
 // @Produce     json
@@ -38,14 +41,14 @@ type confirmEmailChangeRequest struct {
 // @Failure     413  {object}  errorResponse  "Request body too large"
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/email/confirm [post]
-func (h *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (ce *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	reqBody, err := readJSON[confirmEmailChangeRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
 	}
 
-	err = h.uc.Execute(r.Context(), reqBody.Token)
+	err = ce.uc.Execute(r.Context(), reqBody.Token)
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrInvalidConfirmationToken):
@@ -65,9 +68,9 @@ func (h *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 	rw.WriteHeader(http.StatusNoContent)
 }
 
-func (h *ConfirmEmailChange) Route() Route {
+func (ce *ConfirmEmailChange) Route() Route {
 	return Route{
 		Pattern: "POST /users/email/confirm",
-		Handler: h,
+		Handler: ce,
 	}
 }

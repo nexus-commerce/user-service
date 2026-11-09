@@ -153,7 +153,7 @@ func (enc *encoder) encode(e user.Event) (messaging.Message, error) {
 	}, nil
 }
 
-type userRegistered struct {
+type registered struct {
 	UserID    string    `json:"userId"`
 	Email     string    `json:"email"`
 	FirstName string    `json:"firstName"`
@@ -162,7 +162,7 @@ type userRegistered struct {
 }
 
 func convertRegistered(e user.Registered) (any, error) {
-	return userRegistered{
+	return registered{
 		UserID:    e.AggregateID.String(),
 		Email:     e.Email.String(),
 		FirstName: e.FullName.FirstName().String(),
@@ -171,7 +171,7 @@ func convertRegistered(e user.Registered) (any, error) {
 	}, nil
 }
 
-type userRegistrationRequested struct {
+type registrationRequested struct {
 	UserID         string    `json:"userId"`
 	Email          string    `json:"email"`
 	FirstName      string    `json:"firstName"`
@@ -187,7 +187,7 @@ func (enc *encoder) convertRegistrationRequested(e user.RegistrationRequested) (
 	if err != nil {
 		return nil, fmt.Errorf("seal registration token: %w", err)
 	}
-	return userRegistrationRequested{
+	return registrationRequested{
 		UserID:         e.AggregateID.String(),
 		Email:          e.Email.String(),
 		FirstName:      e.FullName.FirstName().String(),
@@ -199,33 +199,33 @@ func (enc *encoder) convertRegistrationRequested(e user.RegistrationRequested) (
 	}, nil
 }
 
-type userRegistrationConfirmed struct {
+type registrationConfirmed struct {
 	UserID      string    `json:"userId"`
 	ConfirmedAt time.Time `json:"confirmedAt"`
 }
 
 func convertRegistrationConfirmed(e user.RegistrationConfirmed) (any, error) {
-	return userRegistrationConfirmed{
+	return registrationConfirmed{
 		UserID:      e.AggregateID.String(),
 		ConfirmedAt: e.OccurredAt,
 	}, nil
 }
 
-type userRegistrationRejected struct {
+type registrationRejected struct {
 	UserID     string    `json:"userId"`
 	Email      string    `json:"email"`
 	RejectedAt time.Time `json:"rejectedAt"`
 }
 
 func convertRegistrationRejected(e user.RegistrationRejected) (any, error) {
-	return userRegistrationRejected{
+	return registrationRejected{
 		UserID:     e.AggregateID.String(),
 		Email:      e.Email.String(),
 		RejectedAt: e.OccurredAt,
 	}, nil
 }
 
-type userDuplicateRegistrationAttempted struct {
+type duplicateRegistrationAttempted struct {
 	UserID      string    `json:"userId"`
 	FirstName   string    `json:"firstName"`
 	LastName    string    `json:"lastName"`
@@ -234,7 +234,7 @@ type userDuplicateRegistrationAttempted struct {
 }
 
 func convertDuplicateRegistrationAttempted(e user.DuplicateRegistrationAttempted) (any, error) {
-	return userDuplicateRegistrationAttempted{
+	return duplicateRegistrationAttempted{
 		UserID:      e.AggregateID.String(),
 		FirstName:   e.FullName.FirstName().String(),
 		LastName:    e.FullName.LastName().String(),
@@ -243,7 +243,7 @@ func convertDuplicateRegistrationAttempted(e user.DuplicateRegistrationAttempted
 	}, nil
 }
 
-type userRenamed struct {
+type renamed struct {
 	UserID    string    `json:"userId"`
 	FirstName string    `json:"firstName"`
 	LastName  string    `json:"lastName"`
@@ -251,7 +251,7 @@ type userRenamed struct {
 }
 
 func convertRenamed(e user.Renamed) (any, error) {
-	return userRenamed{
+	return renamed{
 		UserID:    e.AggregateID.String(),
 		FirstName: e.FullName.FirstName().String(),
 		LastName:  e.FullName.LastName().String(),
@@ -259,7 +259,7 @@ func convertRenamed(e user.Renamed) (any, error) {
 	}, nil
 }
 
-type userEmailChangeRequested struct {
+type emailChangeRequested struct {
 	UserID         string    `json:"userId"`
 	FirstName      string    `json:"firstName"`
 	LastName       string    `json:"lastName"`
@@ -275,7 +275,7 @@ func (enc *encoder) convertEmailChangeRequested(e user.EmailChangeRequested) (an
 	if err != nil {
 		return nil, fmt.Errorf("seal email change token: %w", err)
 	}
-	return userEmailChangeRequested{
+	return emailChangeRequested{
 		UserID:         e.AggregateID.String(),
 		FirstName:      e.FullName.FirstName().String(),
 		LastName:       e.FullName.LastName().String(),
@@ -287,21 +287,21 @@ func (enc *encoder) convertEmailChangeRequested(e user.EmailChangeRequested) (an
 	}, nil
 }
 
-type userEmailChangeToTakenAddressAttempted struct {
+type emailChangeToTakenAddressAttempted struct {
 	UserID      string    `json:"userId"`
 	NewEmail    string    `json:"newEmail"`
 	AttemptedAt time.Time `json:"attemptedAt"`
 }
 
 func convertEmailChangeToTakenAddressAttempted(e user.EmailChangeToTakenAddressAttempted) (any, error) {
-	return userEmailChangeToTakenAddressAttempted{
+	return emailChangeToTakenAddressAttempted{
 		UserID:      e.AggregateID.String(),
 		NewEmail:    e.NewEmail.String(),
 		AttemptedAt: e.OccurredAt,
 	}, nil
 }
 
-type userEmailChanged struct {
+type emailChanged struct {
 	UserID    string    `json:"userId"`
 	FirstName string    `json:"firstName"`
 	LastName  string    `json:"lastName"`
@@ -311,7 +311,7 @@ type userEmailChanged struct {
 }
 
 func convertEmailChanged(e user.EmailChanged) (any, error) {
-	return userEmailChanged{
+	return emailChanged{
 		UserID:    e.AggregateID.String(),
 		FirstName: e.FullName.FirstName().String(),
 		LastName:  e.FullName.LastName().String(),
@@ -321,14 +321,14 @@ func convertEmailChanged(e user.EmailChanged) (any, error) {
 	}, nil
 }
 
-type userEmailChangeRejected struct {
+type emailChangeRejected struct {
 	UserID     string    `json:"userId"`
 	NewEmail   string    `json:"newEmail"`
 	RejectedAt time.Time `json:"rejectedAt"`
 }
 
 func convertEmailChangeRejected(e user.EmailChangeRejected) (any, error) {
-	return userEmailChangeRejected{
+	return emailChangeRejected{
 		UserID:     e.AggregateID.String(),
 		NewEmail:   e.NewEmail.String(),
 		RejectedAt: e.OccurredAt,

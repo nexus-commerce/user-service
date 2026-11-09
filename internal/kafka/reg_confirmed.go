@@ -23,15 +23,15 @@ func NewRegistrationConfirmed(uc registrationCompleter) *RegistrationConfirmed {
 	return &RegistrationConfirmed{uc: uc}
 }
 
-func (h *RegistrationConfirmed) EventType() string { return userevent.TypeRegistrationConfirmed }
+func (rc *RegistrationConfirmed) EventType() string { return userevent.TypeRegistrationConfirmed }
 
-func (h *RegistrationConfirmed) Handle(ctx context.Context, msg messaging.Message) error {
+func (rc *RegistrationConfirmed) Handle(ctx context.Context, msg messaging.Message) error {
 	userID, err := userevent.DecodeRegistrationConfirmed(msg.Value)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrPermanent, err)
 	}
 
-	err = h.uc.Execute(ctx, userID)
+	err = rc.uc.Execute(ctx, userID)
 	switch {
 	case errors.Is(err, user.ErrEmailTaken):
 		return nil

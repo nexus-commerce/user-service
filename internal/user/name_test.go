@@ -44,10 +44,10 @@ func TestNewName(t *testing.T) {
 }
 
 func TestFullNameWith(t *testing.T) {
-	jane, _ := user.NewName("Jane")
-	doe, _ := user.NewName("Doe")
-	janet, _ := user.NewName("Janet")
-	smith, _ := user.NewName("Smith")
+	jane := mustName(t, "Jane")
+	doe := mustName(t, "Doe")
+	janet := mustName(t, "Janet")
+	smith := mustName(t, "Smith")
 	orig := user.NewFullName(jane, doe)
 
 	if got := orig.WithFirstName(janet); got != user.NewFullName(janet, doe) {

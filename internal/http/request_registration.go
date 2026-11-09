@@ -49,8 +49,11 @@ func (r *registrationRequest) toRegistrationRequest() usecase.RegistrationReques
 	}
 }
 
+// ServeHTTP starts a registration.
+//
 // @Summary     Request registration
-// @Description Starts a registration: sends a confirmation link to a new email or an "account already exists" notice to a registered one.
+// @Description Starts a registration: sends a confirmation link to a new email
+// @Description or an "account already exists" notice to a registered one.
 // @Description The response does not reveal which.
 // @Tags        Auth
 // @Accept      json
@@ -61,14 +64,14 @@ func (r *registrationRequest) toRegistrationRequest() usecase.RegistrationReques
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register [post]
-func (h *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (rr *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	reqBody, err := readJSON[registrationRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
 	}
 
-	err = h.uc.Execute(r.Context(), reqBody.toRegistrationRequest())
+	err = rr.uc.Execute(r.Context(), reqBody.toRegistrationRequest())
 	if err != nil {
 		if errors.Is(err, user.ErrValidation) {
 			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registrationFields))
@@ -81,9 +84,9 @@ func (h *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request)
 	rw.WriteHeader(http.StatusAccepted)
 }
 
-func (h *RequestRegistration) Route() Route {
+func (rr *RequestRegistration) Route() Route {
 	return Route{
 		Pattern: "POST /auth/register",
-		Handler: h,
+		Handler: rr,
 	}
 }

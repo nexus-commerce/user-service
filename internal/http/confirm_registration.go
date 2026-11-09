@@ -30,10 +30,13 @@ type confirmRegistrationResponse struct {
 	Status string `json:"status"`
 }
 
+// ServeHTTP confirms a pending registration.
+//
 // @Summary     Confirm registration
 // @Description Confirms a pending registration with the token from the confirmation link.
-// @Description The account is created asynchronously: a user.registered event follows, or user.registration_rejected if the email was taken meanwhile.
-// @Description Log in via /auth/login once the account exists
+// @Description The account is created asynchronously: a user.registered event follows,
+// @Description or user.registration_rejected if the email was taken meanwhile.
+// @Description Log in via /auth/login once the account exists.
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
@@ -43,14 +46,14 @@ type confirmRegistrationResponse struct {
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register/confirm [post]
-func (h *ConfirmRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (cr *ConfirmRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	reqBody, err := readJSON[confirmRegistrationRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
 	}
 
-	if err := h.uc.Execute(r.Context(), reqBody.Token); err != nil {
+	if err := cr.uc.Execute(r.Context(), reqBody.Token); err != nil {
 		switch {
 		case errors.Is(err, user.ErrInvalidConfirmationToken):
 			writeError(rw, r, http.StatusBadRequest, msgInvalidConfirmationLink)
@@ -66,9 +69,9 @@ func (h *ConfirmRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request)
 	writeJSON(rw, r, http.StatusAccepted, confirmRegistrationResponse{Status: msgRegistrationConfirmed})
 }
 
-func (h *ConfirmRegistration) Route() Route {
+func (cr *ConfirmRegistration) Route() Route {
 	return Route{
 		Pattern: "POST /auth/register/confirm",
-		Handler: h,
+		Handler: cr,
 	}
 }

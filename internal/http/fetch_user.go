@@ -46,6 +46,8 @@ func toUserEnvelope(v usecase.UserView) userEnvelope {
 	}
 }
 
+// ServeHTTP returns the authenticated user.
+//
 // @Summary     Get current user
 // @Description Returns the authenticated user
 // @Tags        Users
@@ -56,14 +58,14 @@ func toUserEnvelope(v usecase.UserView) userEnvelope {
 // @Failure     404  {object}  errorResponse  "User not found"
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/me [get]
-func (h *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (fu *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := userIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
 		return
 	}
 
-	view, err := h.uc.Execute(r.Context(), userID)
+	view, err := fu.uc.Execute(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			writeError(rw, r, http.StatusNotFound, msgUserNotFound)
@@ -76,10 +78,10 @@ func (h *FetchUser) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, r, http.StatusOK, toUserEnvelope(view))
 }
 
-func (h *FetchUser) Route() Route {
+func (fu *FetchUser) Route() Route {
 	return Route{
 		Pattern: "GET /users/me",
-		Handler: h,
+		Handler: fu,
 		Auth:    AuthBearer,
 	}
 }

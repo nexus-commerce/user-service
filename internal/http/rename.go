@@ -42,8 +42,11 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 	}
 }
 
+// ServeHTTP partially changes the name of the authenticated user.
+//
 // @Summary     Rename user
-// @Description Partially changes the first and last name of the authenticated user; only provided fields are changed
+// @Description Partially changes the first and last name of the authenticated user;
+// @Description only provided fields are changed
 // @Tags        Users
 // @Accept      json
 // @Produce     json
@@ -56,7 +59,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /users/me/name [patch]
-func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (rn *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	userID, err := userIDFromContext(r.Context())
 	if err != nil {
 		writeInternalError(rw, r, err)
@@ -69,7 +72,7 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	view, err := h.uc.Execute(r.Context(), reqBody.toNameChange(userID))
+	view, err := rn.uc.Execute(r.Context(), reqBody.toNameChange(userID))
 	if err != nil {
 		switch {
 		case errors.Is(err, user.ErrValidation):
@@ -86,10 +89,10 @@ func (h *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, r, http.StatusOK, toUserEnvelope(view))
 }
 
-func (h *Rename) Route() Route {
+func (rn *Rename) Route() Route {
 	return Route{
 		Pattern: "PATCH /users/me/name",
-		Handler: h,
+		Handler: rn,
 		Auth:    AuthBearer,
 	}
 }

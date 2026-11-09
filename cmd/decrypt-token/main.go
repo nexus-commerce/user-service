@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -14,8 +14,10 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(); err != nil {
-		log.Fatal(err)
+		logger.Error("decrypt-token failed", "err", err)
+		os.Exit(1)
 	}
 }
 

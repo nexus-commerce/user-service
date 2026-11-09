@@ -23,7 +23,7 @@ func DecodeRegistrationConfirmed(value []byte) (uuid.UUID, error) {
 	if env.Type != TypeRegistrationConfirmed {
 		return uuid.UUID{}, fmt.Errorf("%w: event type %q, want %q", ErrMalformedMessage, env.Type, TypeRegistrationConfirmed)
 	}
-	var data userRegistrationConfirmed
+	var data registrationConfirmed
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		return uuid.UUID{}, fmt.Errorf("%w: decode %s data: %w", ErrMalformedMessage, TypeRegistrationConfirmed, err)
 	}

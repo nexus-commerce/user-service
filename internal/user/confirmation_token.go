@@ -25,7 +25,7 @@ type ConfirmationToken struct {
 
 func NewConfirmationToken() ConfirmationToken {
 	b := make([]byte, confirmationTokenBytes)
-	_, _ = rand.Read(b)
+	_, _ = rand.Read(b) // crypto/rand.Read never returns an error.
 	return ConfirmationToken{value: base64.RawURLEncoding.EncodeToString(b)}
 }
 
