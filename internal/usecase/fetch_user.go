@@ -7,15 +7,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type fetchUserUsers interface {
+type userLookup interface {
 	ByID(ctx context.Context, id uuid.UUID) (*user.User, error)
 }
 
 type FetchUser struct {
-	users fetchUserUsers
+	users userLookup
 }
 
-func NewFetchUser(users fetchUserUsers) *FetchUser {
+func NewFetchUser(users userLookup) *FetchUser {
 	return &FetchUser{
 		users: users,
 	}

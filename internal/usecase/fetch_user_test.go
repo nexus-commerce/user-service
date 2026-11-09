@@ -11,9 +11,9 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type fetchUserUsersFunc func(context.Context, uuid.UUID) (*user.User, error)
+type userLookupFunc func(context.Context, uuid.UUID) (*user.User, error)
 
-func (f fetchUserUsersFunc) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
+func (f userLookupFunc) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	return f(ctx, id)
 }
 
@@ -33,7 +33,7 @@ func TestFetchUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			u, users := newJane(t)
 			calls := 0
-			repo := fetchUserUsersFunc(func(ctx context.Context, id uuid.UUID) (*user.User, error) {
+			repo := userLookupFunc(func(ctx context.Context, id uuid.UUID) (*user.User, error) {
 				calls++
 				if ctx != t.Context() || id != u.ID() {
 					t.Errorf("ByID() got context %v, ID %v; want test context, %v", ctx, id, u.ID())

@@ -12,17 +12,17 @@ type requestRegistrationUsers interface {
 	UpdateByEmail(ctx context.Context, email user.Email, update func(*user.User) error) (*user.User, error)
 }
 
-type requestRegistrationRegistrations interface {
+type requestRegistrationPending interface {
 	Save(ctx context.Context, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error
 }
 
 type RequestRegistration struct {
 	users         requestRegistrationUsers
-	registrations requestRegistrationRegistrations
+	registrations requestRegistrationPending
 	hasher        user.Hasher
 }
 
-func NewRequestRegistration(users requestRegistrationUsers, registrations requestRegistrationRegistrations, hasher user.Hasher) *RequestRegistration {
+func NewRequestRegistration(users requestRegistrationUsers, registrations requestRegistrationPending, hasher user.Hasher) *RequestRegistration {
 	return &RequestRegistration{
 		users:         users,
 		registrations: registrations,

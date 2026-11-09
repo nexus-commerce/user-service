@@ -7,15 +7,15 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type confirmRegistrationRegistrations interface {
+type confirmRegistrationPending interface {
 	UpdateByToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.PendingRegistration) error) (*user.PendingRegistration, error)
 }
 
 type ConfirmRegistration struct {
-	registrations confirmRegistrationRegistrations
+	registrations confirmRegistrationPending
 }
 
-func NewConfirmRegistration(registrations confirmRegistrationRegistrations) *ConfirmRegistration {
+func NewConfirmRegistration(registrations confirmRegistrationPending) *ConfirmRegistration {
 	return &ConfirmRegistration{
 		registrations: registrations,
 	}

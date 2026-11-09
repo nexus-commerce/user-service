@@ -8,7 +8,7 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-type completeRegistrationRegistrations interface {
+type completeRegistrationPending interface {
 	ByUserID(ctx context.Context, id uuid.UUID) (*user.PendingRegistration, error)
 	Remove(ctx context.Context, p *user.PendingRegistration) error
 }
@@ -18,11 +18,11 @@ type completeRegistrationUsers interface {
 }
 
 type CompleteRegistration struct {
-	registrations completeRegistrationRegistrations
+	registrations completeRegistrationPending
 	users         completeRegistrationUsers
 }
 
-func NewCompleteRegistration(registrations completeRegistrationRegistrations, users completeRegistrationUsers) *CompleteRegistration {
+func NewCompleteRegistration(registrations completeRegistrationPending, users completeRegistrationUsers) *CompleteRegistration {
 	return &CompleteRegistration{
 		registrations: registrations,
 		users:         users,
