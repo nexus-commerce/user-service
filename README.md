@@ -10,12 +10,10 @@ This service deliberately merges two bounded contexts that would ideally be sepa
 - **Identity** (generic subdomain) — credentials, login, confirmation tokens, email ownership.
 - **Customer** (supporting subdomain) — the person's profile (name, and whatever the shop needs later).
 
-Neither is the platform's core domain, so neither warrants its own bounded context;
-a single `user` context is a deliberate trade-off, not a shortcut.
-
-In a production system, Identity would be delegated to an off-the-shelf provider
-(Keycloak, Auth0, Zitadel). Here it is built in-house on purpose: this is a learning
-project, and modelling registration, confirmation and email change is part of the goal.
+Identity and Customer share a single `user` bounded context because the model is small.
+This learning project implements Identity in-house to explore registration, confirmation
+and email change; a production system would delegate it to an off-the-shelf provider
+such as Keycloak, Auth0 or Zitadel.
 
 The model mostly keeps them apart: authentication and confirmation flows on one side,
 `Rename` on the other. The seam is not perfectly clean: registration collects the name
