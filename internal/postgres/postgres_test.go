@@ -343,7 +343,11 @@ func TestSaveSupersedesUnconfirmedRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ByUserID(first) error: %v", err)
 	}
-	if p.FullName() != again.FullName() || p.PasswordHash() != again.PasswordHash() || p.TokenHash() != superseded.TokenHash() || !p.ExpiresAt().After(first.ExpiresAt()) {
+	replaced := p.FullName() == again.FullName() &&
+		p.PasswordHash() == again.PasswordHash() &&
+		p.TokenHash() == superseded.TokenHash() &&
+		p.ExpiresAt().After(first.ExpiresAt())
+	if !replaced {
 		t.Error("unconfirmed registration was not superseded")
 	}
 	r.assertState(t, first.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})

@@ -90,7 +90,8 @@ func TestRequestEmailChangeVerifiesPasswordOutsideUpdate(t *testing.T) {
 			newUser(t, users, "john@example.com", "John", "Roe")
 			hasher := &countingHasher{}
 
-			err := usecase.NewRequestEmailChange(hashFreeUpdates{fakeUsers: users, t: t, hasher: hasher}, hasher).Execute(t.Context(), usecase.EmailChangeRequest{
+			uc := usecase.NewRequestEmailChange(hashFreeUpdates{fakeUsers: users, t: t, hasher: hasher}, hasher)
+			err := uc.Execute(t.Context(), usecase.EmailChangeRequest{
 				UserID:   u.ID(),
 				NewEmail: newEmail,
 				Password: "s3cretpass",

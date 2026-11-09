@@ -28,9 +28,10 @@ func TestRequestRegistrationServeHTTP(t *testing.T) {
 		{name: "password mismatch", ucErr: &usecase.FieldError{Field: usecase.FieldPasswordConfirmation, Err: usecase.ErrPasswordMismatch}, wantStatus: http.StatusBadRequest, wantBody: `{"error":"passwordConfirmation: passwords do not match"}`},
 		{name: "unexpected error", ucErr: errors.New("private database details"), wantStatus: http.StatusInternalServerError, wantBody: `{"error":"internal server error"}`},
 	}
+	const body = `{"firstName":"Jane","lastName":"Doe","email":"jane@example.com","password":"secretpass","passwordConfirmation":"secretpass"}`
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/register", strings.NewReader(`{"firstName":"Jane","lastName":"Doe","email":"jane@example.com","password":"secretpass","passwordConfirmation":"secretpass"}`))
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/register", strings.NewReader(body))
 			calls := 0
 			uc := registrationRequesterFunc(func(ctx context.Context, got usecase.RegistrationRequest) error {
 				calls++

@@ -52,7 +52,10 @@ func TestRequestRegistrationRecordsEvent(t *testing.T) {
 		if e.Token.Hash() != p.TokenHash() || p.TokenHash() != tok.Hash() {
 			t.Errorf("token hash = %q, pending hash = %q, want equal", e.Token.Hash().Encoded(), p.TokenHash().Encoded())
 		}
-		if !e.OccurredAt.Equal(time.Now()) || !e.ExpiresAt.Equal(p.ExpiresAt()) || !e.ExpiresAt.Equal(e.OccurredAt.Add(24*time.Hour)) {
+		timed := e.OccurredAt.Equal(time.Now()) &&
+			e.ExpiresAt.Equal(p.ExpiresAt()) &&
+			e.ExpiresAt.Equal(e.OccurredAt.Add(24*time.Hour))
+		if !timed {
 			t.Errorf("OccurredAt = %v, ExpiresAt = %v, pending ExpiresAt = %v", e.OccurredAt, e.ExpiresAt, p.ExpiresAt())
 		}
 		if got := p.PasswordHash().Encoded(); got != "hashed:s3cretpass" {
@@ -165,7 +168,12 @@ func TestSupersedeRenewsRegistration(t *testing.T) {
 			t.Fatalf("Events() len = %d, want 2", n)
 		}
 		e := lastRequested(t, p)
-		if e.AggregateID != id || e.Email != email || e.FullName != name || !e.OccurredAt.Equal(time.Now()) || !e.ExpiresAt.Equal(p.ExpiresAt()) {
+		matches := e.AggregateID == id &&
+			e.Email == email &&
+			e.FullName == name &&
+			e.OccurredAt.Equal(time.Now()) &&
+			e.ExpiresAt.Equal(p.ExpiresAt())
+		if !matches {
 			t.Errorf("RegistrationRequested = %+v does not match superseded registration", e)
 		}
 		if e.Token.Hash() != p.TokenHash() {
@@ -258,7 +266,11 @@ func TestCompleteCreatesRegisteredUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Complete() error: %v", err)
 	}
-	if u.ID() != p.UserID() || u.Email() != p.Email() || u.FullName() != p.FullName() || u.PasswordHash() != p.PasswordHash() {
+	matches := u.ID() == p.UserID() &&
+		u.Email() == p.Email() &&
+		u.FullName() == p.FullName() &&
+		u.PasswordHash() == p.PasswordHash()
+	if !matches {
 		t.Errorf("Complete() = {id: %v, email: %q, hash: %q}, want {id: %v, email: %q, hash: %q}",
 			u.ID(), u.Email(), u.PasswordHash().Encoded(), p.UserID(), p.Email(), p.PasswordHash().Encoded())
 	}

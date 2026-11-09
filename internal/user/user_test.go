@@ -173,7 +173,11 @@ func TestRename(t *testing.T) {
 		if u.FullName().LastName().String() != "Smith" || len(events) != 1 {
 			t.Fatalf("after Rename: lastName=%q, %d Renamed; want Smith, 1", u.FullName().LastName(), len(events))
 		}
-		if e := events[0]; e.AggregateID != u.ID() || e.FullName.FirstName().String() != "Jane" || e.FullName.LastName().String() != "Smith" {
+		e := events[0]
+		matches := e.AggregateID == u.ID() &&
+			e.FullName.FirstName().String() == "Jane" &&
+			e.FullName.LastName().String() == "Smith"
+		if !matches {
 			t.Errorf("Renamed = %+v", e)
 		}
 	})
@@ -208,10 +212,19 @@ func TestRequestEmailChange(t *testing.T) {
 			}
 			p, ok := u.PendingEmailChange()
 			events := eventsOf[user.EmailChangeRequested](u)
-			if !ok || p.Email().String() != "new@example.com" || !p.ExpiresAt().Equal(now.Add(24*time.Hour)) || len(events) != 1 {
+			requested := ok &&
+				p.Email().String() == "new@example.com" &&
+				p.ExpiresAt().Equal(now.Add(24*time.Hour)) &&
+				len(events) == 1
+			if !requested {
 				t.Fatalf("pending = %+v, %v; %d events", p, ok, len(events))
 			}
-			if e := events[0]; e.Token.Hash() != p.TokenHash() || e.NewEmail != p.Email() || !e.ExpiresAt.Equal(p.ExpiresAt()) || !e.OccurredAt.Equal(now) {
+			e := events[0]
+			matches := e.Token.Hash() == p.TokenHash() &&
+				e.NewEmail == p.Email() &&
+				e.ExpiresAt.Equal(p.ExpiresAt()) &&
+				e.OccurredAt.Equal(now)
+			if !matches {
 				t.Errorf("EmailChangeRequested = %+v does not match pending %+v", e, p)
 			}
 		})
@@ -259,7 +272,11 @@ func TestRequestEmailChangeToTakenAddress(t *testing.T) {
 			if len(events) != 1 {
 				t.Fatalf("recorded %d EmailChangeToTakenAddressAttempted, want 1", len(events))
 			}
-			if e := events[0]; e.AggregateID != u.ID() || e.NewEmail.String() != "taken@example.com" || !e.OccurredAt.Equal(time.Now()) {
+			e := events[0]
+			matches := e.AggregateID == u.ID() &&
+				e.NewEmail.String() == "taken@example.com" &&
+				e.OccurredAt.Equal(time.Now())
+			if !matches {
 				t.Errorf("EmailChangeToTakenAddressAttempted = %+v", e)
 			}
 		})
@@ -369,7 +386,11 @@ func TestConfirmEmailChange(t *testing.T) {
 			if _, ok := u.PendingEmailChange(); ok || u.Email().String() != "new@example.com" || len(events) != 1 {
 				t.Fatalf("after confirm: email=%q pending=%v events=%d", u.Email(), ok, len(events))
 			}
-			if e := events[0]; e.OldEmail.String() != "jane@example.com" || e.NewEmail.String() != "new@example.com" || !e.OccurredAt.Equal(time.Now()) {
+			e := events[0]
+			matches := e.OldEmail.String() == "jane@example.com" &&
+				e.NewEmail.String() == "new@example.com" &&
+				e.OccurredAt.Equal(time.Now())
+			if !matches {
 				t.Errorf("EmailChanged = %+v", e)
 			}
 		})
@@ -415,7 +436,11 @@ func TestRejectEmailChange(t *testing.T) {
 			if len(events) != 1 {
 				t.Fatalf("recorded %d EmailChangeRejected, want 1", len(events))
 			}
-			if e := events[0]; e.AggregateID != u.ID() || e.NewEmail.String() != "new@example.com" || !e.OccurredAt.Equal(time.Now()) {
+			e := events[0]
+			matches := e.AggregateID == u.ID() &&
+				e.NewEmail.String() == "new@example.com" &&
+				e.OccurredAt.Equal(time.Now())
+			if !matches {
 				t.Errorf("EmailChangeRejected = %+v", e)
 			}
 		})
