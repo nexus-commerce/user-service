@@ -62,7 +62,7 @@ func (r *fakeReader) CommitMessages(_ context.Context, msgs ...kafka.Message) er
 	return nil
 }
 
-func (r *fakeReader) Close() error { return nil }
+func (*fakeReader) Close() error { return nil }
 
 func confirmedKafkaMessage(offset int64) kafka.Message {
 	return kafka.Message{

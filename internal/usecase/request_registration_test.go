@@ -50,7 +50,7 @@ func TestRequestRegistration(t *testing.T) {
 				t.Errorf("Execute() error = %v, want FieldError for %v", err, tt.wantField)
 			}
 			if len(regs.byEmail) != 0 {
-				t.Errorf("Save stored %d pending registrations, want 0", len(regs.byEmail))
+				t.Errorf("Execute() saved %d pending registrations, want 0", len(regs.byEmail))
 			}
 		})
 	}
@@ -71,11 +71,17 @@ func TestRequestRegistrationNewEmailSavesPending(t *testing.T) {
 	if !ok {
 		t.Fatal("no pending registration for jane@example.com")
 	}
-	if p.FullName().FirstName().String() != "Jane" || p.FullName().LastName().String() != "Doe" {
-		t.Errorf("pending name = %s %s, want Jane Doe", p.FullName().FirstName(), p.FullName().LastName())
+	type nameFields struct {
+		FirstName string
+		LastName  string
+	}
+	got := nameFields{FirstName: p.FullName().FirstName().String(), LastName: p.FullName().LastName().String()}
+	want := nameFields{FirstName: "Jane", LastName: "Doe"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Execute() pending name mismatch (-want +got):\n%s", diff)
 	}
 	if len(users.byID) != 0 {
-		t.Errorf("users has %d entries, want 0", len(users.byID))
+		t.Errorf("Execute() added %d users, want 0", len(users.byID))
 	}
 }
 
@@ -87,12 +93,12 @@ func TestRequestRegistrationTakenEmailRecordsDuplicate(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 	if len(regs.byEmail) != 0 {
-		t.Errorf("saved %d pending registrations, want 0", len(regs.byEmail))
+		t.Errorf("Execute() saved %d pending registrations, want 0", len(regs.byEmail))
 	}
 	events := jane.Events()
 	last := events[len(events)-1]
 	if _, ok := last.(user.DuplicateRegistrationAttempted); !ok {
-		t.Errorf("last event = %T, want user.DuplicateRegistrationAttempted", last)
+		t.Errorf("Execute() last event = %T, want user.DuplicateRegistrationAttempted", last)
 	}
 }
 
@@ -122,7 +128,7 @@ func TestRequestRegistrationDuplicateUserVanished(t *testing.T) {
 		t.Errorf("Execute() error: %v", err)
 	}
 	if len(regs.byEmail) != 0 {
-		t.Errorf("saved %d pending registrations, want 0", len(regs.byEmail))
+		t.Errorf("Execute() saved %d pending registrations, want 0", len(regs.byEmail))
 	}
 }
 
@@ -143,7 +149,7 @@ func TestRequestRegistrationAgainSupersedesPending(t *testing.T) {
 		t.Fatalf("second Execute() error: %v", err)
 	}
 	if len(regs.byEmail) != 1 {
-		t.Fatalf("saved %d pending registrations, want 1", len(regs.byEmail))
+		t.Errorf("second Execute() left %d pending registrations, want 1", len(regs.byEmail))
 	}
 	type registrationFields struct {
 		UserID       uuid.UUID
@@ -160,7 +166,7 @@ func TestRequestRegistrationAgainSupersedesPending(t *testing.T) {
 	}
 	want := registrationFields{UserID: id, FirstName: "Janet", LastName: "Doe", PasswordHash: "hashed:n3wpassword"}
 	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("registration mismatch (-want +got):\n%s", diff)
+		t.Errorf("second Execute() stored registration mismatch (-want +got):\n%s", diff)
 	}
 	second := tokenFor(t, regs, "jane@example.com")
 
@@ -181,10 +187,16 @@ func TestRequestRegistrationKeepsConfirmedRegistration(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 	p := pendingJane(t, regs)
-	if p.UserID() != id || !p.Confirmed() {
-		t.Errorf("registration = {id: %v, confirmed: %v}, want {id: %v, confirmed: true}", p.UserID(), p.Confirmed(), id)
+	type registrationFields struct {
+		UserID    uuid.UUID
+		Confirmed bool
+	}
+	got := registrationFields{UserID: p.UserID(), Confirmed: p.Confirmed()}
+	want := registrationFields{UserID: id, Confirmed: true}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Execute() registration mismatch (-want +got):\n%s", diff)
 	}
 	if len(regs.published) != published {
-		t.Errorf("published %d new events, want 0", len(regs.published)-published)
+		t.Errorf("Execute() published %d new events, want 0", len(regs.published)-published)
 	}
 }

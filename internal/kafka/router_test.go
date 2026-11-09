@@ -50,7 +50,7 @@ func TestRouteSkipsUnknownType(t *testing.T) {
 		t.Fatalf("route() error: %v", err)
 	}
 	if h.calls != 0 {
-		t.Errorf("handler called %d times, want 0", h.calls)
+		t.Errorf("route() called the handler %d times, want 0", h.calls)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestRouteSkipsPermanentFailure(t *testing.T) {
 		t.Fatalf("route() error: %v", err)
 	}
 	if h.calls != 1 {
-		t.Errorf("handler called %d times, want 1", h.calls)
+		t.Errorf("route() called the handler %d times, want 1", h.calls)
 	}
 }
 
@@ -74,10 +74,10 @@ func TestRouteRetriesWithBackoff(t *testing.T) {
 			t.Fatalf("route() error: %v", err)
 		}
 		if h.calls != 4 {
-			t.Errorf("handler called %d times, want 4", h.calls)
+			t.Errorf("route() called the handler %d times, want 4", h.calls)
 		}
 		if got, want := time.Since(start), 700*time.Millisecond; got != want {
-			t.Errorf("retried for %v, want %v", got, want)
+			t.Errorf("route() retried for %v, want %v", got, want)
 		}
 	})
 }
@@ -101,7 +101,7 @@ func TestRouteCapsBackoff(t *testing.T) {
 			delay = min(delay*2, maxRetryDelay)
 		}
 		if got := time.Since(start); got != want {
-			t.Errorf("retried for %v, want %v", got, want)
+			t.Errorf("route() retried for %v, want %v", got, want)
 		}
 	})
 }
@@ -116,7 +116,7 @@ func TestRouteStopsOnCancel(t *testing.T) {
 			t.Fatalf("route() error = %v, want %v", err, context.Canceled)
 		}
 		if h.calls != 1 {
-			t.Errorf("handler called %d times, want 1", h.calls)
+			t.Errorf("route() called the handler %d times, want 1", h.calls)
 		}
 	})
 }

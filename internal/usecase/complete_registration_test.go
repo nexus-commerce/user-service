@@ -34,10 +34,10 @@ func TestCompleteRegistrationCreatesUser(t *testing.T) {
 		t.Fatalf("ByID() error: %v", err)
 	}
 	if n := len(publishedOf[user.Registered](u.Events())); n != 1 {
-		t.Errorf("user has %d Registered events, want 1", n)
+		t.Errorf("Execute() recorded %d Registered events, want 1", n)
 	}
 	if len(regs.byEmail) != 0 {
-		t.Errorf("%d pending registrations left, want 0", len(regs.byEmail))
+		t.Errorf("Execute() left %d pending registrations, want 0", len(regs.byEmail))
 	}
 }
 
@@ -51,7 +51,7 @@ func TestCompleteRegistrationIsIdempotent(t *testing.T) {
 		}
 	}
 	if len(users.byID) != 1 || users.addCalls != 1 {
-		t.Errorf("users = %d, Add calls = %d; want 1, 1", len(users.byID), users.addCalls)
+		t.Errorf("Execute() twice: users = %d, Add calls = %d; want 1, 1", len(users.byID), users.addCalls)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestCompleteRegistrationRetriesAfterRemoveFailure(t *testing.T) {
 		t.Fatalf("retried Execute() error: %v", err)
 	}
 	if len(users.byID) != 1 || len(regs.byEmail) != 0 {
-		t.Errorf("users = %d, registrations = %d; want 1, 0", len(users.byID), len(regs.byEmail))
+		t.Errorf("retried Execute(): users = %d, registrations = %d; want 1, 0", len(users.byID), len(regs.byEmail))
 	}
 }
 
@@ -79,7 +79,7 @@ func TestCompleteRegistrationMissingRegistration(t *testing.T) {
 		t.Errorf("Execute() error = %v, want nil", err)
 	}
 	if users.addCalls != 0 {
-		t.Errorf("Add calls = %d, want 0", users.addCalls)
+		t.Errorf("Execute() made %d Add calls, want 0", users.addCalls)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestCompleteRegistrationUnconfirmed(t *testing.T) {
 		t.Errorf("Execute() error = %v, want %v", err, user.ErrRegistrationNotConfirmed)
 	}
 	if len(users.byID) != 0 || len(regs.byEmail) != 1 {
-		t.Errorf("users = %d, registrations = %d; want 0, 1", len(users.byID), len(regs.byEmail))
+		t.Errorf("Execute(): users = %d, registrations = %d; want 0, 1", len(users.byID), len(regs.byEmail))
 	}
 }
 
@@ -125,7 +125,7 @@ func TestCompleteRegistrationRejectFailure(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, want)
 	}
 	if len(regs.byEmail) != 1 {
-		t.Errorf("%d pending registrations left, want 1", len(regs.byEmail))
+		t.Errorf("Execute() left %d pending registrations, want 1", len(regs.byEmail))
 	}
 }
 
@@ -138,6 +138,6 @@ func TestCompleteRegistrationAddFailureKeepsRegistration(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, want)
 	}
 	if !pendingJane(t, regs).Confirmed() {
-		t.Error("confirmed registration lost after Add failure")
+		t.Error("Execute() lost the confirmed registration after Add failure")
 	}
 }

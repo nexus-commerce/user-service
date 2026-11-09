@@ -48,7 +48,7 @@ func TestConfirmEmailChange(t *testing.T) {
 		t.Fatalf("Execute() error: %v", err)
 	}
 	if got := u.Email().String(); got != "new@example.com" {
-		t.Errorf("Email() = %q, want new@example.com", got)
+		t.Errorf("after Execute() Email() = %q, want new@example.com", got)
 	}
 	var changed int
 	for _, e := range u.Events() {
@@ -57,7 +57,7 @@ func TestConfirmEmailChange(t *testing.T) {
 		}
 	}
 	if changed != 1 {
-		t.Errorf("recorded %d EmailChanged events, want 1", changed)
+		t.Errorf("Execute() recorded %d EmailChanged events, want 1", changed)
 	}
 }
 

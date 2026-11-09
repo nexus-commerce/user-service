@@ -23,7 +23,7 @@ func NewRegistrationConfirmed(uc registrationCompleter) *RegistrationConfirmed {
 	return &RegistrationConfirmed{uc: uc}
 }
 
-func (rc *RegistrationConfirmed) EventType() string { return userevent.TypeRegistrationConfirmed }
+func (*RegistrationConfirmed) EventType() string { return userevent.TypeRegistrationConfirmed }
 
 func (rc *RegistrationConfirmed) Handle(ctx context.Context, msg messaging.Message) error {
 	userID, err := userevent.DecodeRegistrationConfirmed(msg.Value)

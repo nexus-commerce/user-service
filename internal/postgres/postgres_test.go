@@ -173,19 +173,19 @@ func (r testRepos) count(t *testing.T, query string, args ...any) int {
 	return n
 }
 
-func (r testRepos) assertState(t *testing.T, id uuid.UUID, wantUsers, wantPending int, wantEvents map[string]int) {
+func (r testRepos) assertState(t *testing.T, step string, id uuid.UUID, wantUsers, wantPending int, wantEvents map[string]int) {
 	t.Helper()
 	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1`, id.String()); got != wantUsers {
-		t.Errorf("users with id %v = %d, want %d", id, got, wantUsers)
+		t.Errorf("after %s: users with id %v = %d, want %d", step, id, got, wantUsers)
 	}
 	if got := r.count(t, `SELECT count(*) FROM pending_registrations WHERE user_id = $1`, id.String()); got != wantPending {
-		t.Errorf("pending registrations for %v = %d, want %d", id, got, wantPending)
+		t.Errorf("after %s: pending registrations for %v = %d, want %d", step, id, got, wantPending)
 	}
 	query := `SELECT count(*) FROM outbox WHERE key = convert_to($1, 'UTF8') AND headers->>$2 = $3`
 	for typ, want := range wantEvents {
 		got := r.count(t, query, id.String(), messaging.HeaderEventType, typ)
 		if got != want {
-			t.Errorf("outbox %s events for %v = %d, want %d", typ, id, got, want)
+			t.Errorf("after %s: outbox %s events for %v = %d, want %d", step, typ, id, got, want)
 		}
 	}
 }
@@ -197,7 +197,7 @@ func TestConfirmThenCompleteRegistration(t *testing.T) {
 	if err := r.confirm().Execute(t.Context(), token.Plaintext()); err != nil {
 		t.Fatalf("ConfirmRegistration.Execute() error: %v", err)
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{
+	r.assertState(t, "ConfirmRegistration.Execute()", pending.UserID(), 0, 1, map[string]int{
 		userevent.TypeRegistrationConfirmed: 1,
 		"user.registered":                   0,
 	})
@@ -207,7 +207,7 @@ func TestConfirmThenCompleteRegistration(t *testing.T) {
 			t.Fatalf("CompleteRegistration.Execute() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, pending.UserID(), 1, 0, map[string]int{
+	r.assertState(t, "CompleteRegistration.Execute()", pending.UserID(), 1, 0, map[string]int{
 		userevent.TypeRegistrationConfirmed: 1,
 		"user.registered":                   1,
 	})
@@ -227,7 +227,7 @@ func TestCompleteRegistrationRejectsTakenEmail(t *testing.T) {
 	if err := r.complete().Execute(t.Context(), pending.UserID()); !errors.Is(err, user.ErrEmailTaken) {
 		t.Errorf("CompleteRegistration.Execute() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	r.assertState(t, pending.UserID(), 0, 0, map[string]int{
+	r.assertState(t, "CompleteRegistration.Execute()", pending.UserID(), 0, 0, map[string]int{
 		userevent.TypeRegistrationConfirmed: 1,
 		"user.registration_rejected":        1,
 		"user.registered":                   0,
@@ -257,7 +257,7 @@ func TestDuplicateRejectionPublishesOnce(t *testing.T) {
 			t.Errorf("Registrations.Remove() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, pending.UserID(), 0, 0, map[string]int{
+	r.assertState(t, "Registrations.Remove()", pending.UserID(), 0, 0, map[string]int{
 		"user.registration_rejected": 1,
 	})
 }
@@ -283,7 +283,7 @@ func TestUpdateByTokenRollsBackOnFailure(t *testing.T) {
 	if p.Confirmed() {
 		t.Error("Registrations.UpdateByToken() kept the confirmation after a failed update, want it rolled back")
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 0})
+	r.assertState(t, "Registrations.UpdateByToken()", pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 0})
 }
 
 func TestConcurrentConfirmation(t *testing.T) {
@@ -316,7 +316,7 @@ func TestConcurrentConfirmation(t *testing.T) {
 	if successes != 1 || invalid != 1 {
 		t.Errorf("concurrent ConfirmRegistration.Execute() successes, invalid tokens = %d, %d; want 1, 1", successes, invalid)
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 1})
+	r.assertState(t, "concurrent ConfirmRegistration.Execute()", pending.UserID(), 0, 1, map[string]int{userevent.TypeRegistrationConfirmed: 1})
 }
 
 func TestSaveKeepsConfirmedRegistration(t *testing.T) {
@@ -338,8 +338,8 @@ func TestSaveKeepsConfirmedRegistration(t *testing.T) {
 	if got, want := p.TokenHash().Encoded(), token.Hash().Encoded(); got != want {
 		t.Errorf("Registrations.Save() changed the token hash of a confirmed registration to %q, want %q", got, want)
 	}
-	r.assertState(t, pending.UserID(), 0, 1, map[string]int{"user.registration_requested": 0})
-	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+	r.assertState(t, "Registrations.Save()", pending.UserID(), 0, 1, map[string]int{"user.registration_requested": 0})
+	r.assertState(t, "Registrations.Save()", again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
 }
 
 func newTestRegistration(t *testing.T, email string, name user.FullName) *user.PendingRegistration {
@@ -383,8 +383,8 @@ func TestSaveSupersedesUnconfirmedRegistration(t *testing.T) {
 	if !p.ExpiresAt().After(first.ExpiresAt()) {
 		t.Errorf("Registrations.Save() ExpiresAt() = %v, want after %v", p.ExpiresAt(), first.ExpiresAt())
 	}
-	r.assertState(t, first.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
-	r.assertState(t, again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
+	r.assertState(t, "Registrations.Save()", first.UserID(), 0, 1, map[string]int{"user.registration_requested": 1})
+	r.assertState(t, "Registrations.Save()", again.UserID(), 0, 0, map[string]int{"user.registration_requested": 0})
 	if err := r.confirm().Execute(t.Context(), oldToken.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("ConfirmRegistration.Execute(superseded token) error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
@@ -433,7 +433,7 @@ func TestUsersAddIsIdempotent(t *testing.T) {
 			t.Fatalf("Users.Add() #%d error: %v", i+1, err)
 		}
 	}
-	r.assertState(t, u.ID(), 1, 1, map[string]int{"user.registered": 1})
+	r.assertState(t, "Users.Add()", u.ID(), 1, 1, map[string]int{"user.registered": 1})
 }
 
 func TestUsersAddEmailTaken(t *testing.T) {
@@ -451,7 +451,7 @@ func TestUsersAddEmailTaken(t *testing.T) {
 	if err := r.users.Add(t.Context(), u); !errors.Is(err, user.ErrEmailTaken) {
 		t.Errorf("Users.Add() error = %v, want %v", err, user.ErrEmailTaken)
 	}
-	r.assertState(t, u.ID(), 0, 1, map[string]int{"user.registered": 0})
+	r.assertState(t, "Users.Add()", u.ID(), 0, 1, map[string]int{"user.registered": 0})
 }
 
 func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
@@ -467,8 +467,8 @@ func TestDeleteAbandonedKeepsConfirmedRegistrations(t *testing.T) {
 	if n != 1 {
 		t.Errorf("DeleteAbandonedRegistrations() = %d, want 1", n)
 	}
-	r.assertState(t, unconfirmed.UserID(), 0, 0, nil)
-	r.assertState(t, confirmed.UserID(), 0, 1, nil)
+	r.assertState(t, "DeleteAbandonedRegistrations()", unconfirmed.UserID(), 0, 0, nil)
+	r.assertState(t, "DeleteAbandonedRegistrations()", confirmed.UserID(), 0, 1, nil)
 }
 
 func TestOutboxCarriesEventType(t *testing.T) {
@@ -682,7 +682,7 @@ func TestConfirmEmailChangeRejectsTakenEmail(t *testing.T) {
 	if got := r.count(t, `SELECT count(*) FROM pending_email_changes WHERE user_id = $1`, id.String()); got != 0 {
 		t.Errorf("pending email changes for %v = %d, want 0", id, got)
 	}
-	r.assertState(t, id, 1, 0, map[string]int{"user.email_change_rejected": 1, "user.email_changed": 0})
+	r.assertState(t, "ConfirmEmailChange.Execute()", id, 1, 0, map[string]int{"user.email_change_rejected": 1, "user.email_changed": 0})
 	if err := confirm.Execute(t.Context(), token.Plaintext()); !errors.Is(err, user.ErrInvalidConfirmationToken) {
 		t.Errorf("repeated ConfirmEmailChange.Execute() error = %v, want %v", err, user.ErrInvalidConfirmationToken)
 	}
@@ -720,5 +720,5 @@ func TestUpdateByEmailSavesChangesAndEvents(t *testing.T) {
 	if got := r.count(t, `SELECT count(*) FROM users WHERE id = $1 AND first_name = 'Renamed'`, id.String()); got != 1 {
 		t.Errorf("renamed users = %d, want 1", got)
 	}
-	r.assertState(t, id, 1, 0, map[string]int{"user.duplicate_registration_attempted": 1, "user.renamed": 1})
+	r.assertState(t, "Users.UpdateByEmail()", id, 1, 0, map[string]int{"user.duplicate_registration_attempted": 1, "user.renamed": 1})
 }

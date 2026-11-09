@@ -67,7 +67,7 @@ func TestConfirmRegistration(t *testing.T) {
 		t.Errorf("Execute() RegistrationConfirmed events mismatch (-want +got):\n%s", diff)
 	}
 	if len(users.byID) != 0 || users.addCalls != 0 {
-		t.Errorf("users = %d, Add calls = %d; want 0, 0", len(users.byID), users.addCalls)
+		t.Errorf("Execute(): users = %d, Add calls = %d; want 0, 0", len(users.byID), users.addCalls)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestConfirmRegistrationExpired(t *testing.T) {
 			t.Errorf("Execute() error = %v, want %v", err, user.ErrConfirmationTokenExpired)
 		}
 		if pendingJane(t, regs).Confirmed() {
-			t.Error("expired registration was confirmed")
+			t.Error("Execute() confirmed an expired registration")
 		}
 	})
 }
@@ -131,10 +131,10 @@ func TestConfirmRegistrationUpdateFailure(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want %v", err, want)
 	}
 	if pendingJane(t, regs).Confirmed() {
-		t.Error("registration confirmed after failed update")
+		t.Error("Execute() left the registration confirmed after a failed update")
 	}
 	if n := len(publishedOf[user.RegistrationConfirmed](regs.published)); n != 0 {
-		t.Errorf("published %d RegistrationConfirmed events, want 0", n)
+		t.Errorf("Execute() published %d RegistrationConfirmed events, want 0", n)
 	}
 }
 

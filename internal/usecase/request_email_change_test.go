@@ -67,7 +67,7 @@ func checkEmailChangeRequested(t *testing.T, u *user.User, wantEmail string) {
 	t.Helper()
 	p, ok := u.PendingEmailChange()
 	if !ok {
-		t.Error("Execute() left no pending email change, want one")
+		t.Fatal("Execute() left no pending email change, want one")
 	}
 	if got := p.Email().String(); got != wantEmail {
 		t.Errorf("Execute() PendingEmailChange().Email() = %q, want %q", got, wantEmail)

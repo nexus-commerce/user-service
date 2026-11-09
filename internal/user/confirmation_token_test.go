@@ -12,7 +12,7 @@ import (
 func TestNewConfirmationTokenRoundTrip(t *testing.T) {
 	tok := user.NewConfirmationToken()
 	if n := len(tok.Plaintext()); n != 43 {
-		t.Fatalf("len(Plaintext()) = %d, want 43", n)
+		t.Errorf("len(Plaintext()) = %d, want 43", n)
 	}
 	parsed, err := user.ParseConfirmationToken(tok.Plaintext())
 	if err != nil || parsed.Hash() != tok.Hash() {
