@@ -24,7 +24,7 @@ func NewRename(uc userRenamer) *Rename {
 	}
 }
 
-type renameRequest struct {
+type renameBody struct {
 	FirstName *string `json:"firstName"`
 	LastName  *string `json:"lastName"`
 }
@@ -34,7 +34,7 @@ var renameFields = wireFields{
 	usecase.FieldLastName:  "lastName",
 }
 
-func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
+func (r *renameBody) toNameChange(userID uuid.UUID) usecase.NameChange {
 	return usecase.NameChange{
 		UserID:    userID,
 		FirstName: r.FirstName,
@@ -51,7 +51,7 @@ func (r *renameRequest) toNameChange(userID uuid.UUID) usecase.NameChange {
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       request  body      renameRequest  true  "Fields to change"
+// @Param       request  body      renameBody  true  "Fields to change"
 // @Success     200      {object}  userEnvelope
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields"
 // @Failure     401      {object}  errorResponse  "Missing or invalid token"
@@ -66,7 +66,7 @@ func (rn *Rename) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqBody, err := readJSON[renameRequest](rw, r)
+	reqBody, err := readJSON[renameBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return

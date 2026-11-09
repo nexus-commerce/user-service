@@ -23,12 +23,12 @@ func NewLogin(uc authenticator) *Login {
 	}
 }
 
-type loginRequest struct {
+type loginBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-func (r *loginRequest) toCredentials() usecase.Credentials {
+func (r *loginBody) toCredentials() usecase.Credentials {
 	return usecase.Credentials{
 		Email:    r.Email,
 		Password: r.Password,
@@ -46,7 +46,7 @@ type loginResponse struct {
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
-// @Param       request  body      loginRequest   true  "User credentials"
+// @Param       request  body      loginBody   true  "User credentials"
 // @Success     200      {object}  loginResponse
 // @Failure     400      {object}  errorResponse  "Invalid request body"
 // @Failure     401      {object}  errorResponse  "Invalid credentials"
@@ -54,7 +54,7 @@ type loginResponse struct {
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/login [post]
 func (l *Login) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	reqBody, err := readJSON[loginRequest](rw, r)
+	reqBody, err := readJSON[loginBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return

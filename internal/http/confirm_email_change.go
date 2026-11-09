@@ -22,7 +22,7 @@ func NewConfirmEmailChange(uc emailChangeConfirmer) *ConfirmEmailChange {
 	}
 }
 
-type confirmEmailChangeRequest struct {
+type confirmEmailChangeBody struct {
 	Token string `json:"token"`
 }
 
@@ -34,7 +34,7 @@ type confirmEmailChangeRequest struct {
 // @Tags        Users
 // @Accept      json
 // @Produce     json
-// @Param       request  body  confirmEmailChangeRequest  true  "Confirmation token"
+// @Param       request  body  confirmEmailChangeBody  true  "Confirmation token"
 // @Success     204
 // @Failure     400  {object}  errorResponse  "Invalid request, invalid, already used or expired confirmation link"
 // @Failure     409  {object}  errorResponse  "User with this email already exists; the email change is cancelled"
@@ -42,7 +42,7 @@ type confirmEmailChangeRequest struct {
 // @Failure     500  {object}  errorResponse  "Internal server error"
 // @Router      /users/email/confirm [post]
 func (ce *ConfirmEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	reqBody, err := readJSON[confirmEmailChangeRequest](rw, r)
+	reqBody, err := readJSON[confirmEmailChangeBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return

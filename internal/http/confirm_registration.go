@@ -22,7 +22,7 @@ func NewConfirmRegistration(uc registrationConfirmer) *ConfirmRegistration {
 	}
 }
 
-type confirmRegistrationRequest struct {
+type confirmRegistrationBody struct {
 	Token string `json:"token"`
 }
 
@@ -40,14 +40,14 @@ type confirmRegistrationResponse struct {
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
-// @Param       request  body      confirmRegistrationRequest   true  "Confirmation token"
+// @Param       request  body      confirmRegistrationBody   true  "Confirmation token"
 // @Success     202      {object}  confirmRegistrationResponse  "Registration confirmed, account is being created"
 // @Failure     400      {object}  errorResponse  "Invalid request, invalid, already used or expired confirmation link"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register/confirm [post]
 func (cr *ConfirmRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	reqBody, err := readJSON[confirmRegistrationRequest](rw, r)
+	reqBody, err := readJSON[confirmRegistrationBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return

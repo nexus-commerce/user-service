@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.loginRequest"
+                            "$ref": "#/definitions/http.loginBody"
                         }
                     }
                 ],
@@ -93,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.registrationRequest"
+                            "$ref": "#/definitions/http.registrationBody"
                         }
                     }
                 ],
@@ -142,7 +142,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.confirmRegistrationRequest"
+                            "$ref": "#/definitions/http.confirmRegistrationBody"
                         }
                     }
                 ],
@@ -335,7 +335,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.confirmEmailChangeRequest"
+                            "$ref": "#/definitions/http.confirmEmailChangeBody"
                         }
                     }
                 ],
@@ -438,7 +438,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.emailChangeRequest"
+                            "$ref": "#/definitions/http.emailChangeBody"
                         }
                     }
                 ],
@@ -510,7 +510,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.renameRequest"
+                            "$ref": "#/definitions/http.renameBody"
                         }
                     }
                 ],
@@ -556,7 +556,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "http.confirmEmailChangeRequest": {
+        "http.confirmEmailChangeBody": {
             "type": "object",
             "properties": {
                 "token": {
@@ -564,7 +564,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.confirmRegistrationRequest": {
+        "http.confirmRegistrationBody": {
             "type": "object",
             "properties": {
                 "token": {
@@ -580,7 +580,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.emailChangeRequest": {
+        "http.emailChangeBody": {
             "type": "object",
             "properties": {
                 "newEmail": {
@@ -599,7 +599,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.loginRequest": {
+        "http.loginBody": {
             "type": "object",
             "properties": {
                 "email": {
@@ -618,7 +618,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.registrationRequest": {
+        "http.registrationBody": {
             "type": "object",
             "properties": {
                 "email": {
@@ -638,7 +638,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.renameRequest": {
+        "http.renameBody": {
             "type": "object",
             "properties": {
                 "firstName": {

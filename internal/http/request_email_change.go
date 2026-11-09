@@ -24,14 +24,14 @@ func NewRequestEmailChange(uc emailChangeRequester) *RequestEmailChange {
 	}
 }
 
-type emailChangeRequest struct {
+type emailChangeBody struct {
 	NewEmail string `json:"newEmail"`
 	Password string `json:"password"`
 }
 
 var emailChangeFields = wireFields{usecase.FieldEmail: "newEmail"}
 
-func (r *emailChangeRequest) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
+func (r *emailChangeBody) toEmailChangeRequest(userID uuid.UUID) usecase.EmailChangeRequest {
 	return usecase.EmailChangeRequest{
 		UserID:   userID,
 		NewEmail: r.NewEmail,
@@ -50,7 +50,7 @@ func (r *emailChangeRequest) toEmailChangeRequest(userID uuid.UUID) usecase.Emai
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       request  body  emailChangeRequest  true  "New email and current password"
+// @Param       request  body  emailChangeBody  true  "New email and current password"
 // @Success     202
 // @Failure     400  {object}  errorResponse  "Invalid request, malformed email or email equal to the current one"
 // @Failure     401  {object}  errorResponse  "Missing or invalid token"
@@ -66,7 +66,7 @@ func (re *RequestEmailChange) ServeHTTP(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	reqBody, err := readJSON[emailChangeRequest](rw, r)
+	reqBody, err := readJSON[emailChangeBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return

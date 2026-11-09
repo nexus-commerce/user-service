@@ -23,7 +23,7 @@ func NewRequestRegistration(uc registrationRequester) *RequestRegistration {
 	}
 }
 
-type registrationRequest struct {
+type registrationBody struct {
 	FirstName            string `json:"firstName"`
 	LastName             string `json:"lastName"`
 	Email                string `json:"email"`
@@ -39,7 +39,7 @@ var registrationFields = wireFields{
 	usecase.FieldPasswordConfirmation: "passwordConfirmation",
 }
 
-func (r *registrationRequest) toRegistrationRequest() usecase.RegistrationRequest {
+func (r *registrationBody) toRegistrationRequest() usecase.RegistrationRequest {
 	return usecase.RegistrationRequest{
 		FirstName:            r.FirstName,
 		LastName:             r.LastName,
@@ -58,14 +58,14 @@ func (r *registrationRequest) toRegistrationRequest() usecase.RegistrationReques
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
-// @Param       request  body      registrationRequest   true  "Registration data"
+// @Param       request  body      registrationBody   true  "Registration data"
 // @Success     202
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register [post]
 func (rr *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	reqBody, err := readJSON[registrationRequest](rw, r)
+	reqBody, err := readJSON[registrationBody](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
