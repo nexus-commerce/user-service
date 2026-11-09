@@ -148,7 +148,7 @@ func (r router) route(ctx context.Context, msg messaging.Message) error {
 	}
 
 	op := fmt.Sprintf("handle %q message with key %q", msg.Type, msg.Key)
-	err := retry(ctx, r.logger, op, func(err error) bool { return !errors.Is(err, ErrPermanent) }, func() error {
+	err := retry(ctx, r.logger, op, notPermanent, func() error {
 		return h.Handle(ctx, msg)
 	})
 	if errors.Is(err, ErrPermanent) {
@@ -156,6 +156,10 @@ func (r router) route(ctx context.Context, msg messaging.Message) error {
 		return nil
 	}
 	return err
+}
+
+func notPermanent(err error) bool {
+	return !errors.Is(err, ErrPermanent)
 }
 
 func temporary(err error) bool {
