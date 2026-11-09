@@ -8,7 +8,7 @@ import (
 )
 
 type confirmRegistrationPending interface {
-	UpdateByToken(ctx context.Context, hash user.ConfirmationTokenHash, update func(*user.PendingRegistration) error) (*user.PendingRegistration, error)
+	UpdateByToken(ctx context.Context, hash user.ConfirmationTokenHash, update user.PendingRegistrationUpdate) (*user.PendingRegistration, error)
 }
 
 type ConfirmRegistration struct {

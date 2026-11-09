@@ -27,6 +27,8 @@ type PendingRegistration struct {
 	events []Event
 }
 
+type PendingRegistrationUpdate func(*PendingRegistration) error
+
 func RequestRegistration(email Email, name FullName, password Password, hasher Hasher) (*PendingRegistration, error) {
 	hash, err := hasher.Hash(password)
 	if err != nil {

@@ -122,7 +122,7 @@ func testName(first, last string) user.FullName {
 	return user.NewFullName(user.RestoreName(first), user.RestoreName(last))
 }
 
-func supersedeWith(p *user.PendingRegistration) func(*user.PendingRegistration) error {
+func supersedeWith(p *user.PendingRegistration) user.PendingRegistrationUpdate {
 	return func(existing *user.PendingRegistration) error {
 		return existing.Supersede(p)
 	}

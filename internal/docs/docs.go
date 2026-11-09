@@ -93,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.requestRegistrationRequest"
+                            "$ref": "#/definitions/http.registrationRequest"
                         }
                     }
                 ],
@@ -438,7 +438,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.requestEmailChangeRequest"
+                            "$ref": "#/definitions/http.emailChangeRequest"
                         }
                     }
                 ],
@@ -580,6 +580,17 @@ const docTemplate = `{
                 }
             }
         },
+        "http.emailChangeRequest": {
+            "type": "object",
+            "properties": {
+                "newEmail": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
         "http.errorResponse": {
             "type": "object",
             "properties": {
@@ -607,29 +618,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.renameRequest": {
-            "type": "object",
-            "properties": {
-                "firstName": {
-                    "type": "string"
-                },
-                "lastName": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.requestEmailChangeRequest": {
-            "type": "object",
-            "properties": {
-                "newEmail": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.requestRegistrationRequest": {
+        "http.registrationRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -645,6 +634,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "passwordConfirmation": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.renameRequest": {
+            "type": "object",
+            "properties": {
+                "firstName": {
+                    "type": "string"
+                },
+                "lastName": {
                     "type": "string"
                 }
             }

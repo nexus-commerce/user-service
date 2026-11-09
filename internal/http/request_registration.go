@@ -23,7 +23,7 @@ func NewRequestRegistration(uc registrationRequester) *RequestRegistration {
 	}
 }
 
-type requestRegistrationRequest struct {
+type registrationRequest struct {
 	FirstName            string `json:"firstName"`
 	LastName             string `json:"lastName"`
 	Email                string `json:"email"`
@@ -31,7 +31,7 @@ type requestRegistrationRequest struct {
 	PasswordConfirmation string `json:"passwordConfirmation"`
 }
 
-var requestRegistrationFields = wireFields{
+var registrationFields = wireFields{
 	usecase.FieldFirstName:            "firstName",
 	usecase.FieldLastName:             "lastName",
 	usecase.FieldEmail:                "email",
@@ -39,7 +39,7 @@ var requestRegistrationFields = wireFields{
 	usecase.FieldPasswordConfirmation: "passwordConfirmation",
 }
 
-func (r *requestRegistrationRequest) toRegistrationRequest() usecase.RegistrationRequest {
+func (r *registrationRequest) toRegistrationRequest() usecase.RegistrationRequest {
 	return usecase.RegistrationRequest{
 		FirstName:            r.FirstName,
 		LastName:             r.LastName,
@@ -55,14 +55,14 @@ func (r *requestRegistrationRequest) toRegistrationRequest() usecase.Registratio
 // @Tags        Auth
 // @Accept      json
 // @Produce     json
-// @Param       request  body      requestRegistrationRequest   true  "Registration data"
+// @Param       request  body      registrationRequest   true  "Registration data"
 // @Success     202
 // @Failure     400      {object}  errorResponse  "Invalid request, empty or too long fields, too short password, malformed email or passwords do not match"
 // @Failure     413      {object}  errorResponse  "Request body too large"
 // @Failure     500      {object}  errorResponse  "Internal server error"
 // @Router      /auth/register [post]
 func (h *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	reqBody, err := readJSON[requestRegistrationRequest](rw, r)
+	reqBody, err := readJSON[registrationRequest](rw, r)
 	if err != nil {
 		writeInvalidBody(rw, r, err)
 		return
@@ -71,7 +71,7 @@ func (h *RequestRegistration) ServeHTTP(rw http.ResponseWriter, r *http.Request)
 	err = h.uc.Execute(r.Context(), reqBody.toRegistrationRequest())
 	if err != nil {
 		if errors.Is(err, user.ErrValidation) {
-			writeError(rw, r, http.StatusBadRequest, validationMessage(err, requestRegistrationFields))
+			writeError(rw, r, http.StatusBadRequest, validationMessage(err, registrationFields))
 			return
 		}
 		writeInternalError(rw, r, err)

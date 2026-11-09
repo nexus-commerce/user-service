@@ -13,7 +13,7 @@ type requestRegistrationUsers interface {
 }
 
 type requestRegistrationPending interface {
-	Save(ctx context.Context, p *user.PendingRegistration, supersede func(existing *user.PendingRegistration) error) error
+	Save(ctx context.Context, p *user.PendingRegistration, supersede user.PendingRegistrationUpdate) error
 }
 
 type RequestRegistration struct {

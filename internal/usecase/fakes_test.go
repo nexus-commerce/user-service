@@ -122,7 +122,7 @@ func copyPending(p *user.PendingRegistration) *user.PendingRegistration {
 	})
 }
 
-func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration, supersede func(*user.PendingRegistration) error) error {
+func (f *fakeRegistrations) Save(_ context.Context, p *user.PendingRegistration, supersede user.PendingRegistrationUpdate) error {
 	if f.byEmail == nil {
 		f.byEmail = make(map[user.Email]*user.PendingRegistration)
 	}
@@ -142,7 +142,7 @@ func (f *fakeRegistrations) ByUserID(_ context.Context, id uuid.UUID) (*user.Pen
 	return f.find(func(p *user.PendingRegistration) bool { return p.UserID() == id })
 }
 
-func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.ConfirmationTokenHash, update func(*user.PendingRegistration) error) (*user.PendingRegistration, error) {
+func (f *fakeRegistrations) UpdateByToken(_ context.Context, hash user.ConfirmationTokenHash, update user.PendingRegistrationUpdate) (*user.PendingRegistration, error) {
 	p, err := f.find(func(p *user.PendingRegistration) bool { return p.TokenHash() == hash })
 	if err != nil {
 		return nil, err

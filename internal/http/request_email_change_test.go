@@ -33,7 +33,9 @@ func TestRequestEmailChangeServeHTTP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequestWithContext(context.WithValue(t.Context(), userIDKey{}, id), http.MethodPost, "/users/me/email", strings.NewReader(`{"newEmail":"new@example.com","password":"secretpass"}`))
+			ctx := context.WithValue(t.Context(), userIDKey{}, id)
+			body := strings.NewReader(`{"newEmail":"new@example.com","password":"secretpass"}`)
+			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/users/me/email", body)
 			calls := 0
 			uc := emailChangeRequesterFunc(func(ctx context.Context, got usecase.EmailChangeRequest) error {
 				calls++
