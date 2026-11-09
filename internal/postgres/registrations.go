@@ -15,9 +15,6 @@ const saveAttempts = 3
 
 var errConcurrentRegistration = errors.New("concurrent registration for the same email")
 
-const selectPendingRegistration = `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
-	FROM pending_registrations`
-
 type Registrations struct {
 	db     *Database
 	events eventPublisher
@@ -50,7 +47,9 @@ func (r *Registrations) save(
 	p *user.PendingRegistration,
 	supersede func(existing *user.PendingRegistration) error,
 ) error {
-	selectQuery := selectPendingRegistration + ` WHERE email = $1 FOR UPDATE`
+	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
+		FROM pending_registrations
+		WHERE email = $1 FOR UPDATE`
 
 	saved := p
 	existing, err := scanPendingRegistration(tx.QueryRowContext(ctx, selectQuery, p.Email().String()))
@@ -123,7 +122,9 @@ func updatePendingRegistration(ctx context.Context, tx *sql.Tx, p *user.PendingR
 }
 
 func (r *Registrations) ByUserID(ctx context.Context, id uuid.UUID) (*user.PendingRegistration, error) {
-	query := selectPendingRegistration + ` WHERE user_id = $1`
+	query := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
+		FROM pending_registrations
+		WHERE user_id = $1`
 
 	p, err := scanPendingRegistration(r.db.pool.QueryRowContext(ctx, query, id.String()))
 	if err != nil && !errors.Is(err, user.ErrRegistrationNotFound) {
@@ -137,7 +138,9 @@ func (r *Registrations) UpdateByToken(
 	hash user.ConfirmationTokenHash,
 	updateFn func(*user.PendingRegistration) error,
 ) (*user.PendingRegistration, error) {
-	selectQuery := selectPendingRegistration + ` WHERE token_hash = $1 FOR UPDATE`
+	selectQuery := `SELECT email, user_id, first_name, last_name, password_hash, token_hash, expires_at, confirmed_at
+		FROM pending_registrations
+		WHERE token_hash = $1 FOR UPDATE`
 
 	var p *user.PendingRegistration
 	err := r.db.runInTx(ctx, func(tx *sql.Tx) error {

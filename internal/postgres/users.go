@@ -14,11 +14,6 @@ import (
 	"github.com/nexus-commerce/user-service/internal/user"
 )
 
-const selectUser = `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
-		p.email, p.token_hash, p.expires_at
-	FROM users u
-	LEFT JOIN pending_email_changes p ON p.user_id = u.id`
-
 type eventPublisher interface {
 	Publish(ctx context.Context, pr messaging.Producer, events []user.Event) error
 }
@@ -33,7 +28,11 @@ func NewUsers(db *Database, events eventPublisher) *Users {
 }
 
 func (u *Users) ByEmail(ctx context.Context, email user.Email) (*user.User, error) {
-	query := selectUser + ` WHERE u.email = $1`
+	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
+			p.email, p.token_hash, p.expires_at
+		FROM users u
+		LEFT JOIN pending_email_changes p ON p.user_id = u.id
+		WHERE u.email = $1`
 
 	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, email.String()))
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
@@ -53,7 +52,11 @@ func (u *Users) EmailTaken(ctx context.Context, email user.Email) (bool, error) 
 }
 
 func (u *Users) ByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
-	query := selectUser + ` WHERE u.id = $1`
+	query := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
+			p.email, p.token_hash, p.expires_at
+		FROM users u
+		LEFT JOIN pending_email_changes p ON p.user_id = u.id
+		WHERE u.id = $1`
 
 	usr, err := scanUser(u.db.pool.QueryRowContext(ctx, query, id.String()))
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
@@ -67,7 +70,9 @@ func (u *Users) UpdateByID(
 	id uuid.UUID,
 	updateFn func(*user.User) error,
 ) (*user.User, error) {
-	return u.update(ctx, `SELECT id FROM users WHERE id = $1 FOR UPDATE`, id.String(), updateFn)
+	lockQuery := `SELECT id FROM users WHERE id = $1 FOR UPDATE`
+
+	return u.update(ctx, lockQuery, id.String(), updateFn)
 }
 
 func (u *Users) UpdateByEmail(
@@ -75,7 +80,9 @@ func (u *Users) UpdateByEmail(
 	email user.Email,
 	updateFn func(*user.User) error,
 ) (*user.User, error) {
-	return u.update(ctx, `SELECT id FROM users WHERE email = $1 FOR UPDATE`, email.String(), updateFn)
+	lockQuery := `SELECT id FROM users WHERE email = $1 FOR UPDATE`
+
+	return u.update(ctx, lockQuery, email.String(), updateFn)
 }
 
 func (u *Users) UpdateByEmailChangeToken(
@@ -97,7 +104,11 @@ func (u *Users) update(
 	arg string,
 	updateFn func(*user.User) error,
 ) (*user.User, error) {
-	selectQuery := selectUser + ` WHERE u.id = $1`
+	selectQuery := `SELECT u.id, u.first_name, u.last_name, u.email, u.password_hash, u.created_at,
+			p.email, p.token_hash, p.expires_at
+		FROM users u
+		LEFT JOIN pending_email_changes p ON p.user_id = u.id
+		WHERE u.id = $1`
 	updateQuery := `UPDATE users SET first_name = $1, last_name = $2, email = $3, password_hash = $4 WHERE id = $5`
 
 	var usr *user.User
