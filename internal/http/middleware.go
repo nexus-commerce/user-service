@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -80,13 +80,35 @@ func (rec *statusRecorder) Unwrap() http.ResponseWriter {
 	return rec.ResponseWriter
 }
 
-func Logging(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: rw, status: http.StatusOK}
+type loggerKey struct{}
 
-		next.ServeHTTP(rec, r)
+var discardLogger = slog.New(slog.DiscardHandler)
 
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rec.status, time.Since(start))
-	})
+func Logging(logger *slog.Logger) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			rec := &statusRecorder{ResponseWriter: rw, status: http.StatusOK}
+
+			next.ServeHTTP(rec, r.WithContext(context.WithValue(r.Context(), loggerKey{}, logger)))
+
+			logger.Info("request",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", rec.status,
+				"duration", time.Since(start),
+			)
+		})
+	}
+}
+
+func loggerFrom(ctx context.Context) *slog.Logger {
+	if l, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok {
+		return l
+	}
+	return discardLogger
+}
+
+func logRequestError(r *http.Request, msg string, err error) {
+	loggerFrom(r.Context()).Error(msg, "method", r.Method, "path", r.URL.Path, "err", err)
 }

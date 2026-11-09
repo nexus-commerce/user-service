@@ -6,7 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -17,10 +17,11 @@ import (
 )
 
 type Database struct {
-	pool *sql.DB
+	pool   *sql.DB
+	logger *slog.Logger
 }
 
-func New(ctx context.Context, dsn string) (*Database, error) {
+func New(ctx context.Context, dsn string, logger *slog.Logger) (*Database, error) {
 	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse dsn: %w", err)
@@ -36,7 +37,7 @@ func New(ctx context.Context, dsn string) (*Database, error) {
 		return nil, errors.Join(fmt.Errorf("ping: %w", err), pool.Close())
 	}
 
-	return &Database{pool: pool}, nil
+	return &Database{pool: pool, logger: logger}, nil
 }
 
 func (d *Database) Close() error {
@@ -53,7 +54,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 	}
 	defer func() {
 		if err := source.Close(); err != nil {
-			log.Printf("close migration source: %v", err)
+			d.logger.Error("close migration source", "err", err)
 		}
 	}()
 
@@ -63,7 +64,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Printf("close migration connection: %v", err)
+			d.logger.Error("close migration connection", "err", err)
 		}
 	}()
 
@@ -82,7 +83,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 
 	err = m.Up()
 	if errors.Is(err, migrate.ErrNoChange) {
-		log.Println("No new migrations to apply")
+		d.logger.Info("no new migrations to apply")
 		return nil
 	}
 	if err != nil {
@@ -92,7 +93,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 		return fmt.Errorf("interrupted: %w", err)
 	}
 
-	log.Println("Migrations applied successfully")
+	d.logger.Info("migrations applied")
 	return nil
 }
 

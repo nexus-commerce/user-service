@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -20,6 +20,7 @@ type Server struct {
 	api        *http.ServeMux
 	basicAuth  Middleware
 	bearerAuth Middleware
+	logger     *slog.Logger
 }
 
 type Auth int
@@ -40,9 +41,14 @@ type Options struct {
 	Port       string
 	BasicAuth  Middleware
 	BearerAuth Middleware
+	Logger     *slog.Logger
 }
 
 func New(opts Options) *Server {
+	logger := opts.Logger
+	if logger == nil {
+		logger = discardLogger
+	}
 	api := http.NewServeMux()
 	root := http.NewServeMux()
 	root.Handle("/api/", http.StripPrefix("/api", api))
@@ -51,12 +57,13 @@ func New(opts Options) *Server {
 		api: api,
 		srv: &http.Server{
 			Addr:         ":" + opts.Port,
-			Handler:      Logging(root),
+			Handler:      Logging(logger)(root),
 			ReadTimeout:  5 * time.Second,
 			WriteTimeout: 120 * time.Second,
 		},
 		basicAuth:  opts.BasicAuth,
 		bearerAuth: opts.BearerAuth,
+		logger:     logger,
 	}
 }
 
@@ -77,7 +84,7 @@ func (s *Server) Register(controllers ...Controller) {
 func (s *Server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {
-		log.Println("Starting server on port", s.srv.Addr)
+		s.logger.Info("starting server", "addr", s.srv.Addr)
 		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -87,7 +94,7 @@ func (s *Server) Run(ctx context.Context) error {
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
-		log.Println("Shutting down...")
+		s.logger.Info("shutting down server")
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 		defer cancel()
 		if err := s.srv.Shutdown(shutdownCtx); err != nil {

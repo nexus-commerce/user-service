@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -28,7 +29,8 @@ func testDB(t *testing.T) *Database {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	admin, err := New(ctx, dsn)
+	logger := slog.New(slog.DiscardHandler)
+	admin, err := New(ctx, dsn, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +52,7 @@ func testDB(t *testing.T) *Database {
 		t.Fatal(err)
 	}
 	config.RuntimeParams["search_path"] = schema
-	db := &Database{pool: stdlib.OpenDB(*config)}
+	db := &Database{pool: stdlib.OpenDB(*config), logger: logger}
 	t.Cleanup(func() { _ = db.Close() })
 	if err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)

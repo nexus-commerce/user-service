@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"time"
 
@@ -29,6 +29,7 @@ type ConsumerOptions struct {
 	Addr    string
 	GroupID string
 	Topic   string
+	Logger  *slog.Logger
 }
 
 type messageReader interface {
@@ -42,10 +43,15 @@ type Consumer struct {
 	router  router
 	groupID string
 	topic   string
+	logger  *slog.Logger
 }
 
 func NewConsumer(opts ConsumerOptions, handlers ...Handler) (*Consumer, error) {
-	r, err := newRouter(handlers...)
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	r, err := newRouter(logger, handlers...)
 	if err != nil {
 		return nil, err
 	}
@@ -58,22 +64,23 @@ func NewConsumer(opts ConsumerOptions, handlers ...Handler) (*Consumer, error) {
 		router:  r,
 		groupID: opts.GroupID,
 		topic:   opts.Topic,
+		logger:  logger,
 	}, nil
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
-	log.Printf("Starting kafka consumer %s on topic %s", c.groupID, c.topic)
+	c.logger.Info("starting kafka consumer", "group", c.groupID, "topic", c.topic)
 
 	for {
 		var km kafka.Message
-		err := retry(ctx, "fetch message", temporary, func() error {
+		err := retry(ctx, c.logger, "fetch message", temporary, func() error {
 			var err error
 			km, err = c.reader.FetchMessage(ctx)
 			return err
 		})
 		if err != nil {
 			if ctx.Err() != nil {
-				log.Println("Stopping kafka consumer")
+				c.logger.Info("stopping kafka consumer")
 				return nil
 			}
 			return fmt.Errorf("fetch message: %w", err)
@@ -81,18 +88,18 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 		if err = c.router.route(ctx, toMessage(km)); err != nil {
 			if ctx.Err() != nil {
-				log.Println("Stopping kafka consumer")
+				c.logger.Info("stopping kafka consumer")
 				return nil
 			}
 			return err
 		}
 
-		err = retry(ctx, "commit message", temporary, func() error {
+		err = retry(ctx, c.logger, "commit message", temporary, func() error {
 			return c.reader.CommitMessages(ctx, km)
 		})
 		if err != nil {
 			if ctx.Err() != nil {
-				log.Println("Stopping kafka consumer")
+				c.logger.Info("stopping kafka consumer")
 				return nil
 			}
 			return fmt.Errorf("commit message %d/%d: %w", km.Partition, km.Offset, err)
@@ -118,31 +125,34 @@ func toMessage(km kafka.Message) messaging.Message {
 	return msg
 }
 
-type router map[string]Handler
+type router struct {
+	handlers map[string]Handler
+	logger   *slog.Logger
+}
 
-func newRouter(handlers ...Handler) (router, error) {
-	r := make(router, len(handlers))
+func newRouter(logger *slog.Logger, handlers ...Handler) (router, error) {
+	r := router{handlers: make(map[string]Handler, len(handlers)), logger: logger}
 	for _, h := range handlers {
-		if _, ok := r[h.EventType()]; ok {
-			return nil, fmt.Errorf("duplicate handler for event type %q", h.EventType())
+		if _, ok := r.handlers[h.EventType()]; ok {
+			return router{}, fmt.Errorf("duplicate handler for event type %q", h.EventType())
 		}
-		r[h.EventType()] = h
+		r.handlers[h.EventType()] = h
 	}
 	return r, nil
 }
 
 func (r router) route(ctx context.Context, msg messaging.Message) error {
-	h, ok := r[msg.Type]
+	h, ok := r.handlers[msg.Type]
 	if !ok {
 		return nil
 	}
 
 	op := fmt.Sprintf("handle %q message with key %q", msg.Type, msg.Key)
-	err := retry(ctx, op, func(err error) bool { return !errors.Is(err, ErrPermanent) }, func() error {
+	err := retry(ctx, r.logger, op, func(err error) bool { return !errors.Is(err, ErrPermanent) }, func() error {
 		return h.Handle(ctx, msg)
 	})
 	if errors.Is(err, ErrPermanent) {
-		log.Printf("skip %q message with key %q: %v", msg.Type, msg.Key, err)
+		r.logger.Warn("skip message", "type", msg.Type, "key", msg.Key, "err", err)
 		return nil
 	}
 	return err
@@ -156,14 +166,14 @@ func temporary(err error) bool {
 	return ok
 }
 
-func retry(ctx context.Context, op string, retryable func(error) bool, fn func() error) error {
+func retry(ctx context.Context, logger *slog.Logger, op string, retryable func(error) bool, fn func() error) error {
 	delay := minRetryDelay
 	for {
 		err := fn()
 		if err == nil || !retryable(err) {
 			return err
 		}
-		log.Printf("%s, retrying in %v: %v", op, delay, err)
+		logger.Warn("retrying", "op", op, "delay", delay, "err", err)
 
 		select {
 		case <-ctx.Done():

@@ -1,9 +1,6 @@
 package http
 
-import (
-	"log"
-	"net/http"
-)
+import "net/http"
 
 const asyncAPIDocsHTML = `<!DOCTYPE html>
 <html>
@@ -43,7 +40,7 @@ func (*AsyncAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if _, err := rw.Write([]byte(asyncAPIDocsHTML)); err != nil {
-		log.Printf("%s %s: write response: %v", r.Method, r.URL.Path, err)
+		logRequestError(r, "write response", err)
 	}
 }
 
@@ -75,7 +72,7 @@ func (h *AsyncAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/yaml")
 
 	if _, err := rw.Write(h.spec); err != nil {
-		log.Printf("%s %s: write response: %v", r.Method, r.URL.Path, err)
+		logRequestError(r, "write response", err)
 	}
 }
 

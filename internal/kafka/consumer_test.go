@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/nexus-commerce/user-service/internal/messaging"
 )
+
+var discardLogger = slog.New(slog.DiscardHandler)
 
 type fakeHandler struct {
 	typ   string
@@ -33,7 +36,7 @@ func (h *fakeHandler) Handle(context.Context, messaging.Message) error {
 
 func mustRouter(t *testing.T, handlers ...Handler) router {
 	t.Helper()
-	r, err := newRouter(handlers...)
+	r, err := newRouter(discardLogger, handlers...)
 	if err != nil {
 		t.Fatalf("newRouter() error: %v", err)
 	}
@@ -41,7 +44,7 @@ func mustRouter(t *testing.T, handlers ...Handler) router {
 }
 
 func TestNewRouterRejectsDuplicateHandlers(t *testing.T) {
-	if _, err := newRouter(&fakeHandler{typ: "a"}, &fakeHandler{typ: "a"}); err == nil {
+	if _, err := newRouter(discardLogger, &fakeHandler{typ: "a"}, &fakeHandler{typ: "a"}); err == nil {
 		t.Error("newRouter(duplicate) error = nil, want error")
 	}
 }
@@ -191,7 +194,7 @@ func TestRunRetriesTemporaryKafkaErrors(t *testing.T) {
 			commitErr: []error{kafka.NotCoordinatorForGroup},
 			done:      cancel,
 		}
-		c := &Consumer{reader: reader, router: mustRouter(t, h)}
+		c := &Consumer{reader: reader, router: mustRouter(t, h), logger: discardLogger}
 
 		if err := c.Run(ctx); err != nil {
 			t.Fatalf("Run() error = %v, want nil", err)
@@ -208,7 +211,7 @@ func TestRunRetriesTemporaryKafkaErrors(t *testing.T) {
 func TestRunStopsOnNonTemporaryFetchError(t *testing.T) {
 	want := errors.New("broken reader")
 	reader := &fakeReader{fetches: []fetchResult{{err: want}}, done: func() {}}
-	c := &Consumer{reader: reader, router: mustRouter(t)}
+	c := &Consumer{reader: reader, router: mustRouter(t), logger: discardLogger}
 
 	if err := c.Run(t.Context()); !errors.Is(err, want) {
 		t.Fatalf("Run() error = %v, want %v", err, want)

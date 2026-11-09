@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,13 +27,15 @@ type purgeConfig struct {
 }
 
 func main() {
-	if err := run(); err != nil {
-		log.Fatal(err)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	if err := run(logger); err != nil {
+		logger.Error("purge stopped", "err", err)
+		os.Exit(1)
 	}
 }
 
-func run() error {
-	if err := loadDotEnv(); err != nil {
+func run(logger *slog.Logger) error {
+	if err := loadDotEnv(logger); err != nil {
 		return err
 	}
 
@@ -47,13 +49,13 @@ func run() error {
 
 	pingCtx, cancel := context.WithTimeout(ctx, dbConnectTimeout)
 	defer cancel()
-	db, err := postgres.New(pingCtx, cfg.Postgres.DSN())
+	db, err := postgres.New(pingCtx, cfg.Postgres.DSN(), logger)
 	if err != nil {
 		return fmt.Errorf("connect to postgres: %w", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("close postgres: %v", err)
+			logger.Error("close postgres", "err", err)
 		}
 	}()
 
@@ -61,17 +63,18 @@ func run() error {
 	purger := purge.New(retention, retention, purge.Options{
 		Interval: cfg.Purge.Interval,
 		Grace:    cfg.Purge.Grace,
+		Logger:   logger,
 	})
 
 	return lifecycle.Run(ctx, purger)
 }
 
-func loadDotEnv() error {
+func loadDotEnv(logger *slog.Logger) error {
 	if err := godotenv.Load(".env"); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("parse .env: %w", err)
 		}
-		log.Println("no .env file found, relying on environment variables")
+		logger.Info("no .env file found, relying on environment variables")
 	}
 	return nil
 }

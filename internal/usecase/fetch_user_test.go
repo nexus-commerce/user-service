@@ -48,7 +48,7 @@ func TestFetchUser(t *testing.T) {
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("Execute() error = %v, want %v", err, tt.wantErr)
 			}
-			wantView := usecase.UserView{}
+			var wantView usecase.UserView
 			if tt.wantErr == nil {
 				wantView = usecase.UserView{ID: u.ID(), Email: "jane@example.com", FirstName: "Jane", LastName: "Doe"}
 			}

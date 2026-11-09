@@ -2,7 +2,7 @@ package relay
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/nexus-commerce/user-service/internal/messaging"
@@ -12,27 +12,29 @@ type Outbox interface {
 	ProcessBatch(ctx context.Context, limit int, fn messaging.BatchFunc) (int, error)
 }
 
-type Producer interface {
-	Produce(ctx context.Context, msgs ...messaging.Message) error
-}
-
 type Options struct {
 	Interval  time.Duration
 	BatchSize int
+	Logger    *slog.Logger
 }
 
 type Relay struct {
 	outbox   Outbox
-	producer Producer
+	producer messaging.Producer
 	opts     Options
+	logger   *slog.Logger
 }
 
-func New(outbox Outbox, producer Producer, opts Options) *Relay {
-	return &Relay{outbox: outbox, producer: producer, opts: opts}
+func New(outbox Outbox, producer messaging.Producer, opts Options) *Relay {
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	return &Relay{outbox: outbox, producer: producer, opts: opts, logger: logger}
 }
 
 func (r *Relay) Run(ctx context.Context) error {
-	log.Println("Starting outbox relay")
+	r.logger.Info("starting outbox relay")
 
 	ticker := time.NewTicker(r.opts.Interval)
 	defer ticker.Stop()
@@ -42,7 +44,7 @@ func (r *Relay) Run(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			log.Println("Stopping outbox relay")
+			r.logger.Info("stopping outbox relay")
 			return nil
 		case <-ticker.C:
 		}
@@ -53,7 +55,7 @@ func (r *Relay) flush(ctx context.Context) {
 	for ctx.Err() == nil {
 		n, err := r.processBatch(ctx)
 		if err != nil {
-			log.Printf("relay outbox messages: %v", err)
+			r.logger.Error("relay outbox messages", "err", err)
 			return
 		}
 		if n < r.opts.BatchSize {

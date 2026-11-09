@@ -1,9 +1,6 @@
 package http
 
-import (
-	"log"
-	"net/http"
-)
+import "net/http"
 
 const openAPIDocsHTML = `<!DOCTYPE html>
 <html>
@@ -37,7 +34,7 @@ func (*OpenAPIDocs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if _, err := rw.Write([]byte(openAPIDocsHTML)); err != nil {
-		log.Printf("%s %s: write response: %v", r.Method, r.URL.Path, err)
+		logRequestError(r, "write response", err)
 	}
 }
 
@@ -69,7 +66,7 @@ func (h *OpenAPI) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
 	if _, err := rw.Write(h.spec); err != nil {
-		log.Printf("%s %s: write response: %v", r.Method, r.URL.Path, err)
+		logRequestError(r, "write response", err)
 	}
 }
 

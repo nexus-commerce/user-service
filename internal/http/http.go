@@ -3,7 +3,6 @@ package http
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/nexus-commerce/user-service/internal/usecase"
@@ -22,7 +21,7 @@ func writeJSON(rw http.ResponseWriter, r *http.Request, status int, v any) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(status)
 	if err := json.NewEncoder(rw).Encode(v); err != nil {
-		log.Printf("%s %s: encode response: %v", r.Method, r.URL.Path, err)
+		logRequestError(r, "encode response", err)
 	}
 }
 
@@ -65,6 +64,6 @@ func writeInvalidBody(rw http.ResponseWriter, r *http.Request, err error) {
 }
 
 func writeInternalError(rw http.ResponseWriter, r *http.Request, err error) {
-	log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
+	logRequestError(r, "internal error", err)
 	writeError(rw, r, http.StatusInternalServerError, "internal server error")
 }
